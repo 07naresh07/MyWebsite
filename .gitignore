@@ -1,0 +1,53 @@
+# -----------------------------
+# OS & Editor trash
+# -----------------------------
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# -----------------------------
+# Secrets / environment files
+# -----------------------------
+.env
+.env.*
+!env.example                 # keep a sample env file, no secrets
+
+# -----------------------------
+# .NET (backend)
+# -----------------------------
+backend/**/bin/
+backend/**/obj/
+backend/.vs/
+*.user
+*.suo
+
+# Optional local settings (keep real secrets out of git)
+backend/**/appsettings.*.local.json
+backend/**/appsettings.Local.json
+
+# -----------------------------
+# Node / Vite (frontend)
+# -----------------------------
+frontend/node_modules/
+frontend/dist/
+frontend/.cache/
+frontend/.vite/
+
+# Package managers (keep the lockfile!)
+# DO NOT ignore package-lock.json or pnpm-lock.yaml or yarn.lock
+# They should be committed for reproducible builds.
+
+# -----------------------------
+# Misc build artifacts anywhere
+# -----------------------------
+**/coverage/
+**/out/
+**/build/
