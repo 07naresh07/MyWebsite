@@ -33,7 +33,9 @@ function useDarkMode() {
     try {
       localStorage.setItem("darkMode", JSON.stringify(darkMode));
     } catch {}
-    document.documentElement.classList.toggle("dark", darkMode);
+    const root = document.documentElement;
+    if (darkMode) root.classList.add("dark");
+    else root.classList.remove("dark");
   }, [darkMode]);
 
   return [darkMode, setDarkMode];
@@ -44,7 +46,7 @@ function DarkModeToggle({ darkMode, setDarkMode }) {
   return (
     <button
       onClick={() => setDarkMode(!darkMode)}
-      className="fixed top-4 right-4 z-50 p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-300 group"
+      className="fixed top-4 right-4 z-50 p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-300 group border border-gray-200 dark:border-gray-700"
       aria-label="Toggle dark mode"
       type="button"
     >
@@ -70,6 +72,36 @@ function DarkModeToggle({ darkMode, setDarkMode }) {
         </svg>
       )}
     </button>
+  );
+}
+
+/* Toast notification component */
+function Toast({ message, type = "success", onClose }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div
+      className={`fixed top-4 left-4 z-50 px-4 py-3 rounded-lg shadow-lg text-white font-medium transition-all transform translate-x-0 ${
+        type === "success"
+          ? "bg-green-600"
+          : type === "error"
+          ? "bg-red-600"
+          : "bg-blue-600"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        {type === "success" && <span>✓</span>}
+        {type === "error" && <span>✗</span>}
+        {type === "info" && <span>ℹ</span>}
+        <span>{message}</span>
+        <button onClick={onClose} className="ml-2 hover:opacity-70" type="button">
+          ×
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -100,10 +132,23 @@ function MonthPicker({ value, onChange, id }) {
 
   useEffect(() => {
     const onDocClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setShowYears(false);
+      }
+    };
+    const onEscape = (e) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setShowYears(false);
+      }
     };
     document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEscape);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEscape);
+    };
   }, []);
 
   useEffect(() => {
@@ -159,9 +204,9 @@ function MonthPicker({ value, onChange, id }) {
             <button
               type="button"
               onClick={() => setYear((y) => y - 1)}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-400"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-gray-600 dark:text-gray-400" stroke="currentColor" strokeWidth="2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M15 18l-6-6 6-6" />
               </svg>
             </button>
@@ -169,7 +214,7 @@ function MonthPicker({ value, onChange, id }) {
             <button
               type="button"
               onClick={() => setShowYears((v) => !v)}
-              className="text-lg font-semibold px-4 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="text-lg font-semibold px-4 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-gray-100"
             >
               {year}
             </button>
@@ -177,9 +222,9 @@ function MonthPicker({ value, onChange, id }) {
             <button
               type="button"
               onClick={() => setYear((y) => y + 1)}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-400"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-gray-600 dark:text-gray-400" stroke="currentColor" strokeWidth="2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M9 18l6-6-6-6" />
               </svg>
             </button>
@@ -195,7 +240,7 @@ function MonthPicker({ value, onChange, id }) {
                     setYear(y);
                     setShowYears(false);
                   }}
-                  className={`px-3 py-2 rounded-lg border text-sm ${
+                  className={`px-3 py-2 rounded-lg border text-sm transition-colors ${
                     y === year
                       ? "bg-indigo-600 text-white border-indigo-600"
                       : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
@@ -216,7 +261,7 @@ function MonthPicker({ value, onChange, id }) {
                     onChange(`${year}-${mm}`);
                     setOpen(false);
                   }}
-                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-colors"
                 >
                   {m}
                 </button>
@@ -255,13 +300,13 @@ function SkillsEditor({ value = [], onChange }) {
               add();
             }
           }}
-          className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-gray-900 dark:text-gray-100"
+          className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-all"
           placeholder="Add skills (comma separated)…"
         />
         <button
           type="button"
           onClick={add}
-          className="px-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+          className="px-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors"
         >
           Add
         </button>
@@ -277,7 +322,7 @@ function SkillsEditor({ value = [], onChange }) {
               <button
                 type="button"
                 onClick={() => remove(t)}
-                className="hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full p-0.5"
+                className="hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
                 aria-label={`Remove ${t}`}
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -294,10 +339,10 @@ function SkillsEditor({ value = [], onChange }) {
 
 /* ----------------------- helpers: dataURL → File -------------------------- */
 function dataUrlToFile(dataUrl, filename = "image.png") {
-  const [header, base64] = dataUrl.split(",");
+  const [header, base64] = (dataUrl || "").split(",");
   const match = /data:(.*?);base64/.exec(header || "");
   const mime = match?.[1] || "image/png";
-  const bin = atob(base64 || "");
+  const bin = base64 ? atob(base64) : "";
   const len = bin.length;
   const u8 = new Uint8Array(len);
   for (let i = 0; i < len; i++) u8[i] = bin.charCodeAt(i);
@@ -336,6 +381,7 @@ export default function CertificatesAdd() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [linkStatus, setLinkStatus] = useState(""); // CORS-safe link check
+  const [toast, setToast] = useState(null);
   const imgInputRef = useRef(null);
   const imgPreviewRef = useRef(null);
 
@@ -344,12 +390,14 @@ export default function CertificatesAdd() {
 
   // Load for edit or new (with prefill)
   useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         if (isEditing) {
           // 1) Try local first
           const local = getLocalCertificateById(id);
           if (local) {
+            if (!mounted) return;
             setForm((f) => ({ ...f, ...local, id: local.id, updatedAt: local.updatedAt || null }));
             return;
           }
@@ -360,11 +408,12 @@ export default function CertificatesAdd() {
             : null;
 
           if (found) {
+            if (!mounted) return;
             setForm((f) => ({
               ...f,
               id: found.id,
               title: found.title || "",
-              // gallery GET doesn't include issuer/type/credential fields — keep editable
+              // gallery GET may not include these — keep editable defaults
               issuer: "",
               type: "Certificate",
               dateMonth: "",
@@ -376,10 +425,12 @@ export default function CertificatesAdd() {
               updatedAt: found.updatedAt || null,
             }));
           } else {
+            if (!mounted) return;
             setError("Certificate not found.");
           }
         } else if (prefill) {
           const nextId = `cert-${Date.now()}`;
+          if (!mounted) return;
           setForm((f) => ({
             ...f,
             id: nextId,
@@ -395,19 +446,28 @@ export default function CertificatesAdd() {
           }));
         }
       } catch (e) {
+        if (!mounted) return;
         setError(e?.message || "Failed to initialize form.");
       }
     })();
+    return () => {
+      mounted = false;
+    };
   }, [id, isEditing, prefill]);
 
   // Paste image from clipboard
   useEffect(() => {
     const onPaste = async (e) => {
-      if (!e.clipboardData) return;
-      const file = Array.from(e.clipboardData.files || [])[0];
-      if (file && file.type.startsWith("image/")) {
-        const dataUrl = await toDataUrl(file);
-        setForm((f) => ({ ...f, image: dataUrl }));
+      try {
+        if (!e.clipboardData) return;
+        const file = Array.from(e.clipboardData.files || [])[0];
+        if (file && file.type?.startsWith("image/")) {
+          const dataUrl = await toDataUrl(file);
+          setForm((f) => ({ ...f, image: dataUrl }));
+          setToast({ message: "Image pasted successfully!", type: "success" });
+        }
+      } catch {
+        setToast({ message: "Failed to paste image", type: "error" });
       }
     };
     document.addEventListener("paste", onPaste);
@@ -418,24 +478,37 @@ export default function CertificatesAdd() {
 
   const handleFile = async (file) => {
     if (!file) return;
-    const dataUrl = await toDataUrl(file);
-    setForm((f) => ({ ...f, image: dataUrl }));
+    try {
+      const dataUrl = await toDataUrl(file);
+      setForm((f) => ({ ...f, image: dataUrl }));
+      setToast({ message: "Image uploaded successfully!", type: "success" });
+    } catch {
+      setToast({ message: "Failed to process image", type: "error" });
+    }
   };
 
   async function verifyCertLink() {
     setLinkStatus("");
-    const url = (form.credentialUrl || "").trim();
-    if (!url) return;
+    const raw = (form.credentialUrl || "").trim();
+    if (!raw) {
+      setToast({ message: "Please enter a URL first", type: "info" });
+      return;
+    }
+    // Normalize URL (avoid user entering without scheme)
+    const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
     try {
       setLinkStatus("Checking…");
-      const r = await resolveCertificateUrl(url); // backend proxy, no browser-to-LinkedIn fetch
+      const r = await resolveCertificateUrl(url); // backend proxy, no browser fetch
       if (r?.ok) {
-        setLinkStatus(`OK ${r.status}${r.finalUrl ? ` • final: ${r.finalUrl}` : ""}`);
+        setLinkStatus(`✓ Valid ${r.status}${r.finalUrl ? ` • Redirects to: ${r.finalUrl}` : ""}`);
+        setToast({ message: "Credential link verified!", type: "success" });
       } else {
-        setLinkStatus(`Unreachable (status ${r?.status ?? "?"})`);
+        setLinkStatus(`✗ Unreachable${r?.status ? ` (status ${r.status})` : ""}`);
+        setToast({ message: "Credential link appears to be invalid", type: "error" });
       }
     } catch (e) {
-      setLinkStatus(`Error: ${e.message}`);
+      setLinkStatus(`✗ Error: ${e?.message || "Unknown error"}`);
+      setToast({ message: `Link verification failed: ${e?.message || "Unknown error"}`, type: "error" });
     }
   }
 
@@ -444,12 +517,15 @@ export default function CertificatesAdd() {
     const img = form.image || "";
     if (!owner || !img.startsWith("data:")) return payload;
     try {
+      setToast({ message: "Uploading image...", type: "info" });
       const file = dataUrlToFile(img, "certificate.png");
       const up = await uploadProfileImage(file); // { url: "/uploads/..." }
       if (up?.url) {
+        setToast({ message: "Image uploaded to server!", type: "success" });
         return { ...payload, imageUrl: up.url };
       }
     } catch {
+      setToast({ message: "Image upload failed, saving locally", type: "error" });
       // ignore upload errors; fall back to existing value
     }
     return payload;
@@ -459,9 +535,18 @@ export default function CertificatesAdd() {
     e.preventDefault();
     setError("");
 
-    if (!form.title.trim()) return setError("Title is required.");
-    if (!form.issuer.trim()) return setError("Issuer is required.");
-    if (!isValidYm(form.dateMonth)) return setError("Month/Year must be in YYYY-MM format.");
+    if (!form.title.trim()) {
+      setError("Title is required.");
+      return;
+    }
+    if (!form.issuer.trim()) {
+      setError("Issuer is required.");
+      return;
+    }
+    if (!isValidYm(form.dateMonth)) {
+      setError("Month/Year must be in YYYY-MM format.");
+      return;
+    }
 
     try {
       setSaving(true);
@@ -470,15 +555,14 @@ export default function CertificatesAdd() {
       let payload = {
         title: form.title.trim(),
         description: form.description?.trim() || "",
-        imageUrl: form.image || "", // replaced by server URL if uploaded below
-        skills: Array.isArray(form.skills) ? form.skills : [], // <-- backend expects 'skills'
+        imageUrl: form.image || "",
+        skills: Array.isArray(form.skills) ? form.skills : [],
         sortOrder: 0,
-        // extra certificate fields (backend stores on certificates table)
         issuer: form.issuer?.trim() || null,
         type: form.type?.trim() || "Certificate",
         dateMonth: form.dateMonth || null, // "YYYY-MM"
         credentialId: form.credentialId?.trim() || null,
-        credentialUrl: form.credentialUrl?.trim() || null,
+        credentialUrl: (form.credentialUrl || "").trim() || null,
       };
 
       payload = await ensureImageOnServerIfNeeded(payload);
@@ -487,24 +571,30 @@ export default function CertificatesAdd() {
         // Persist to server
         if (isEditing && isGuid(id)) {
           await apiUpdateCertificate(id, payload); // PUT /api/gallery/{guid}
+          setToast({ message: "Certificate updated successfully!", type: "success" });
         } else {
           await createCertificate(payload); // POST /api/gallery
+          setToast({ message: "Certificate created successfully!", type: "success" });
         }
       } else {
         // Local fallback (no backend write)
         const row = { ...form, updatedAt: new Date().toISOString() };
         if (isEditing) {
           updateLocalCertificate(row);
+          setToast({ message: "Certificate updated locally!", type: "success" });
         } else {
           const exists = getLocalCertificates().some((c) => String(c.id) === String(row.id));
           const assignId = exists ? `cert-${Date.now()}` : row.id;
           saveLocalCertificate({ ...row, id: assignId });
+          setToast({ message: "Certificate saved locally!", type: "success" });
         }
       }
 
-      nav("/certificates");
+      // Navigate after a short delay to show the toast
+      setTimeout(() => nav("/certificates"), 1000);
     } catch (err) {
       setError(err?.message || "Failed to save certificate.");
+      setToast({ message: "Failed to save certificate", type: "error" });
     } finally {
       setSaving(false);
     }
@@ -512,6 +602,9 @@ export default function CertificatesAdd() {
 
   return (
     <section className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+      {/* Toast Notifications */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
       <div className="container mx-auto px-4 py-10">
         <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
 
@@ -528,7 +621,10 @@ export default function CertificatesAdd() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-3">
+          <div className="mb-4 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-4 py-3 flex items-center gap-2">
+            <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
             {error}
           </div>
         )}
@@ -536,7 +632,7 @@ export default function CertificatesAdd() {
         <Reveal>
           <form
             onSubmit={handleSubmit}
-            className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6"
+            className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 shadow-sm"
           >
             {/* Left column: inputs */}
             <div className="lg:col-span-7 space-y-5">
@@ -547,7 +643,7 @@ export default function CertificatesAdd() {
                 <input
                   value={form.title}
                   onChange={(e) => handleChange("title", e.target.value)}
-                  className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4"
+                  className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-all"
                   placeholder="e.g., AWS Certified Cloud Practitioner"
                   required
                 />
@@ -561,7 +657,7 @@ export default function CertificatesAdd() {
                   <input
                     value={form.issuer}
                     onChange={(e) => handleChange("issuer", e.target.value)}
-                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4"
+                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-all"
                     placeholder="e.g., Coursera, AWS, LinkedIn Learning"
                     required
                   />
@@ -574,7 +670,7 @@ export default function CertificatesAdd() {
                   <input
                     value={form.type}
                     onChange={(e) => handleChange("type", e.target.value)}
-                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4"
+                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-all"
                     placeholder="Certificate / License / Award"
                   />
                 </div>
@@ -599,7 +695,7 @@ export default function CertificatesAdd() {
                   <input
                     value={form.credentialId}
                     onChange={(e) => handleChange("credentialId", e.target.value)}
-                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4"
+                    className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-all"
                     placeholder="Optional"
                   />
                 </div>
@@ -612,7 +708,7 @@ export default function CertificatesAdd() {
                 <input
                   value={form.credentialUrl}
                   onChange={(e) => handleChange("credentialUrl", e.target.value)}
-                  className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4"
+                  className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-all"
                   placeholder="https://…"
                   type="url"
                 />
@@ -620,27 +716,43 @@ export default function CertificatesAdd() {
                   <button
                     type="button"
                     onClick={verifyCertLink}
-                    className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm"
+                    className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 transition-colors flex items-center gap-2"
                     title="Check link without CORS issues"
                   >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                     Check link
                   </button>
                   {linkStatus && (
-                    <span className="text-xs text-gray-600 dark:text-gray-400">{linkStatus}</span>
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full ${
+                        linkStatus.includes("✓")
+                          ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
+                          : linkStatus.includes("✗")
+                          ? "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
+                          : "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400"
+                      }`}
+                    >
+                      {linkStatus}
+                    </span>
                   )}
                   {form.credentialUrl && (
                     <a
-                      className="ml-auto text-sm text-indigo-600 hover:underline"
-                      href={form.credentialUrl}
+                      className="ml-auto text-sm text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                      href={/^https?:\/\//i.test(form.credentialUrl) ? form.credentialUrl : `https://${form.credentialUrl}`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Open in new tab →
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      Open in new tab
                     </a>
                   )}
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Tip: paste an image from your clipboard to attach it quickly.
+                  💡 Tip: Paste an image from your clipboard (Ctrl+V) to attach it quickly.
                 </p>
               </div>
 
@@ -652,14 +764,14 @@ export default function CertificatesAdd() {
                   value={form.description}
                   onChange={(e) => handleChange("description", e.target.value)}
                   rows={4}
-                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3"
-                  placeholder="Optional notes or details…"
+                  className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-all resize-none"
+                  placeholder="Optional notes or details about this certificate…"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Skills
+                  Skills & Topics
                 </label>
                 <SkillsEditor
                   value={form.skills}
@@ -678,30 +790,66 @@ export default function CertificatesAdd() {
                 </label>
 
                 <div
-                  className="relative rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 overflow-hidden"
-                  onDragOver={(e) => e.preventDefault()}
+                  className="relative rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 overflow-hidden group hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.add("border-indigo-400");
+                    e.currentTarget.classList.add("dark:border-indigo-500");
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove("border-indigo-400");
+                    e.currentTarget.classList.remove("dark:border-indigo-500");
+                  }}
                   onDrop={async (e) => {
                     e.preventDefault();
-                    const file = e.dataTransfer.files?.[0];
-                    if (file && file.type.startsWith("image/")) {
+                    e.currentTarget.classList.remove("border-indigo-400");
+                    e.currentTarget.classList.remove("dark:border-indigo-500");
+                    const file = e.dataTransfer?.files?.[0];
+                    if (file && file.type?.startsWith("image/")) {
                       await handleFile(file);
+                    } else if (file) {
+                      setToast({ message: "Please drop an image file", type: "error" });
                     }
                   }}
                 >
                   {form.image ? (
-                    <img
-                      ref={imgPreviewRef}
-                      src={form.image}
-                      alt="Certificate"
-                      className="w-full aspect-[4/3] object-cover"
-                    />
-                  ) : (
-                    <div className="w-full aspect-[4/3] grid place-items-center text-gray-400">
-                      Drop image here, paste, or use the picker
+                    <div className="relative">
+                      <img
+                        ref={imgPreviewRef}
+                        src={form.image}
+                        alt="Certificate preview"
+                        className="w-full aspect-[4/3] object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => imgInputRef.current?.click()}
+                            className="px-3 py-2 rounded-lg bg-white/90 dark:bg-gray-800/90 border border-gray-300 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium transition-colors"
+                          >
+                            Change Image
+                          </button>
+                        </div>
+                      </div>
                     </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => imgInputRef.current?.click()}
+                      className="w-full aspect-[4/3] grid place-items-center text-gray-400 dark:text-gray-500"
+                    >
+                      <div className="text-center pointer-events-none">
+                        <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <p className="text-sm">Drop image here, paste (Ctrl+V), or click to browse</p>
+                        <p className="text-xs mt-1">PNG, JPG up to 10MB</p>
+                      </div>
+                    </button>
                   )}
 
-                  <div className="p-3 flex items-center justify-between gap-2">
+                  <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between gap-2">
                     <input
                       ref={imgInputRef}
                       type="file"
@@ -709,7 +857,9 @@ export default function CertificatesAdd() {
                       className="hidden"
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
-                        await handleFile(file);
+                        if (file) {
+                          await handleFile(file);
+                        }
                         e.target.value = "";
                       }}
                     />
@@ -717,50 +867,107 @@ export default function CertificatesAdd() {
                       <button
                         type="button"
                         onClick={() => imgInputRef.current?.click()}
-                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm"
+                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-700 dark:text-gray-200 transition-colors flex items-center gap-2"
                       >
-                        Choose Image
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        {form.image ? "Change" : "Choose"} Image
                       </button>
                       {form.image && (
                         <button
                           type="button"
-                          onClick={() => handleChange("image", "")}
-                          className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm"
+                          onClick={() => {
+                            handleChange("image", "");
+                            setToast({ message: "Image removed", type: "info" });
+                          }}
+                          className="px-3 py-2 rounded-lg border border-red-300 dark:border-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm text-red-600 dark:text-red-400 transition-colors flex items-center gap-2"
                         >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
                           Remove
                         </button>
                       )}
                     </div>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                      Supported: PNG/JPG (or paste)
+                      {form.image ? "✓ Image ready" : "No image"}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2">
-                <Link
-                  to="/certificates"
-                  className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  Cancel
-                </Link>
+              {/* Form Actions */}
+              <div className="flex flex-col gap-3 pt-2">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50"
+                  className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                 >
-                  {saving ? "Saving…" : isEditing ? "Save Changes" : "Save Certificate"}
+                  {saving ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {isEditing ? "Save Changes" : "Save Certificate"}
+                    </>
+                  )}
                 </button>
+
+                <Link
+                  to="/certificates"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 transition-colors text-center font-medium flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  Back to Certificates
+                </Link>
+              </div>
+
+              {/* Quick Tips */}
+              <div className="mt-6 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">💡 Quick Tips</h4>
+                <ul className="text-xs text-blue-800 dark:text-blue-400 space-y-1">
+                  <li>• Use Ctrl+V to paste images from clipboard</li>
+                  <li>• Drag and drop images directly onto the upload area</li>
+                  <li>• Add multiple skills separated by commas</li>
+                  <li>• Use "Check link" to verify credential URLs</li>
+                  <li>• All fields except Title and Issuer are optional</li>
+                </ul>
               </div>
             </div>
           </form>
         </Reveal>
       </div>
 
-      {/* small utilities */}
+      {/* Utility styles */}
       <style>{`
-        .aspect-4\\/3 { aspect-ratio: 4 / 3; }
+        /* Ensure dark mode compatibility placeholders */
+        .dark input::placeholder,
+        .dark textarea::placeholder {
+          color: rgb(156 163 175);
+        }
+
+        /* Smooth transitions for interactive elements */
+        input, textarea, button, select {
+          transition: all 0.2s ease-in-out;
+        }
+
+        /* Focus visible for accessibility */
+        input:focus-visible,
+        textarea:focus-visible,
+        button:focus-visible {
+          outline: 2px solid rgb(99 102 241);
+          outline-offset: 2px;
+        }
       `}</style>
     </section>
   );

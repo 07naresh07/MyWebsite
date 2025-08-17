@@ -10,6 +10,13 @@ import {
   ChevronDown, X, Check, AlertCircle, Info
 } from "lucide-react";
 
+import { useOwnerMode } from "../lib/owner.js";
+import {
+  getExperience as apiGetExperience,
+  createExperience as apiCreateExperience,
+  updateExperience as apiUpdateExperience
+} from "../lib/api.js";
+
 /* ============================== Theme hook ============================== */
 const useTheme = () => {
   const [isDark, setIsDark] = useState(() => {
@@ -56,6 +63,7 @@ function writeAllExperiences(rows) {
 
 /* ----------------------- Date helpers ----------------------- */
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const isGuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(s || ""));
 
 function ymToIso(ym) {
   if (!ym || typeof ym !== "string") return "";
@@ -665,6 +673,7 @@ export default function ExperienceAdd() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = Boolean(id);
+  const { owner } = useOwnerMode();
 
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
@@ -688,25 +697,58 @@ export default function ExperienceAdd() {
     isCurrentRole: false,
   });
 
-  // Load when editing
+  // Load when editing — try server first (if GUID), else local
   useEffect(() => {
-    if (!isEditing) return;
-    const all = readAllExperiences();
-    const row = all.find((r) => String(r.id) === String(id));
-    if (row) {
-      setFormData({
-        company: row.company || "",
-        role: row.role || "",
-        project: row.project || "",
-        location: row.location || "",
-        startDate: row.startDate || "",
-        endDate: row.endDate || "",
-        description: row.descriptionHtml || row.description || "",
-        tags: (row.tools || []).join(", "),
-        isCurrentRole: !row.endDate,
-      });
-    }
-  }, [isEditing, id]);
+    (async () => {
+      if (!isEditing) return;
+
+      // if GUID, try server
+      if (isGuid(id)) {
+        try {
+          const list = await apiGetExperience().catch(() => []);
+          const items = Array.isArray(list?.items)
+            ? list.items
+            : Array.isArray(list)
+            ? list
+            : [];
+          const row = items.find((r) => String(r.id) === String(id));
+          if (row) {
+            setFormData({
+              company: row.company || "",
+              role: row.role || "",
+              project: row.project || "",
+              location: row.location || "",
+              startDate: row.startDate || "",
+              endDate: row.endDate || "",
+              description: row.descriptionHtml || row.description || "",
+              tags: Array.isArray(row.tools) ? row.tools.join(", ") : "",
+              isCurrentRole: !row.endDate,
+            });
+            return;
+          }
+        } catch {
+          /* fall back to local below */
+        }
+      }
+
+      // fallback to local
+      const all = readAllExperiences();
+      const localRow = all.find((r) => String(r.id) === String(id));
+      if (localRow) {
+        setFormData({
+          company: localRow.company || "",
+          role: localRow.role || "",
+          project: localRow.project || "",
+          location: localRow.location || "",
+          startDate: localRow.startDate || "",
+          endDate: localRow.endDate || "",
+          description: localRow.descriptionHtml || localRow.description || "",
+          tags: (localRow.tools || []).join(", "),
+          isCurrentRole: !localRow.endDate,
+        });
+      }
+    })();
+  }, [id, isEditing]);
 
   // Auto-save draft
   useEffect(() => {
@@ -775,7 +817,7 @@ export default function ExperienceAdd() {
     };
   };
 
-  const saveRow = (row) => {
+  const saveRowLocal = (row) => {
     const all = readAllExperiences();
     const idx = all.findIndex((r) => String(r.id) === String(row.id));
     if (idx >= 0) all[idx] = row;
@@ -790,7 +832,48 @@ export default function ExperienceAdd() {
     setSaving(true);
     try {
       const row = toRow();
-      saveRow(row);
+
+      // Always keep a local draft/version so nothing is lost
+      saveRowLocal(row);
+
+      // If owner mode, sync to server
+      if (owner) {
+        const payload = {
+          company: row.company,
+          role: row.role || null,
+          project: row.project || null,
+          location: row.location || null,
+          startDate: row.startDate,                 // "YYYY-MM"
+          endDate: row.endDate || null,             // null for "Present"
+          descriptionHtml: row.descriptionHtml || "",// stored as HTML
+          tools: Array.isArray(row.tools) ? row.tools : [],
+
+          // snake_case mirrors for APIs that expect them
+          company_url: row.companyUrl || null,
+          start_ym: row.startDate,
+          end_ym: row.endDate || null,
+          description_html: row.descriptionHtml || "",
+          
+          status: "published",
+        };
+
+        if (isEditing && isGuid(id)) {
+          await apiUpdateExperience(id, payload);
+        } else {
+          const created = await apiCreateExperience(payload);
+          // Optional: if server returns an id, you could update local to reference it.
+          if (created?.id) {
+            const all = readAllExperiences();
+            const idx = all.findIndex((r) => String(r.id) === String(row.id));
+            if (idx >= 0) {
+              all[idx] = { ...all[idx], id: created.id }; // map local temp id to server id
+              writeAllExperiences(all);
+              window.dispatchEvent(new Event("experience:saved"));
+            }
+          }
+        }
+      }
+
       navigate("/experience");
     } catch (err) {
       alert(err?.message || "Failed to save experience");

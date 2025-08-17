@@ -166,9 +166,7 @@ function Modal({ open, title, onClose, children, width = "w-[min(90vw,680px)]" }
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose} />
-      <div
-        className={`relative ${width} max-h-[90vh] overflow-auto animate-in zoom-in-95 duration-300`}
-      >
+      <div className={`relative ${width} max-h-[90vh] overflow-auto animate-in zoom-in-95 duration-300`}>
         <div
           className={`rounded-2xl shadow-2xl ring-1 backdrop-blur-sm ${
             isDark ? "bg-slate-800/95 ring-slate-700/50" : "bg-white/95 ring-slate-200/60"
@@ -179,9 +177,7 @@ function Modal({ open, title, onClose, children, width = "w-[min(90vw,680px)]" }
               isDark ? "border-slate-700/50" : "border-slate-100/60"
             }`}
           >
-            <h4 className={`font-semibold text-lg ${isDark ? "text-slate-200" : "text-gray-900"}`}>
-              {title}
-            </h4>
+            <h4 className={`font-semibold text-lg ${isDark ? "text-slate-200" : "text-gray-900"}`}>{title}</h4>
             <button
               className={`text-2xl leading-none transition-all duration-200 hover:scale-110 ${
                 isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-800"
@@ -200,8 +196,6 @@ function Modal({ open, title, onClose, children, width = "w-[min(90vw,680px)]" }
 }
 
 /* ----------------------------- Header ----------------------------- */
-/* Name fixed to "Naresh Singh Dhami". Quote sits inside the same box,
-   bottom-right. Edit button appears only on hover. */
 function Header({ quote, editable, onOpenQuoteModal }) {
   const { isDark } = useTheme();
   const styles = getStyles(isDark);
@@ -217,13 +211,7 @@ function Header({ quote, editable, onOpenQuoteModal }) {
         </h1>
 
         {quote && (
-          <p
-            className={`absolute right-4 bottom-2 text-sm italic ${
-              isDark ? "text-slate-300" : "text-gray-600"
-            }`}
-          >
-            “{quote}”
-          </p>
+          <p className={`absolute right-4 bottom-2 text-sm italic ${isDark ? "text-slate-300" : "text-gray-600"}`}>“{quote}”</p>
         )}
 
         {editable && (
@@ -245,9 +233,7 @@ function EditableCard({ title, canEdit, editing, onEdit, onSave, onCancel, child
   return (
     <div className={`${styles.card} group p-5 space-y-4 hover:shadow-2xl transition-all duration-300`}>
       <div className="flex items-center justify-between">
-        <div className={`font-semibold text-base flex items-center gap-2 ${styles.text.primary}`}>
-          {title}
-        </div>
+        <div className={`font-semibold text-base flex items-center gap-2 ${styles.text.primary}`}>{title}</div>
         <div className="opacity-0 group-hover:opacity-100 transition-all duration-300">
           {canEdit &&
             (!editing ? (
@@ -287,11 +273,7 @@ function SkillsCard({ grouped, onAdd, onDelete, openEditModal, busy, isOwner }) 
   return (
     <div className={`${styles.card} p-6 overflow-hidden hover:shadow-2xl transition-all duration-300`}>
       <div className="flex items-center gap-3 mb-6">
-        <div
-          className={`w-1 h-8 rounded-full ${
-            isDark ? "bg-gradient-to-b from-green-400 to-blue-500" : "bg-gradient-to-b from-green-500 to-blue-600"
-          }`}
-        />
+        <div className={`w-1 h-8 rounded-full ${isDark ? "bg-gradient-to-b from-green-400 to-blue-500" : "bg-gradient-to-b from-green-500 to-blue-600"}`} />
         <h3
           className={`text-xl md:text-2xl font-bold bg-gradient-to-r ${
             isDark ? "from-green-400 to-blue-400" : "from-green-600 to-blue-600"
@@ -302,11 +284,7 @@ function SkillsCard({ grouped, onAdd, onDelete, openEditModal, busy, isOwner }) 
       </div>
 
       {isOwner && (
-        <div
-          className={`mb-8 p-5 rounded-xl border backdrop-blur-sm ${
-            isDark ? "border-slate-600/50 bg-slate-700/30" : "border-slate-200/60 bg-slate-50/80"
-          }`}
-        >
+        <div className={`mb-8 p-5 rounded-xl border backdrop-blur-sm ${isDark ? "border-slate-600/50 bg-slate-700/30" : "border-slate-200/60 bg-slate-50/80"}`}>
           <div className="flex items-center gap-2 mb-4">
             <span className="text-sm font-medium text-blue-500">➕</span>
             <span className={`text-sm font-medium ${styles.text.primary}`}>Add New Skill</span>
@@ -369,7 +347,6 @@ function SkillsCard({ grouped, onAdd, onDelete, openEditModal, busy, isOwner }) 
   );
 }
 
-/* Enhanced Skill Chip */
 function SkillChip({ skill, onStartEdit, onDelete, isOwner }) {
   const { isDark } = useTheme();
   return (
@@ -448,9 +425,7 @@ function EditableList({ items, setItems, placeholder = "Add item..." }) {
         {(items || []).map((v, i) => (
           <li
             key={`${v}-${i}`}
-            className={`flex items-center justify-between px-3 py-2 rounded-lg border ${
-              isDark ? "border-slate-600/50" : "border-slate-200/60"
-            }`}
+            className={`flex items-center justify-between px-3 py-2 rounded-lg border ${isDark ? "border-slate-600/50" : "border-slate-200/60"}`}
           >
             <span className="truncate">{v}</span>
             <button className={styles.btnGhost} onClick={() => remove(i)}>
@@ -463,49 +438,47 @@ function EditableList({ items, setItems, placeholder = "Add item..." }) {
   );
 }
 
-/* ------------------------- Languages helpers ------------------------- */
-// Remove emoji/flags so cards always show clean language names
+/* ------------------------- Helpers ------------------------- */
 const stripEmoji = (s = "") =>
   s.replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{FE0F}]/gu, "").trim();
 
-/* ---------- About HTML sanitization: strip styles/classes & keep basic tags ---------- */
+// minimal, safe sanitizer for about-html
 function sanitizeAboutHtml(raw = "") {
   if (typeof window === "undefined") return raw;
   const container = document.createElement("div");
   container.innerHTML = raw;
-
   const ALLOWED = new Set(["P", "UL", "OL", "LI", "BR", "STRONG", "EM", "B", "I", "A"]);
-  const walk = (node, parent) => {
-    const children = Array.from(node.childNodes);
-    for (const child of children) {
+  const SAFE_PROTOCOLS = ["http:", "https:", "mailto:", "tel:"];
+  const walk = (node) => {
+    for (const child of Array.from(node.childNodes)) {
       if (child.nodeType === 1) {
-        if (!ALLOWED.has(child.tagName)) {
-          while (child.firstChild) parent.insertBefore(child.firstChild, child);
-          parent.removeChild(child);
+        const tag = child.tagName;
+        if (!ALLOWED.has(tag)) {
+          while (child.firstChild) child.parentNode.insertBefore(child.firstChild, child);
+          child.parentNode.removeChild(child);
           continue;
         }
-        child.removeAttribute("style");
-        child.removeAttribute("class");
-        child.removeAttribute("bgcolor");
-        if (child.tagName === "A") {
-          const href = child.getAttribute("href");
-          if (!href) {
-            while (child.firstChild) parent.insertBefore(child.firstChild, child);
-            parent.removeChild(child);
-            continue;
-          }
-          child.setAttribute("target", "_blank");
-          child.setAttribute("rel", "noopener noreferrer");
+        let href = tag === "A" ? child.getAttribute("href") || "" : null;
+        for (const a of Array.from(child.attributes)) child.removeAttribute(a.name);
+        if (tag === "A" && href) {
+          try {
+            const url = new URL(href, window.location.origin);
+            if (SAFE_PROTOCOLS.includes(url.protocol)) {
+              child.setAttribute("href", href);
+              child.setAttribute("target", "_blank");
+              child.setAttribute("rel", "noopener noreferrer");
+            }
+          } catch {}
         }
-        walk(child, child);
+        walk(child);
       }
     }
   };
-  walk(container, container);
+  walk(container);
   return container.innerHTML;
 }
 
-/* ------------------------- Languages View (clean + non-overlapping X) ------------------------- */
+/* ------------------------- Languages UI ------------------------- */
 function LanguagesView({ items = [], onRemove }) {
   const { isDark } = useTheme();
   return (
@@ -516,9 +489,7 @@ function LanguagesView({ items = [], onRemove }) {
         return (
           <div
             key={`${name}-${i}`}
-            className={`rounded-xl border p-4 ${
-              isDark ? "border-slate-600/50 bg-slate-700/30" : "border-slate-200/60 bg-white/70"
-            }`}
+            className={`rounded-xl border p-4 ${isDark ? "border-slate-600/50 bg-slate-700/30" : "border-slate-200/60 bg-white/70"}`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -528,9 +499,7 @@ function LanguagesView({ items = [], onRemove }) {
               {typeof onRemove === "function" && (
                 <button
                   className={`w-6 h-6 leading-none rounded-md border text-xs grid place-items-center ${
-                    isDark
-                      ? "border-slate-600 text-slate-300 hover:bg-slate-700/60"
-                      : "border-slate-300 text-slate-600 hover:bg-slate-100"
+                    isDark ? "border-slate-600 text-slate-300 hover:bg-slate-700/60" : "border-slate-300 text-slate-600 hover:bg-slate-100"
                   }`}
                   onClick={() => onRemove(i)}
                   title="Remove"
@@ -550,7 +519,6 @@ function LanguagesView({ items = [], onRemove }) {
   );
 }
 
-/* ------------------------- Languages Editor (no tip; proper arrow; per-card X) ------------------------- */
 function LanguagesEditor({ items, onChange }) {
   const { isDark } = useTheme();
   const styles = getStyles(isDark);
@@ -577,9 +545,7 @@ function LanguagesEditor({ items, onChange }) {
     setLevel("");
   };
 
-  const removeLang = (idx) => {
-    setList((arr) => arr.filter((_, i) => i !== idx));
-  };
+  const removeLang = (idx) => setList((arr) => arr.filter((_, i) => i !== idx));
 
   return (
     <div className="space-y-4">
@@ -603,10 +569,7 @@ function LanguagesEditor({ items, onChange }) {
               </option>
             ))}
           </select>
-          {/* custom arrow so it never overlaps the label */}
-          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm opacity-60">
-            ▾
-          </span>
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm opacity-60">▾</span>
         </div>
         <button className={styles.btnPrimary} onClick={addLang}>
           Add
@@ -641,38 +604,29 @@ function AboutInner() {
     fullName: "Naresh Singh Dhami",
     quote: "Practice what you preach or change your speech.",
     avatarUrl: "",
-    about: "",
-    interests: ["Playing and watching football", "Traveling and hiking", "Exploring and learning new things"],
-    languages: [
-      { name: "Nepali", level: "Native" },
-      { name: "English", level: "C1" },
-      { name: "Japanese", level: "N2" },
-      { name: "Hindi", level: "Daily" },
-    ],
-    focus: ["AI-assisted BIM workflows", "Sustainable infrastructure and smart mobility"],
-    motto: "Design with purpose, build with passion.",
+    about: "", // ← keep empty; no placeholder
+    interests: [],
+    languages: [],
+    focus: [],
+    motto: "",
   });
 
   const [edit, setEdit] = useState({ about: false, interests: false, languages: false, focus: false, motto: false });
   const [aboutDraftHtml, setAboutDraftHtml] = useState("");
 
-  // prevent edit for viewers
   useEffect(() => {
     if (!isOwner && edit.about) {
       setEdit((e) => ({ ...e, about: false }));
     }
   }, [isOwner, edit.about]);
 
-  // Avatar
   const [imgPreview, setImgPreview] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Skills
   const [skills, setSkills] = useState([]);
   const [busySkill, setBusySkill] = useState(false);
 
-  // Modals
   const [quoteModal, setQuoteModal] = useState(false);
   const [quoteDraft, setQuoteDraft] = useState("");
 
@@ -683,26 +637,26 @@ function AboutInner() {
   const showToast = useCallback((message, type = "info") => setToast({ message, type }), []);
   const hideToast = useCallback(() => setToast(null), []);
 
+  /* ---------- Load ---------- */
   useEffect(() => {
     setLoading(true);
     Promise.all([getProfile(), getSkills()])
       .then(([pr, sk]) => {
-        if (pr) {
-          const extras = pr?.socials?.extras || {};
+        if (pr && typeof pr === "object") {
+          // Only apply fields that are defined (avoid overwriting with null)
           setProfile((cur) => ({
             ...cur,
-            ...pr,
-            fullName: cur.fullName, // keep fixed display name
+            fullName: pr.fullName ?? cur.fullName,
             quote: pr.quote ?? cur.quote,
-            avatarUrl: pr.avatarUrl || pr.avatar_url || cur.avatarUrl,
-            about: pr.about || pr.bio || cur.about,
-            interests: extras.interests ?? cur.interests,
-            languages: extras.languages ?? cur.languages,
-            focus: extras.focus ?? cur.focus,
-            motto: extras.motto ?? cur.motto,
+            avatarUrl: pr.avatarUrl ?? cur.avatarUrl,
+            about: (pr.aboutHtml ?? pr.about ?? pr.bio ?? "").trim(),
+            interests: Array.isArray(pr.interests) ? pr.interests : cur.interests,
+            languages: Array.isArray(pr.languages) ? pr.languages : cur.languages,
+            focus: Array.isArray(pr.focus) ? pr.focus : cur.focus,
+            motto: pr.motto ?? cur.motto,
           }));
         }
-        if (sk) setSkills(sk.map(normalizeSkill));
+        if (Array.isArray(sk)) setSkills(sk.map(normalizeSkill));
       })
       .catch((e) => {
         const message = e?.message || "Failed to load data";
@@ -712,29 +666,38 @@ function AboutInner() {
       .finally(() => setLoading(false));
   }, [showToast]);
 
+  /* ---------- Save ---------- */
   async function saveProfilePatch(patch) {
+    // Build merged state and send only supported keys; api.js maps to aboutHtml
     const merged = { ...profile, ...patch };
     const payload = {
       fullName: merged.fullName,
       quote: merged.quote,
       avatarUrl: merged.avatarUrl,
-      about: merged.about,
+      about: merged.about, // api.js will map -> aboutHtml
       interests: merged.interests,
       languages: merged.languages,
       focus: merged.focus,
       motto: merged.motto,
     };
+
     try {
       const saved = await upsertProfile(payload);
-      setProfile((cur) => ({ ...cur, ...saved, ...payload }));
-      showToast("Profile saved successfully", "success");
+      setProfile((cur) => ({
+        ...cur,
+        ...patch,
+        // make sure we store exactly what backend persisted
+        about: (saved?.aboutHtml ?? saved?.about ?? patch.about ?? cur.about)?.trim() || "",
+        interests: Array.isArray(saved?.interests) ? saved.interests : (patch.interests ?? cur.interests),
+        languages: Array.isArray(saved?.languages) ? saved.languages : (patch.languages ?? cur.languages),
+        focus: Array.isArray(saved?.focus) ? saved.focus : (patch.focus ?? cur.focus),
+        motto: saved?.motto ?? patch.motto ?? cur.motto,
+      }));
+      showToast("Saved.", "success");
     } catch (e) {
       const m = e?.message || "Failed to save profile";
       setErr(m);
       showToast(m, "error");
-      if (/401|403/i.test(m)) {
-        alert("Unauthorized. Click 'Owner -> Unlock' in the navbar, then retry.");
-      }
       throw e;
     }
   }
@@ -859,8 +822,9 @@ function AboutInner() {
     setSkillModal(false);
   };
 
-  /* ---------- About: paste sanitizer & editor ref for focus ---------- */
+  /* ---------- About editor ---------- */
   const aboutRef = useRef(null);
+
   const onAboutPaste = useCallback((e) => {
     const html = e.clipboardData?.getData("text/html");
     if (html) {
@@ -869,6 +833,27 @@ function AboutInner() {
       document.execCommand("insertHTML", false, clean);
     }
   }, []);
+
+  useEffect(() => {
+    if (edit.about && aboutRef.current) {
+      const clean = sanitizeAboutHtml(profile.about || "");
+      aboutRef.current.innerHTML = clean;
+      setAboutDraftHtml(clean);
+      aboutRef.current.setAttribute("dir", "ltr");
+      aboutRef.current.style.direction = "ltr";
+      aboutRef.current.style.unicodeBidi = "isolate";
+      aboutRef.current.style.textAlign = "left";
+      requestAnimationFrame(() => {
+        aboutRef.current?.focus();
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(aboutRef.current);
+        range.collapse(false);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      });
+    }
+  }, [edit.about, profile.about]);
 
   if (loading) {
     return (
@@ -962,13 +947,17 @@ function AboutInner() {
               }}
             >
               {!edit.interests ? (
-                <ul className={`list-disc list-outside pl-5 space-y-2 ${isDark ? "text-slate-300" : "text-gray-700"}`}>
-                  {(profile?.interests || []).map((it, i) => (
-                    <li key={`${it}-${i}`} className="transition-colors hover:text-blue-500">
-                      {it}
-                    </li>
-                  ))}
-                </ul>
+                (profile?.interests?.length ?? 0) > 0 ? (
+                  <ul className={`list-disc list-outside pl-5 space-y-2 ${isDark ? "text-slate-300" : "text-gray-700"}`}>
+                    {profile.interests.map((it, i) => (
+                      <li key={`${it}-${i}`} className="transition-colors hover:text-blue-500">
+                        {it}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className={isDark ? "text-slate-400" : "text-gray-500"}> </div>
+                )
               ) : (
                 <EditableList
                   items={profile.interests || []}
@@ -1013,13 +1002,17 @@ function AboutInner() {
               }}
             >
               {!edit.focus ? (
-                <ul className={`list-disc list-outside pl-5 space-y-2 ${isDark ? "text-slate-300" : "text-gray-700"}`}>
-                  {(profile?.focus || []).map((f, i) => (
-                    <li key={`${f}-${i}`} className="transition-colors hover:text-purple-500">
-                      {f}
-                    </li>
-                  ))}
-                </ul>
+                (profile?.focus?.length ?? 0) > 0 ? (
+                  <ul className={`list-disc list-outside pl-5 space-y-2 ${isDark ? "text-slate-300" : "text-gray-700"}`}>
+                    {profile.focus.map((f, i) => (
+                      <li key={`${f}-${i}`} className="transition-colors hover:text-purple-500">
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className={isDark ? "text-slate-400" : "text-gray-500"}> </div>
+                )
               ) : (
                 <EditableList
                   items={profile.focus || []}
@@ -1047,7 +1040,7 @@ function AboutInner() {
                     isDark ? "text-slate-300 bg-transparent" : "text-gray-700 bg-gradient-to-r from-purple-50 to-blue-50"
                   }`}
                 >
-                  “{profile?.motto || ""}”
+                  {profile?.motto ? `“${profile.motto}”` : ""}
                 </div>
               ) : (
                 <input
@@ -1071,17 +1064,7 @@ function AboutInner() {
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       className={`${styles.btnGhost} text-xs`}
-                      onClick={() => {
-                        // start with sanitized HTML so we kill pasted highlights from previous saves
-                        const clean = sanitizeAboutHtml(profile.about || "");
-                        setAboutDraftHtml(clean);
-                        setEdit((e) => ({ ...e, about: true }));
-                        setTimeout(() => {
-                          // focus editor immediately for normal caret behavior
-                          const el = document.getElementById("about-editor");
-                          el && el.focus();
-                        }, 0);
-                      }}
+                      onClick={() => setEdit((e) => ({ ...e, about: true }))}
                     >
                       ✏️ Edit
                     </button>
@@ -1090,40 +1073,41 @@ function AboutInner() {
               </div>
 
               {!edit.about ? (
-                <div
-                  className={`${styles.paragraphMain} text-justify space-y-4 
-                  [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:leading-relaxed
-                  [&_*]:bg-transparent`}
-                  // sanitize to remove inline highlights/styles from pasted HTML
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      sanitizeAboutHtml((profile?.about || "").trim()) || "",
-                  }}
-                />
+                // *** No placeholder here anymore ***
+                (profile?.about || "").trim() ? (
+                  <div
+                    dir="ltr"
+                    style={{ direction: "ltr", unicodeBidi: "isolate" }}
+                    className={`${styles.paragraphMain} text-justify space-y-4 
+                    [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:leading-relaxed [&_*]:bg-transparent`}
+                    dangerouslySetInnerHTML={{ __html: sanitizeAboutHtml(profile.about || "") }}
+                  />
+                ) : (
+                  <div className={isDark ? "text-slate-400" : "text-gray-500"}> </div>
+                )
               ) : (
                 <div className="space-y-3">
-                  {/* EDITOR: left-aligned (no justify), LTR, sanitized paste, no weird highlight */}
                   <div
+                    ref={aboutRef}
                     id="about-editor"
                     dir="ltr"
                     className={`min-h-[220px] border rounded p-3 text-sm overflow-auto outline-none ${
                       isDark ? "bg-slate-800 text-slate-100 border-slate-600" : "bg-white text-slate-900 border-slate-300"
                     }`}
-                    style={{ textAlign: "left" }}
+                    style={{ direction: "ltr", unicodeBidi: "isolate", textAlign: "left", whiteSpace: "pre-wrap" }}
                     contentEditable
                     suppressContentEditableWarning
                     onPaste={onAboutPaste}
                     onInput={(e) => setAboutDraftHtml(e.currentTarget.innerHTML)}
-                    dangerouslySetInnerHTML={{ __html: aboutDraftHtml || "" }}
                   />
                   <div className="flex gap-2">
                     <button
                       className={styles.btnPrimary}
                       onClick={async () => {
-                        const clean = sanitizeAboutHtml(aboutDraftHtml || "");
+                        const current = aboutRef.current?.innerHTML ?? aboutDraftHtml ?? "";
+                        const clean = sanitizeAboutHtml(current || "");
                         await saveProfilePatch({ about: clean });
                         setEdit((e) => ({ ...e, about: false }));
-                        setProfile((p) => ({ ...p, about: clean }));
                       }}
                     >
                       ✓ Save

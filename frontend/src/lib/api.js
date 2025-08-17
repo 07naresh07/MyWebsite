@@ -72,7 +72,6 @@ async function getJson(path) {
   const res = await doFetch(apiUrl(path), {
     method: "GET",
     headers: { Accept: "application/json" },
-    // No credentials — token-based (Bearer) on write endpoints only
   });
 
   if (!res.ok) {
@@ -192,7 +191,7 @@ export const getGallery = async () => {
 /** Certificates table read (direct) */
 export const getCertificates = () => getJson("/api/certificates");
 
-/** Languages (optional) */
+/** Languages (collection read) */
 export const getLanguages = () => getJson("/api/languages");
 
 /** Posts listing (public) */
@@ -240,8 +239,51 @@ export const createSkill  = (payload)          => sendJson("/api/skills", "POST"
 export const updateSkill  = (id, payload)      => sendJson(`/api/skills/${id}`, "PUT", payload);
 export const deleteSkill  = (id)               => sendJson(`/api/skills/${id}`, "DELETE");
 
+/* ------------------------------- Languages CRUD (optional use) ------------ */
+// Provided in case your backend exposes /api/languages for direct edits
+export const createLanguage = (payload)        => sendJson("/api/languages", "POST", payload);
+export const updateLanguage = (id, payload)    => sendJson(`/api/languages/${id}`, "PUT", payload);
+export const deleteLanguage = (id)             => sendJson(`/api/languages/${id}`, "DELETE");
+
 /* --------------------------- Profile (About page) ------------------------- */
-export const upsertProfile = (payload)         => sendJson("/api/profile", "PUT", payload);
+/** Normalize and map outgoing keys to what backend expects */
+function prepareProfilePayload(p = {}) {
+  const toArray = (v) => {
+    if (Array.isArray(v)) return v;
+    if (typeof v === "string") return v.split(",").map((s) => s.trim()).filter(Boolean);
+    return [];
+  };
+
+  const out = {};
+
+  if ("fullName" in p) out.fullName = p.fullName;
+  if ("quote" in p) out.quote = p.quote;
+  if ("avatarUrl" in p) out.avatarUrl = p.avatarUrl;
+
+  // <- important: map about/about_html/aboutHtml -> aboutHtml for the API
+  const aboutHtml = p.aboutHtml ?? p.about_html ?? p.about ?? p.bio;
+  if (aboutHtml !== undefined) out.aboutHtml = aboutHtml;
+
+  if ("motto" in p) out.motto = p.motto ?? "";
+
+  if ("interests" in p) out.interests = toArray(p.interests);
+  if ("focus" in p) out.focus = toArray(p.focus);
+
+  if ("languages" in p) {
+    const items = Array.isArray(p.languages) ? p.languages : [];
+    out.languages = items
+      .map((l) =>
+        typeof l === "string"
+          ? { name: l, level: "" }
+          : { name: l?.name ?? l?.language ?? "", level: l?.level ?? l?.proficiency ?? "" }
+      )
+      .filter((x) => x.name);
+  }
+
+  return out;
+}
+
+export const upsertProfile = (payload) => sendJson("/api/profile", "PUT", prepareProfilePayload(payload));
 
 export async function uploadProfileImage(file) {
   const form = new FormData();

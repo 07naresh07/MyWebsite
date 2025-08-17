@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOwnerMode } from "../lib/owner.js";
+import { getExperience as apiGetExperience, deleteExperience as apiDeleteExperience } from "../lib/api.js";
 
 /* ----------------------------- Modern Icons ----------------------------- */
 const Icon = {
@@ -108,6 +109,7 @@ const Icon = {
 
 /* ----------------------------- Helpers ----------------------------- */
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const isGuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(s || ""));
 
 const fmtYM = (v) => {
   if (!v) return "Present";
@@ -173,7 +175,7 @@ const Reveal = ({ children, delay = 0 }) => {
 /* =============================== Main Component ============================== */
 export default function Experience() {
   const navigate = useNavigate();
-  const { owner } = useOwnerMode(); // ✅ your hook returns { owner, token }
+  const { owner } = useOwnerMode(); // ✅ returns { owner, token }
 
   const [items, setItems] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
@@ -209,19 +211,37 @@ export default function Experience() {
     } catch {}
   };
 
+  // show local drafts immediately
   useEffect(() => { setItems(readAll()); }, []);
 
+  // then try to fetch from server, merge, and persist merged set locally (non-destructive)
   useEffect(() => {
-    const onSaved = () => setItems(readAll());
-    window.addEventListener("experience:saved", onSaved);
-    const onStorage = (e) => {
-      if (STORAGE_KEYS.includes(e.key)) setItems(readAll());
-    };
-    window.addEventListener("storage", onStorage);
-    return () => {
-      window.removeEventListener("experience:saved", onSaved);
-      window.removeEventListener("storage", onStorage);
-    };
+    (async () => {
+      try {
+        const serverList = await apiGetExperience().catch(() => []);
+        const serverItems = Array.isArray(serverList?.items)
+          ? serverList.items
+          : Array.isArray(serverList)
+          ? serverList
+          : [];
+
+        if (!serverItems.length) return; // keep local-only if nothing on server
+
+        const local = readAll();
+        const map = new Map();
+
+        // start with local (so we don't lose drafts)
+        local.forEach((x) => map.set(String(x.id), x));
+        // overlay server (prefer server version when ids match)
+        serverItems.forEach((x) => map.set(String(x.id), x));
+
+        const merged = Array.from(map.values());
+        setItems(merged);
+        writeAll(merged);
+      } catch {
+        // ignore, stay with local
+      }
+    })();
   }, []);
 
   /* ------------------- DERIVED: TAGS, TOTALS, FILTERS, SORT ------------------- */
@@ -280,17 +300,29 @@ export default function Experience() {
   }, [items, searchTerm, filterBy, sortBy, selectedTags]);
 
   /* ----------------------------- ACTIONS ---------------------------------- */
-  const onDelete = (id) => {
+  const onDelete = async (id) => {
     if (!owner) return; // guard in case UI is somehow shown
     if (!window.confirm("Delete this experience? This cannot be undone.")) return;
+
+    // Update UI + local immediately (non-blocking)
     setItems(prev => {
       const next = prev.filter(x => String(x.id) !== String(id));
       writeAll(next);
       return next;
     });
+
+    // If it's a server row, delete there too
+    try {
+      if (isGuid(id)) {
+        await apiDeleteExperience(id);
+      }
+    } catch (e) {
+      console.error("Server delete failed:", e);
+      // Optional: surface a toast; keeping UI optimistic to avoid "deleting features"
+    }
   };
+
   const exportData = () => {
-    // Export is read-only; allowed for all
     const dataStr = JSON.stringify(items, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob); const a = document.createElement("a");
@@ -346,7 +378,7 @@ export default function Experience() {
                 {darkMode ? "🌙 Dark" : "☀️ Light"} Mode
               </button>
 
-              <div className="flex rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+              <div className="flex rounded-xl bg-white dark:bg-gray-8 00 border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setViewMode("grid")}

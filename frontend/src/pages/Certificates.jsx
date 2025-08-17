@@ -38,6 +38,39 @@ function colorFor(str = "") {
   return `hsl(${hue} 60% 40%)`;
 }
 
+/* Smart URL validation and domain extraction */
+function getCredentialDomain(url) {
+  try {
+    const domain = new URL(url).hostname.replace('www.', '');
+    const parts = domain.split('.');
+    return parts.length > 2 ? parts[parts.length - 2] : parts[0];
+  } catch {
+    return 'Link';
+  }
+}
+
+/* Toast notification component */
+function Toast({ message, type = 'success', onClose }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-white font-medium transition-all transform translate-x-0 ${
+      type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+    }`}>
+      <div className="flex items-center gap-2">
+        {type === 'success' && <span>✓</span>}
+        {type === 'error' && <span>✗</span>}
+        {type === 'info' && <span>ℹ</span>}
+        <span>{message}</span>
+        <button onClick={onClose} className="ml-2 hover:opacity-70">×</button>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- UI bits that accept darkMode ---------- */
 function StatsSection({ items, darkMode }) {
   const stats = useMemo(() => {
@@ -52,11 +85,12 @@ function StatsSection({ items, darkMode }) {
       const year = parseInt(i.dateMonth.split("-")[0], 10);
       return year === currentYear;
     }).length;
-    return { total: items.length, issuers: issuers.size, types, thisYear };
+    const withCredentials = items.filter(i => i.credentialUrl).length;
+    return { total: items.length, issuers: issuers.size, types, thisYear, withCredentials };
   }, [items]);
 
   return (
-    <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 ${darkMode ? "text-white" : "text-gray-900"}`}>
+    <div className={`grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6 ${darkMode ? "text-white" : "text-gray-900"}`}>
       <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white transform hover:scale-105 transition-transform">
         <div className="text-3xl font-bold">{stats.total}</div>
         <div className="text-blue-100 text-sm">Total Certificates</div>
@@ -72,6 +106,10 @@ function StatsSection({ items, darkMode }) {
       <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-4 text-white transform hover:scale-105 transition-transform">
         <div className="text-3xl font-bold">{Object.keys(stats.types).length}</div>
         <div className="text-orange-100 text-sm">Categories</div>
+      </div>
+      <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl p-4 text-white transform hover:scale-105 transition-transform">
+        <div className="text-3xl font-bold">{stats.withCredentials}</div>
+        <div className="text-teal-100 text-sm">Verified</div>
       </div>
     </div>
   );
@@ -158,6 +196,37 @@ function ViewModeToggle({ mode, onChange, darkMode }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
         </svg>
       </button>
+    </div>
+  );
+}
+
+/* Confirmation Modal for Delete */
+function ConfirmModal({ isOpen, onClose, onConfirm, title, message, darkMode }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className={`rounded-2xl shadow-2xl max-w-md w-full p-6 ${darkMode ? "bg-gray-900 text-gray-100 border border-gray-800" : "bg-white text-gray-900"}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-semibold mb-2">{title}</h3>
+        <p className={`mb-6 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>{message}</p>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onClose}
+            className={`px-4 py-2 rounded-lg border ${darkMode ? "border-gray-700 hover:bg-gray-800" : "border-gray-300 hover:bg-gray-50"}`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -281,9 +350,12 @@ function PreviewModal({ item, onClose, onEdit, onDelete, owner, verified, darkMo
                   href={item.credentialUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700"
+                  className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700 flex items-center gap-2"
                 >
-                  View credentials
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  View Credential
                 </a>
               )}
               {owner && (
@@ -329,6 +401,8 @@ export default function Certificates() {
   const [verified, setVerified] = useState({});
   const [viewMode, setViewMode] = useState("grid");
   const [showStats, setShowStats] = useState(true);
+  const [toast, setToast] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   // dark mode
   const [darkMode, setDarkMode] = useState(() => {
@@ -414,6 +488,7 @@ export default function Certificates() {
       if (e.key === "Escape") {
         setExportOpen(false);
         setPreview(null);
+        setConfirmDelete(null);
       }
     };
     document.addEventListener("mousedown", onDocClick);
@@ -455,19 +530,32 @@ export default function Certificates() {
     return arr;
   }, [items, issuer, q, sortKey]);
 
-  const onDelete = (id, source) => {
-    if (!owner || source !== "local") return;
-    if (!window.confirm("Delete this certificate from your device?")) return;
-    const left = removeLocalCertificate(id).map((c, i) =>
-      normalizeItem({ ...c, _source: "local" }, i)
-    );
-    const api = items.filter((x) => x._source !== "local");
-    const map = new Map();
-    [...api, ...left].forEach((c) => {
-      const key = (c.title + "|" + c.issuer).toLowerCase();
-      map.set(key, c);
-    });
-    setItems(Array.from(map.values()));
+  const onDelete = (item) => {
+    if (!owner || item._source !== "local") return;
+    setConfirmDelete(item);
+  };
+
+  const confirmDeleteAction = () => {
+    if (!confirmDelete) return;
+    
+    try {
+      const left = removeLocalCertificate(confirmDelete.id).map((c, i) =>
+        normalizeItem({ ...c, _source: "local" }, i)
+      );
+      const api = items.filter((x) => x._source !== "local");
+      const map = new Map();
+      [...api, ...left].forEach((c) => {
+        const key = (c.title + "|" + c.issuer).toLowerCase();
+        map.set(key, c);
+      });
+      setItems(Array.from(map.values()));
+      setToast({ message: "Certificate deleted successfully", type: "success" });
+      setPreview(null);
+    } catch (error) {
+      setToast({ message: "Failed to delete certificate", type: "error" });
+    }
+    
+    setConfirmDelete(null);
   };
 
   const goEdit = (c, e) => {
@@ -475,6 +563,16 @@ export default function Certificates() {
     if (!owner) return;
     if (c._source === "local") nav(`/certificates/edit/${encodeURIComponent(c.id)}`);
     else nav("/certificates/new", { state: { prefill: c } });
+  };
+
+  // Enhanced credential link handler
+  const openCredential = (url, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setToast({ message: "Opening credential link...", type: "info" });
+    }
   };
 
   async function verifyUrl(url) {
@@ -530,6 +628,7 @@ export default function Certificates() {
       a.download = "certificates.json";
       a.click();
       URL.revokeObjectURL(url);
+      setToast({ message: "JSON export downloaded", type: "success" });
     } else if (format === "csv") {
       const csv = [
         ["Title", "Issuer", "Type", "Date", "Credential ID", "URL"],
@@ -545,11 +644,31 @@ export default function Certificates() {
       a.download = "certificates.csv";
       a.click();
       URL.revokeObjectURL(url);
+      setToast({ message: "CSV export downloaded", type: "success" });
     }
   };
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}>
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={confirmDeleteAction}
+        title="Delete Certificate"
+        message={`Are you sure you want to delete "${confirmDelete?.title}"? This action cannot be undone.`}
+        darkMode={darkMode}
+      />
+
       <section>
         <div className="container mx-auto px-4 py-10">
           {/* Header */}
@@ -709,6 +828,7 @@ export default function Certificates() {
               {filtered.map((c) => {
                 const tint = tintFor(c);
                 const ok = verified[c.id] === true;
+                const domain = c.credentialUrl ? getCredentialDomain(c.credentialUrl) : '';
 
                 if (viewMode === "list") {
                   return (
@@ -754,39 +874,47 @@ export default function Certificates() {
                           </div>
                         </div>
 
-                        {/* Hover actions (View credentials for everyone; Edit/Delete for owner) */}
-                        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto">
+                        {/* Hover actions */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {c.credentialUrl && (
-                            <a
-                              href={c.credentialUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className={`p-2 rounded-lg ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-                              title="View credentials"
+                            <button
+                              onClick={(e) => openCredential(c.credentialUrl, e)}
+                              className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 ${
+                                darkMode 
+                                  ? "bg-indigo-600 hover:bg-indigo-700 text-white" 
+                                  : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                              }`}
+                              title={`View credential on ${domain}`}
                             >
-                              🔗
-                            </a>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              View
+                            </button>
                           )}
                           {owner && (
                             <>
                               <button
                                 onClick={(e) => goEdit(c, e)}
-                                className={`p-2 rounded-lg ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
-                                title="Edit"
+                                className={`p-2 rounded-lg transition-colors ${darkMode ? "hover:bg-gray-700 text-gray-300" : "hover:bg-gray-100 text-gray-600"}`}
+                                title="Edit certificate"
                               >
-                                ✏️
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
                               </button>
                               {c._source === "local" && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onDelete(c.id, c._source);
+                                    onDelete(c);
                                   }}
-                                  className={`p-2 rounded-lg ${darkMode ? "text-red-400 hover:bg-red-900/20" : "text-red-600 hover:bg-red-50"}`}
-                                  title="Delete"
+                                  className={`p-2 rounded-lg transition-colors ${darkMode ? "text-red-400 hover:bg-red-900/20" : "text-red-600 hover:bg-red-50"}`}
+                                  title="Delete certificate"
                                 >
-                                  🗑️
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
                                 </button>
                               )}
                             </>
@@ -807,38 +935,46 @@ export default function Certificates() {
                     onClick={() => setPreview(c)}
                   >
                     {/* Top-right hover actions */}
-                    <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto">
+                    <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {c.credentialUrl && (
-                        <a
-                          href={c.credentialUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className={`p-2 rounded-lg border shadow-sm ${darkMode ? "bg-gray-900/80 border-gray-700 hover:bg-gray-800" : "bg-white/90 border-gray-200 hover:bg-white"}`}
-                          title="View credentials"
+                        <button
+                          onClick={(e) => openCredential(c.credentialUrl, e)}
+                          className={`px-2 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 shadow-sm ${
+                            darkMode 
+                              ? "bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-500" 
+                              : "bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-500"
+                          }`}
+                          title={`View credential on ${domain}`}
                         >
-                          🔗
-                        </a>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          View
+                        </button>
                       )}
                       {owner && (
                         <>
                           <button
                             onClick={(e) => goEdit(c, e)}
-                            className={`p-2 rounded-lg border shadow-sm ${darkMode ? "bg-gray-900/80 border-gray-700 hover:bg-gray-800" : "bg-white/90 border-gray-200 hover:bg-white"}`}
-                            title="Edit"
+                            className={`p-2 rounded-lg border shadow-sm transition-colors ${darkMode ? "bg-gray-900/80 border-gray-700 hover:bg-gray-800 text-gray-300" : "bg-white/90 border-gray-200 hover:bg-white text-gray-600"}`}
+                            title="Edit certificate"
                           >
-                            ✏️
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
                           </button>
                           {c._source === "local" && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onDelete(c.id, c._source);
+                                onDelete(c);
                               }}
-                              className={`p-2 rounded-lg border shadow-sm ${darkMode ? "bg-gray-900/80 border-red-700 text-red-400 hover:bg-red-900/30" : "bg-white/90 border-red-200 text-red-600 hover:bg-red-50"}`}
-                              title="Delete"
+                              className={`p-2 rounded-lg border shadow-sm transition-colors ${darkMode ? "bg-gray-900/80 border-red-700 text-red-400 hover:bg-red-900/30" : "bg-white/90 border-red-200 text-red-600 hover:bg-red-50"}`}
+                              title="Delete certificate"
                             >
-                              🗑️
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
                             </button>
                           )}
                         </>
@@ -883,6 +1019,25 @@ export default function Certificates() {
                           </span>
                         )}
                       </div>
+                      
+                      {/* Bottom action for grid view */}
+                      {c.credentialUrl && (
+                        <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => openCredential(c.credentialUrl, e)}
+                            className={`w-full px-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-2 ${
+                              darkMode 
+                                ? "bg-indigo-600 hover:bg-indigo-700 text-white" 
+                                : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                            }`}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            View on {domain}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -896,7 +1051,7 @@ export default function Certificates() {
           item={preview}
           onClose={() => setPreview(null)}
           onEdit={(item) => goEdit(item)}
-          onDelete={(item) => onDelete(item.id, item._source)}
+          onDelete={(item) => onDelete(item)}
           owner={owner}
           verified={preview ? verified[preview.id] : false}
           darkMode={darkMode}
