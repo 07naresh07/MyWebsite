@@ -500,6 +500,117 @@ static async Task EnsureContactMessagesTableAsync(NpgsqlConnection db)
     await cmd.ExecuteNonQueryAsync();
 }
 
+// -------- NEW: baseline table creators so production DBs are bootstrapped -----
+static async Task EnsureProfileTableAsync(NpgsqlConnection db)
+{
+    const string ddl = @"
+    create table if not exists profile(
+        id uuid primary key,
+        full_name text not null,
+        headline text null,
+        bio text null,
+        location text null,
+        email text null,
+        phone text null,
+        avatar_url text null,
+        banner_url text null,
+        socials jsonb null,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz null
+    );";
+    await using var cmd = new NpgsqlCommand(ddl, db);
+    await cmd.ExecuteNonQueryAsync();
+}
+
+static async Task EnsureProjectsTableAsync(NpgsqlConnection db)
+{
+    const string ddl = @"
+    create table if not exists projects(
+        id uuid primary key,
+        name text not null,
+        slug text unique,
+        summary_html text null,
+        tech_stack text[] not null default '{}',
+        images text[] not null default '{}',
+        links jsonb null,
+        featured boolean not null default false,
+        sort_order int not null default 0,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz null
+    );";
+    await using var cmd = new NpgsqlCommand(ddl, db);
+    await cmd.ExecuteNonQueryAsync();
+}
+
+static async Task EnsureExperienceTableAsync(NpgsqlConnection db)
+{
+    const string ddl = @"
+    create table if not exists experience(
+        id uuid primary key,
+        company text not null,
+        role text not null,
+        location text null,
+        start_ym text not null,
+        end_ym text null,
+        start_date timestamptz null,
+        end_date timestamptz null,
+        description_html text null,
+        tech_tags text[] not null default '{}',
+        sort_order int not null default 0
+    );";
+    await using var cmd = new NpgsqlCommand(ddl, db);
+    await cmd.ExecuteNonQueryAsync();
+}
+
+static async Task EnsureEducationTableAsync(NpgsqlConnection db)
+{
+    const string ddl = @"
+    create table if not exists education(
+        id uuid primary key,
+        school text not null,
+        degree text null,
+        field text null,
+        start_year int null,
+        end_year int null,
+        details_html text null,
+        sort_order int not null default 0
+    );";
+    await using var cmd = new NpgsqlCommand(ddl, db);
+    await cmd.ExecuteNonQueryAsync();
+}
+
+static async Task EnsureSkillsTableAsync(NpgsqlConnection db)
+{
+    const string ddl = @"
+    create table if not exists skills(
+        id uuid primary key,
+        name text not null,
+        category text null,
+        level int null,
+        sort_order int not null default 0
+    );";
+    await using var cmd = new NpgsqlCommand(ddl, db);
+    await cmd.ExecuteNonQueryAsync();
+}
+
+static async Task EnsureLanguagesTableAsync(NpgsqlConnection db)
+{
+    const string ddl = @"
+    create table if not exists languages(
+        id uuid primary key,
+        name text not null,
+        code text null,
+        level_cefr text null,
+        proficiency_pct int null,
+        is_primary boolean not null default false,
+        notes text null,
+        sort_order int not null default 0
+    );";
+    await using var cmd = new NpgsqlCommand(ddl, db);
+    await cmd.ExecuteNonQueryAsync();
+}
+// ---------------------------------------------------------------------------
+
 // --------------------- Routes ---------------------
 
 // Health (JSON under /api)
@@ -817,6 +928,7 @@ app.MapGet("/api/projects", async () =>
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureProjectsTableAsync(db);
     await EnsureProjectsColumnsAsync(db);
 
     const string sql = @"
@@ -840,6 +952,7 @@ app.MapPost("/api/projects", [Authorize(Policy = "Owner")] async (ProjectUpsertR
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureProjectsTableAsync(db);
     await EnsureProjectsColumnsAsync(db);
 
     var id = Guid.NewGuid();
@@ -876,6 +989,7 @@ app.MapPut("/api/projects/{id:guid}", [Authorize(Policy = "Owner")] async (Guid 
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureProjectsTableAsync(db);
     await EnsureProjectsColumnsAsync(db);
 
     var finalSlug = string.IsNullOrWhiteSpace(body.Slug) ? Slugify(body.Name ?? "") : body.Slug;
@@ -916,6 +1030,7 @@ app.MapDelete("/api/projects/{id:guid}", [Authorize(Policy = "Owner")] async (Gu
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureProjectsTableAsync(db);
 
     const string sql = "delete from projects where id = @id;";
     await using var cmd = new NpgsqlCommand(sql, db);
@@ -930,6 +1045,7 @@ app.MapGet("/api/profile", async () =>
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureProfileTableAsync(db);
 
     const string sql = @"
         select id, full_name, headline, bio, location, email, phone, avatar_url, banner_url, socials
@@ -946,6 +1062,7 @@ app.MapPut("/api/profile", [Authorize(Policy = "Owner")] async (ProfileUpsertReq
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureProfileTableAsync(db);
 
     Guid? id = null;
     object? currentSocials = null;
@@ -1059,6 +1176,7 @@ app.MapGet("/api/experience", async () =>
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureExperienceTableAsync(db);
 
     const string sql = @"
         select
@@ -1087,6 +1205,7 @@ app.MapPost("/api/experience", [Authorize(Policy = "Owner")] async (ExperienceUp
 
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureExperienceTableAsync(db);
 
     var id = Guid.NewGuid();
     string startYm = ToYearMonth(start);
@@ -1135,6 +1254,7 @@ app.MapPut("/api/experience/{id:guid}", [Authorize(Policy = "Owner")] async (Gui
 
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureExperienceTableAsync(db);
 
     string startYm = ToYearMonth(start);
     string? endYm = ToYearMonthOrNull(end);
@@ -1179,6 +1299,7 @@ app.MapDelete("/api/experience/{id:guid}", [Authorize(Policy = "Owner")] async (
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureExperienceTableAsync(db);
 
     const string sql = "delete from experience where id = @id;";
     await using var cmd = new NpgsqlCommand(sql, db);
@@ -1193,6 +1314,7 @@ app.MapGet("/api/education", async () =>
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureEducationTableAsync(db);
 
     var detailsCol = await ResolveEducationDetailsColumnAsync(db);
     string selectDetails = detailsCol is null ? "NULL::text as details" : $"{detailsCol} as details";
@@ -1221,6 +1343,7 @@ app.MapPost("/api/education", [Authorize(Policy = "Owner")] async (EducationUpse
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureEducationTableAsync(db);
 
     var detailsCol = await ResolveEducationDetailsColumnAsync(db);
     if (detailsCol is null)
@@ -1279,6 +1402,7 @@ app.MapPut("/api/education/{id:guid}", [Authorize(Policy = "Owner")] async (Guid
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureEducationTableAsync(db);
 
     var detailsCol = await ResolveEducationDetailsColumnAsync(db);
     if (detailsCol is null)
@@ -1343,6 +1467,7 @@ app.MapDelete("/api/education/{id:guid}", [Authorize(Policy = "Owner")] async (G
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureEducationTableAsync(db);
 
     const string sql = "delete from education where id = @id;";
     await using var cmd = new NpgsqlCommand(sql, db);
@@ -1359,6 +1484,8 @@ app.MapMethods("/api/skills", new[] { "GET", "OPTIONS" }, async () =>
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureSkillsTableAsync(db);
+
     const string sql = @"
         select id, name, category, level, sort_order
         from skills
@@ -1374,6 +1501,7 @@ app.MapPost("/api/skills", [Authorize(Policy = "Owner")] async (SkillUpsertReq b
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureSkillsTableAsync(db);
 
     var id = Guid.NewGuid();
 
@@ -1398,6 +1526,7 @@ app.MapPut("/api/skills/{id:guid}", [Authorize(Policy = "Owner")] async (Guid id
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureSkillsTableAsync(db);
 
     const string sql = @"
         update skills set
@@ -1419,6 +1548,8 @@ app.MapDelete("/api/skills/{id:guid}", [Authorize(Policy = "Owner")] async (Guid
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureSkillsTableAsync(db);
+
     const string sql = "delete from skills where id=@id;";
     await using var cmd = new NpgsqlCommand(sql, db);
     cmd.Parameters.AddWithValue("id", id);
@@ -1431,6 +1562,7 @@ app.MapGet("/api/languages", async () =>
 {
     await using var db = new NpgsqlConnection(conn);
     await db.OpenAsync();
+    await EnsureLanguagesTableAsync(db);
 
     const string sql = @"
         select id, name, code, level_cefr, proficiency_pct, is_primary, notes, sort_order
