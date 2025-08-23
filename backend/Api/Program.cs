@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.HttpOverrides; // <-- ADDED
 
 using Npgsql;
 using NpgsqlTypes;
@@ -30,6 +31,10 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 // ===== builder =====
 var builder = WebApplication.CreateBuilder(args);
+
+// Bind to Render's provided PORT (fallback 8080 for local)  <-- ADDED
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 // So API always emits camelCase JSON (nice for JS)
 builder.Services.ConfigureHttpJsonOptions(o =>
@@ -178,6 +183,12 @@ try
 }
 catch { /* ignore */ }
 
+// Honor X-Forwarded-* from Render's proxy so scheme/host are correct  <-- ADDED
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.X-ForwardedProto | ForwardedHeaders.X-ForwardedFor
+});
+
 // Put CORS early
 app.UseCors(corsPolicyName);
 
@@ -215,6 +226,10 @@ app.UseAuthorization();
 // Reply OK to preflights (so CORS headers flow)
 app.MapMethods("{*any}", new[] { "OPTIONS" }, () => Results.NoContent())
    .RequireCors(corsPolicyName);
+
+// --------------------- Root & Health (for Render) ---------------------  <-- ADDED
+app.MapGet("/", () => Results.Text("Backend is up 🚀", "text/plain"));
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok", time = DateTimeOffset.UtcNow }));
 
 // ===== Connection string =====
 string conn = builder.Configuration.GetConnectionString("Default")
@@ -429,6 +444,10 @@ static async Task EnsureContactMessagesTableAsync(NpgsqlConnection db)
 }
 
 // --------------------- Routes ---------------------
+
+// Root + Health (base URL + Render health)  <-- ADDED (placed before other routes is fine)
+app.MapGet("/", () => Results.Text("Backend is up 🚀", "text/plain"));
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok", time = DateTimeOffset.UtcNow }));
 
 // Health
 app.MapGet("/api/health", () => Results.Json(new { ok = true }))
