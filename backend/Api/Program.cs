@@ -75,15 +75,33 @@ var isDev = builder.Environment.IsDevelopment();
 // ===== CORS / Swagger / Static files =====
 var corsPolicyName = "Frontend";
 
-// CORS: exact-allow list + credentials
+// CORS: exact-allow list + (NEW) allow *.vercel.app for Vercel previews/production
 var allowedSet = new HashSet<string>(allowed, StringComparer.OrdinalIgnoreCase);
 builder.Services.AddCors(o =>
 {
     o.AddPolicy(corsPolicyName, p =>
         p.SetIsOriginAllowed(origin =>
         {
-            var normalized = origin?.TrimEnd('/') ?? "";
-            return allowedSet.Contains(normalized);
+            if (string.IsNullOrWhiteSpace(origin)) return false;
+
+            // normalize
+            var normalized = origin.TrimEnd('/');
+
+            // exact match from AllowedOrigin list
+            if (allowedSet.Contains(normalized)) return true;
+
+            // NEW: allow any Vercel deployments (previews + prod)
+            try
+            {
+                var host = new Uri(normalized).Host;
+                if (host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            catch
+            {
+                // ignore parse failure
+            }
+
+            return false;
         })
         .AllowAnyHeader()
         .AllowAnyMethod()
@@ -173,6 +191,7 @@ try
 {
     Console.WriteLine($"[API] ENV: {app.Environment.EnvironmentName}");
     Console.WriteLine($"[API] Allowed Origin(s): {string.Join(", ", allowed)}");
+    Console.WriteLine($"[API] Also allowing: *.vercel.app"); // NEW: quick hint
     Console.WriteLine($"[API] Owner pass configured: {(!string.IsNullOrWhiteSpace(OWNER_PASS) ? "YES" : "NO")}");
     Console.WriteLine($"[API] JWT key length: {SECRET?.Length ?? 0}");
     Console.WriteLine($"[API] Token lifetime (minutes): {tokenMinutes}");
