@@ -95,11 +95,6 @@ const getStyles = (isDark) => ({
       ? "border-slate-600/50 bg-slate-700/80 text-slate-100 placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20"
       : "border-gray-300/60 bg-white/90 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500/20"
   }`,
-  textArea: `w-full rounded-xl border backdrop-blur-sm transition-all duration-200 px-4 py-3 min-h-[140px] resize-none focus:ring-2 focus:ring-offset-0 ${
-    isDark
-      ? "border-slate-600/50 bg-slate-800 text-slate-100 placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20"
-      : "border-gray-300/60 bg-white text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500/20"
-  }`,
   paragraphMain: `leading-relaxed text-[16px] md:text-[17px] ${
     isDark ? "text-slate-200" : "text-gray-800"
   }`,
@@ -114,7 +109,7 @@ const getStyles = (isDark) => ({
 function Toast({ message, type = "info", onClose }) {
   const { isDark } = useTheme();
   useEffect(() => {
-    const t = setTimeout(onClose, 4000);
+    const t = setTimeout(onClose, 6000); // Longer timeout for debugging
     return () => clearTimeout(t);
   }, [onClose]);
   const typeStyles = {
@@ -127,17 +122,20 @@ function Toast({ message, type = "info", onClose }) {
     info: isDark
       ? "bg-blue-700/90 text-blue-100 border-blue-600 shadow-blue-500/20"
       : "bg-blue-100 text-blue-800 border-blue-300 shadow-blue-500/20",
+    debug: isDark
+      ? "bg-purple-700/90 text-purple-100 border-purple-600 shadow-purple-500/20"
+      : "bg-purple-100 text-purple-800 border-purple-300 shadow-purple-500/20",
   };
   return (
     <div
-      className={`fixed bottom-4 right-4 z-50 p-4 rounded-xl shadow-lg max-w-sm border backdrop-blur-sm ${typeStyles[type]} animate-in slide-in-from-right duration-300`}
+      className={`fixed bottom-4 right-4 z-50 p-4 rounded-xl shadow-lg max-w-md border backdrop-blur-sm ${typeStyles[type]} animate-in slide-in-from-right duration-300`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-lg">
-            {type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️"}
+            {type === "success" ? "✅" : type === "error" ? "❌" : type === "debug" ? "🐛" : "ℹ️"}
           </span>
-          <span className="text-sm font-medium">{message}</span>
+          <span className="text-sm font-medium whitespace-pre-wrap">{message}</span>
         </div>
         <button
           onClick={onClose}
@@ -211,7 +209,7 @@ function Header({ quote, editable, onOpenQuoteModal }) {
         </h1>
 
         {quote && (
-          <p className={`absolute right-4 bottom-2 text-sm italic ${isDark ? "text-slate-300" : "text-gray-600"}`}>“{quote}”</p>
+          <p className={`absolute right-4 bottom-2 text-sm italic ${isDark ? "text-slate-300" : "text-gray-600"}`}>"${quote}"</p>
         )}
 
         {editable && (
@@ -525,7 +523,11 @@ function LanguagesEditor({ items, onChange }) {
   const [list, setList] = useState(items || []);
   const [name, setName] = useState("");
   const [level, setLevel] = useState("");
-  useEffect(() => onChange(list), [list, onChange]);
+  
+  useEffect(() => {
+    console.log("LanguagesEditor: items changed to:", list);
+    onChange(list);
+  }, [list, onChange]);
 
   const levelsForLanguage = (n = "") => {
     const nl = n.toLowerCase();
@@ -540,12 +542,17 @@ function LanguagesEditor({ items, onChange }) {
 
   const addLang = () => {
     if (!name.trim() || !level.trim()) return;
-    setList([...(list || []), { name: stripEmoji(name.trim()), level: level.trim() }]);
+    const newLang = { name: stripEmoji(name.trim()), level: level.trim() };
+    console.log("Adding language:", newLang);
+    setList([...(list || []), newLang]);
     setName("");
     setLevel("");
   };
 
-  const removeLang = (idx) => setList((arr) => arr.filter((_, i) => i !== idx));
+  const removeLang = (idx) => {
+    console.log("Removing language at index:", idx);
+    setList((arr) => arr.filter((_, i) => i !== idx));
+  };
 
   return (
     <div className="space-y-4">
@@ -604,20 +611,18 @@ function AboutInner() {
     fullName: "Naresh Singh Dhami",
     quote: "Practice what you preach or change your speech.",
     avatarUrl: "",
-    about: "", // ← keep empty; no placeholder
-    interests: [],
-    languages: [],
-    focus: [],
-    motto: "",
+    about: "",           
+    interests: [],       
+    languages: [],       
+    focus: [],           
+    motto: "",           
   });
 
   const [edit, setEdit] = useState({ about: false, interests: false, languages: false, focus: false, motto: false });
   const [aboutDraftHtml, setAboutDraftHtml] = useState("");
 
   useEffect(() => {
-    if (!isOwner && edit.about) {
-      setEdit((e) => ({ ...e, about: false }));
-    }
+    if (!isOwner && edit.about) setEdit((e) => ({ ...e, about: false }));
   }, [isOwner, edit.about]);
 
   const [imgPreview, setImgPreview] = useState("");
@@ -642,62 +647,133 @@ function AboutInner() {
     setLoading(true);
     Promise.all([getProfile(), getSkills()])
       .then(([pr, sk]) => {
-        if (pr && typeof pr === "object") {
-          // Only apply fields that are defined (avoid overwriting with null)
-          setProfile((cur) => ({
-            ...cur,
-            fullName: pr.fullName ?? cur.fullName,
-            quote: pr.quote ?? cur.quote,
-            avatarUrl: pr.avatarUrl ?? cur.avatarUrl,
-            about: (pr.aboutHtml ?? pr.about ?? pr.bio ?? "").trim(),
-            interests: Array.isArray(pr.interests) ? pr.interests : cur.interests,
-            languages: Array.isArray(pr.languages) ? pr.languages : cur.languages,
-            focus: Array.isArray(pr.focus) ? pr.focus : cur.focus,
-            motto: pr.motto ?? cur.motto,
-          }));
-        }
+        console.log("DEBUG: Raw API response for profile:", pr);
+        console.log("DEBUG: Raw API response for skills:", sk);
+        
+        // Show detailed debug info
+        showToast(`API Response Structure:\nProfile keys: ${Object.keys(pr || {}).join(', ')}\nSkills count: ${Array.isArray(sk) ? sk.length : 'not array'}`, "debug");
+        
+        // Extract exactly what the API returns (more flexible approach)
+        const extras = pr?.socials?.extras || {};
+        console.log("DEBUG: socials.extras found:", extras);
+        
+        setProfile((cur) => ({
+          ...cur,
+          fullName: pr?.fullName ?? pr?.full_name ?? cur.fullName,
+          quote: pr?.headline ?? pr?.quote ?? cur.quote,     
+          avatarUrl: pr?.avatarUrl ?? pr?.avatar_url ?? cur.avatarUrl,
+          about: (pr?.bio ?? pr?.about ?? pr?.About ?? "").toString().trim(),                  
+          interests: Array.isArray(extras?.interests) ? extras.interests : 
+                    Array.isArray(pr?.interests) ? pr.interests : 
+                    cur.interests,
+          languages: Array.isArray(extras?.languages) ? extras.languages : 
+                    Array.isArray(pr?.languages) ? pr.languages : 
+                    cur.languages,
+          focus: Array.isArray(extras?.focus) ? extras.focus : 
+                Array.isArray(pr?.focus) ? pr.focus : 
+                cur.focus,
+          motto: typeof extras?.motto === "string" ? extras.motto : 
+                typeof pr?.motto === "string" ? pr.motto : 
+                cur.motto,
+        }));
+        
         if (Array.isArray(sk)) setSkills(sk.map(normalizeSkill));
       })
       .catch((e) => {
+        console.error("DEBUG: API Error:", e);
         const message = e?.message || "Failed to load data";
         setErr(message);
-        showToast(message, "error");
+        showToast(`Load Error: ${message}`, "error");
       })
       .finally(() => setLoading(false));
   }, [showToast]);
 
   /* ---------- Save ---------- */
   async function saveProfilePatch(patch) {
-    // Build merged state and send only supported keys; api.js maps to aboutHtml
+    console.log("DEBUG: saveProfilePatch called with:", patch);
+    
+    // Build merged state
     const merged = { ...profile, ...patch };
+    console.log("DEBUG: Merged profile data:", merged);
+
+    // Try multiple payload formats to ensure compatibility
     const payload = {
+      // Primary fields - what your original code was trying
       fullName: merged.fullName,
+      full_name: merged.fullName, // snake_case variant
+      FullName: merged.fullName,  // PascalCase variant
+      
+      headline: merged.quote,
       quote: merged.quote,
+      Quote: merged.quote,
+      
       avatarUrl: merged.avatarUrl,
-      about: merged.about, // api.js will map -> aboutHtml
-      interests: merged.interests,
-      languages: merged.languages,
-      focus: merged.focus,
-      motto: merged.motto,
+      avatar_url: merged.avatarUrl,
+      AvatarUrl: merged.avatarUrl,
+      
+      bio: merged.about,
+      about: merged.about,
+      About: merged.about,
+      
+      // Try nested approach (original assumption)
+      socials: {
+        extras: {
+          interests: merged.interests || [],
+          languages: merged.languages || [],
+          focus: merged.focus || [],
+          motto: merged.motto || ""
+        }
+      },
+      
+      // Try flat approach (alternative)
+      interests: merged.interests || [],
+      languages: merged.languages || [],
+      focus: merged.focus || [],
+      motto: merged.motto || "",
+      
+      // PascalCase variants
+      Interests: merged.interests || [],
+      Languages: merged.languages || [],
+      Focus: merged.focus || [],
+      Motto: merged.motto || ""
     };
 
+    console.log("DEBUG: Final payload being sent:", payload);
+
     try {
+      showToast("Attempting to save...", "info");
       const saved = await upsertProfile(payload);
+      
+      console.log("DEBUG: Save response received:", saved);
+      showToast(`Save Success!\nResponse keys: ${Object.keys(saved || {}).join(', ')}`, "success");
+
+      // Normalize from server response again (source of truth)
+      const extras = saved?.socials?.extras || {};
       setProfile((cur) => ({
         ...cur,
-        ...patch,
-        // make sure we store exactly what backend persisted
-        about: (saved?.aboutHtml ?? saved?.about ?? patch.about ?? cur.about)?.trim() || "",
-        interests: Array.isArray(saved?.interests) ? saved.interests : (patch.interests ?? cur.interests),
-        languages: Array.isArray(saved?.languages) ? saved.languages : (patch.languages ?? cur.languages),
-        focus: Array.isArray(saved?.focus) ? saved.focus : (patch.focus ?? cur.focus),
-        motto: saved?.motto ?? patch.motto ?? cur.motto,
+        fullName: saved?.fullName ?? saved?.full_name ?? merged.fullName,
+        quote: saved?.headline ?? saved?.quote ?? merged.quote,
+        avatarUrl: saved?.avatarUrl ?? saved?.avatar_url ?? merged.avatarUrl,
+        about: (saved?.bio ?? saved?.about ?? saved?.About ?? merged.about ?? "").toString().trim(),
+        interests: Array.isArray(extras?.interests) ? extras.interests : 
+                  Array.isArray(saved?.interests) ? saved.interests :
+                  merged.interests ?? [],
+        languages: Array.isArray(extras?.languages) ? extras.languages : 
+                  Array.isArray(saved?.languages) ? saved.languages :
+                  merged.languages ?? [],
+        focus: Array.isArray(extras?.focus) ? extras.focus : 
+              Array.isArray(saved?.focus) ? saved.focus :
+              merged.focus ?? [],
+        motto: typeof extras?.motto === "string" ? extras.motto : 
+              typeof saved?.motto === "string" ? saved.motto :
+              merged.motto ?? "",
       }));
-      showToast("Saved.", "success");
+
     } catch (e) {
+      console.error("DEBUG: Save error:", e);
       const m = e?.message || "Failed to save profile";
       setErr(m);
-      showToast(m, "error");
+      showToast(`Save Failed: ${m}\nCheck Network tab for details`, "error");
       throw e;
     }
   }
@@ -873,6 +949,20 @@ function AboutInner() {
   return (
     <div className={styles.page}>
       <div className="container py-8 space-y-6 max-w-7xl mx-auto">
+        {/* Debug Panel */}
+        {isOwner && (
+          <div className="p-4 bg-purple-100 dark:bg-purple-900/20 rounded-xl border border-purple-300 dark:border-purple-700">
+            <h4 className="font-bold text-purple-800 dark:text-purple-200 mb-2">🐛 Debug Info</h4>
+            <div className="text-sm space-y-1 text-purple-700 dark:text-purple-300">
+              <div><strong>Profile State:</strong> About length: {profile.about?.length || 0}, Languages: {profile.languages?.length || 0}, Motto: {profile.motto?.length || 0}</div>
+              <div><strong>Edit State:</strong> {Object.entries(edit).filter(([,v]) => v).map(([k]) => k).join(', ') || 'None'}</div>
+              <div className="mt-2 p-2 bg-purple-50 dark:bg-purple-900/30 rounded text-xs">
+                <strong>Instructions:</strong> Open browser DevTools → Network tab → Try saving → Check the request/response details
+              </div>
+            </div>
+          </div>
+        )}
+
         <Header
           quote={profile?.quote}
           editable={isOwner}
@@ -881,6 +971,12 @@ function AboutInner() {
             setQuoteModal(true);
           }}
         />
+
+        {err && (
+          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300">
+            {err}
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-4 gap-6">
           {/* LEFT SIDEBAR */}
@@ -939,9 +1035,13 @@ function AboutInner() {
               title="🎯 Interests"
               canEdit={isOwner}
               editing={edit.interests}
-              onEdit={() => isOwner && setEdit((e) => ({ ...e, interests: true }))}
+              onEdit={() => {
+                console.log("DEBUG: Starting to edit interests");
+                isOwner && setEdit((e) => ({ ...e, interests: true }));
+              }}
               onCancel={() => setEdit((e) => ({ ...e, interests: false }))}
               onSave={async () => {
+                console.log("DEBUG: Saving interests:", profile.interests);
                 await saveProfilePatch({ interests: profile.interests || [] });
                 setEdit((e) => ({ ...e, interests: false }));
               }}
@@ -956,12 +1056,15 @@ function AboutInner() {
                     ))}
                   </ul>
                 ) : (
-                  <div className={isDark ? "text-slate-400" : "text-gray-500"}> </div>
+                  <div className={isDark ? "text-slate-400" : "text-gray-500"}>No interests added yet.</div>
                 )
               ) : (
                 <EditableList
                   items={profile.interests || []}
-                  setItems={(arr) => setProfile((p) => ({ ...p, interests: arr }))}
+                  setItems={(arr) => {
+                    console.log("DEBUG: Updating interests to:", arr);
+                    setProfile((p) => ({ ...p, interests: arr }));
+                  }}
                   placeholder="Add a new interest..."
                 />
               )}
@@ -972,9 +1075,13 @@ function AboutInner() {
               title="🌍 Languages"
               canEdit={isOwner}
               editing={edit.languages}
-              onEdit={() => isOwner && setEdit((e) => ({ ...e, languages: true }))}
+              onEdit={() => {
+                console.log("DEBUG: Starting to edit languages");
+                isOwner && setEdit((e) => ({ ...e, languages: true }));
+              }}
               onCancel={() => setEdit((e) => ({ ...e, languages: false }))}
               onSave={async () => {
+                console.log("DEBUG: Saving languages:", profile.languages);
                 await saveProfilePatch({ languages: profile.languages || [] });
                 setEdit((e) => ({ ...e, languages: false }));
               }}
@@ -984,7 +1091,10 @@ function AboutInner() {
               ) : (
                 <LanguagesEditor
                   items={profile.languages || []}
-                  onChange={(arr) => setProfile((p) => ({ ...p, languages: arr }))}
+                  onChange={(arr) => {
+                    console.log("DEBUG: LanguagesEditor onChange called with:", arr);
+                    setProfile((p) => ({ ...p, languages: arr }));
+                  }}
                 />
               )}
             </EditableCard>
@@ -997,6 +1107,7 @@ function AboutInner() {
               onEdit={() => isOwner && setEdit((e) => ({ ...e, focus: true }))}
               onCancel={() => setEdit((e) => ({ ...e, focus: false }))}
               onSave={async () => {
+                console.log("DEBUG: Saving focus:", profile.focus);
                 await saveProfilePatch({ focus: profile.focus || [] });
                 setEdit((e) => ({ ...e, focus: false }));
               }}
@@ -1011,7 +1122,7 @@ function AboutInner() {
                     ))}
                   </ul>
                 ) : (
-                  <div className={isDark ? "text-slate-400" : "text-gray-500"}> </div>
+                  <div className={isDark ? "text-slate-400" : "text-gray-500"}>No focus areas added yet.</div>
                 )
               ) : (
                 <EditableList
@@ -1030,6 +1141,7 @@ function AboutInner() {
               onEdit={() => isOwner && setEdit((e) => ({ ...e, motto: true }))}
               onCancel={() => setEdit((e) => ({ ...e, motto: false }))}
               onSave={async () => {
+                console.log("DEBUG: Saving motto:", profile.motto);
                 await saveProfilePatch({ motto: profile.motto || "" });
                 setEdit((e) => ({ ...e, motto: false }));
               }}
@@ -1040,13 +1152,16 @@ function AboutInner() {
                     isDark ? "text-slate-300 bg-transparent" : "text-gray-700 bg-gradient-to-r from-purple-50 to-blue-50"
                   }`}
                 >
-                  {profile?.motto ? `“${profile.motto}”` : ""}
+                  {profile?.motto ? `"${profile.motto}"` : "No motto added yet."}
                 </div>
               ) : (
                 <input
                   className={`${styles.inputBase} h-12 text-[15px]`}
                   value={profile.motto || ""}
-                  onChange={(e) => setProfile((p) => ({ ...p, motto: e.target.value }))}
+                  onChange={(e) => {
+                    console.log("DEBUG: Motto input changed to:", e.target.value);
+                    setProfile((p) => ({ ...p, motto: e.target.value }));
+                  }}
                   placeholder="Your personal motto..."
                 />
               )}
@@ -1064,7 +1179,10 @@ function AboutInner() {
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       className={`${styles.btnGhost} text-xs`}
-                      onClick={() => setEdit((e) => ({ ...e, about: true }))}
+                      onClick={() => {
+                        console.log("DEBUG: Starting to edit about section");
+                        setEdit((e) => ({ ...e, about: true }));
+                      }}
                     >
                       ✏️ Edit
                     </button>
@@ -1073,7 +1191,6 @@ function AboutInner() {
               </div>
 
               {!edit.about ? (
-                // *** No placeholder here anymore ***
                 (profile?.about || "").trim() ? (
                   <div
                     dir="ltr"
@@ -1083,40 +1200,25 @@ function AboutInner() {
                     dangerouslySetInnerHTML={{ __html: sanitizeAboutHtml(profile.about || "") }}
                   />
                 ) : (
-                  <div className={isDark ? "text-slate-400" : "text-gray-500"}> </div>
+                  <div className={isDark ? "text-slate-400" : "text-gray-500"}>Click edit to add your about section.</div>
                 )
               ) : (
-                <div className="space-y-3">
-                  <div
-                    ref={aboutRef}
-                    id="about-editor"
-                    dir="ltr"
-                    className={`min-h-[220px] border rounded p-3 text-sm overflow-auto outline-none ${
-                      isDark ? "bg-slate-800 text-slate-100 border-slate-600" : "bg-white text-slate-900 border-slate-300"
-                    }`}
-                    style={{ direction: "ltr", unicodeBidi: "isolate", textAlign: "left", whiteSpace: "pre-wrap" }}
-                    contentEditable
-                    suppressContentEditableWarning
-                    onPaste={onAboutPaste}
-                    onInput={(e) => setAboutDraftHtml(e.currentTarget.innerHTML)}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      className={styles.btnPrimary}
-                      onClick={async () => {
-                        const current = aboutRef.current?.innerHTML ?? aboutDraftHtml ?? "";
-                        const clean = sanitizeAboutHtml(current || "");
-                        await saveProfilePatch({ about: clean });
-                        setEdit((e) => ({ ...e, about: false }));
-                      }}
-                    >
-                      ✓ Save
-                    </button>
-                    <button className={styles.btnGhost} onClick={() => setEdit((e) => ({ ...e, about: false }))}>
-                      ✕ Cancel
-                    </button>
-                  </div>
-                </div>
+                <AboutEditor
+                  isDark={isDark}
+                  styles={styles}
+                  aboutRef={aboutRef}
+                  onAboutPaste={onAboutPaste}
+                  aboutDraftHtml={aboutDraftHtml}
+                  setAboutDraftHtml={setAboutDraftHtml}
+                  onSave={async () => {
+                    const current = aboutRef.current?.innerHTML ?? aboutDraftHtml ?? "";
+                    const clean = sanitizeAboutHtml(current || "");
+                    console.log("DEBUG: Saving about section:", clean);
+                    await saveProfilePatch({ about: clean });
+                    setEdit((e) => ({ ...e, about: false }));
+                  }}
+                  onCancel={() => setEdit((e) => ({ ...e, about: false }))}
+                />
               )}
             </div>
 
@@ -1150,6 +1252,7 @@ function AboutInner() {
           <button
             className={styles.btnPrimary}
             onClick={async () => {
+              console.log("DEBUG: Saving quote:", quoteDraft);
               await saveProfilePatch({ quote: quoteDraft });
               setQuoteModal(false);
             }}
@@ -1195,6 +1298,47 @@ function AboutInner() {
       </Modal>
 
       {toast && <Toast {...toast} onClose={hideToast} />}
+    </div>
+  );
+}
+
+/* Split out About editor for clarity */
+function AboutEditor({
+  isDark,
+  styles,
+  aboutRef,
+  onAboutPaste,
+  aboutDraftHtml,
+  setAboutDraftHtml,
+  onSave,
+  onCancel,
+}) {
+  return (
+    <div className="space-y-3">
+      <div
+        ref={aboutRef}
+        id="about-editor"
+        dir="ltr"
+        className={`min-h-[220px] border rounded p-3 text-sm overflow-auto outline-none ${
+          isDark ? "bg-slate-800 text-slate-100 border-slate-600" : "bg-white text-slate-900 border-slate-300"
+        }`}
+        style={{ direction: "ltr", unicodeBidi: "isolate", textAlign: "left", whiteSpace: "pre-wrap" }}
+        contentEditable
+        suppressContentEditableWarning
+        onPaste={onAboutPaste}
+        onInput={(e) => {
+          console.log("DEBUG: About editor input changed");
+          setAboutDraftHtml(e.currentTarget.innerHTML);
+        }}
+      />
+      <div className="flex gap-2">
+        <button className={styles.btnPrimary} onClick={onSave}>
+          ✓ Save
+        </button>
+        <button className={styles.btnGhost} onClick={onCancel}>
+          ✕ Cancel
+        </button>
+      </div>
     </div>
   );
 }
