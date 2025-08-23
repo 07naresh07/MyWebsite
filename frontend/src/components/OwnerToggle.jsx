@@ -1,6 +1,7 @@
+// src/components/OwnerToggle.jsx
 import { useState } from "react";
 import { ownerLogin } from "../lib/api.js";
-import { useOwnerMode, signInOwner, signOutOwner } from "../lib/owner.js";
+import { useOwnerMode, signInOwner, signOutOwner, setOwnerFlag } from "../lib/owner.js";
 
 export default function OwnerToggle({ className = "" }) {
   const { owner } = useOwnerMode();
@@ -17,11 +18,28 @@ export default function OwnerToggle({ className = "" }) {
     setBusy(true);
     setErr("");
     try {
-      const token = await ownerLogin(pass);
-      if (!token) throw new Error("No token received");
-      signInOwner(token);
+      // ownerLogin should POST /api/auth/owner with credentials: "include"
+      // It may return a token (JWT mode) OR just {ok:true} (cookie mode).
+      const res = await ownerLogin(pass);
+
+      const token =
+        typeof res === "string" ? res :
+        typeof res?.token === "string" ? res.token :
+        "";
+
+      if (token) {
+        // legacy/JWT flow
+        signInOwner(token);
+      } else {
+        // cookie flow — trust server set cookie; enable UI owner mode
+        setOwnerFlag(true);
+      }
+
       setPass("");
       setOpen(false);
+
+      // Ask Navbar to re-fetch /api/auth/me
+      window.dispatchEvent(new Event("focus"));
     } catch (ex) {
       setErr(ex.message || "Login failed");
     } finally {
@@ -29,12 +47,22 @@ export default function OwnerToggle({ className = "" }) {
     }
   }
 
+  async function doSignOut() {
+    try {
+      // If you added a logout endpoint that clears the cookie:
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(()=>{});
+    } catch {}
+    signOutOwner();
+    // Ask Navbar to re-check server state
+    window.dispatchEvent(new Event("focus"));
+  }
+
   return (
     <>
       {owner ? (
         <button
           type="button"
-          onClick={() => signOutOwner()}
+          onClick={doSignOut}
           className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm
                       border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 ${className}`}
           title="Owner mode (sign out)"
@@ -111,7 +139,6 @@ export default function OwnerToggle({ className = "" }) {
                       Cancel
                     </button>
 
-                    {/* Primary action — high contrast */}
                     <button
                       type="submit"
                       disabled={!pass || busy}

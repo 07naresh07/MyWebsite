@@ -1,40 +1,29 @@
 // src/components/Navbar.jsx
 import { NavLink, Link } from "react-router-dom";
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Home, User, Briefcase, GraduationCap, FolderOpen,
   BookOpen, Award, Mail, Menu, X
 } from "lucide-react";
 import OwnerToggle from "./OwnerToggle.jsx";
-import { getToggleVisible, setToggleVisible, setOwnerFlag } from "../lib/owner.js";
+import { useOwnerMode, getToggleVisible, setToggleVisible } from "../lib/owner.js";
+// (Optional) import { authMe } from "../lib/api.js"; // only if you want background check logs
 
 /* ---------------------------------------
-   Animated Brand: "Naresh" 
-   - Kauffman script font with 45-degree rotation
-   - Continuous sequential letter animation
-   - Beautiful gradient colors
-   - Fancy decorative underline
+   Animated Brand: "Naresh"
 ---------------------------------------- */
 function AnimatedBrand() {
   const text = "Naresh";
-  const prefersReduced = typeof window !== "undefined" &&
+  const prefersReduced =
+    typeof window !== "undefined" &&
     window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  const letterGradients = [
-    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-    "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
-    "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
-    "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
-    "linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)"
-  ];
-
   return (
     <div className="relative inline-flex items-center select-none group">
-      <link 
-        href="https://fonts.googleapis.com/css2?family=Kaushan+Script:wght@400&display=swap" 
-        rel="stylesheet" 
+      <link
+        href="https://fonts.googleapis.com/css2?family=Kaushan+Script:wght@400&display=swap"
+        rel="stylesheet"
       />
       <div
         className="
@@ -45,24 +34,25 @@ function AnimatedBrand() {
         style={{
           fontFamily: "'Kaushan Script', cursive",
           fontSize: "1.5rem",
-          fontWeight: "400"
+          fontWeight: 400
         }}
       >
         {Array.from(text).map((letter, index) => {
           const delay = index * 150;
           return (
             <span
-              key={`${letter}-${index}-${Date.now()}`}
+              key={`${letter}-${index}`}
               className="
                 relative inline-block
                 opacity-0 transform translate-y-4 scale-90
                 transition-all duration-400
               "
               style={{
-                animation: prefersReduced 
-                  ? "none" 
+                animation: prefersReduced
+                  ? "none"
                   : `letterSlideInfinite 3s ${delay}ms ease-in-out infinite`,
-                backgroundImage: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%)",
+                backgroundImage:
+                  "linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%)",
                 WebkitBackgroundClip: "text",
                 backgroundClip: "text",
                 color: "transparent",
@@ -74,7 +64,8 @@ function AnimatedBrand() {
             </span>
           );
         })}
-        {/* underline and sparkle effects (unchanged) */}
+
+        {/* underline line */}
         <div
           className="
             absolute -bottom-1 left-0 right-0 h-0.5 overflow-hidden rounded-full
@@ -82,9 +73,7 @@ function AnimatedBrand() {
           "
           style={{
             background: "linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899)",
-            animation: prefersReduced 
-              ? "none" 
-              : "simpleUnderlineGrow 3s 1s ease-out infinite"
+            animation: prefersReduced ? "none" : "simpleUnderlineGrow 3s 1s ease-out infinite"
           }}
         >
           {!prefersReduced && (
@@ -100,15 +89,15 @@ function AnimatedBrand() {
             />
           )}
         </div>
+
+        {/* fancy underline */}
         <div
           className="
             absolute -bottom-1 left-0 right-0 h-1 overflow-visible
             transform origin-left scale-x-0 transition-transform duration-600 ease-out
           "
           style={{
-            animation: prefersReduced 
-              ? "none" 
-              : "fancyUnderlineGrow 3s 1s ease-out infinite"
+            animation: prefersReduced ? "none" : "fancyUnderlineGrow 3s 1s ease-out infinite"
           }}
         >
           <svg
@@ -154,20 +143,12 @@ function AnimatedBrand() {
         </div>
       </div>
 
-      <style jsx>{`
+      {/* Plain <style> (no styled-jsx) */}
+      <style>{`
         @keyframes letterSlideInfinite {
-          0%, 20% {
-            opacity: 0;
-            transform: translateY(16px) scale(0.8) rotateZ(-3deg);
-          }
-          25%, 75% {
-            opacity: 1;
-            transform: translateY(0) scale(1) rotateZ(0deg);
-          }
-          80%, 100% {
-            opacity: 0;
-            transform: translateY(-8px) scale(0.9) rotateZ(2deg);
-          }
+          0%, 20% { opacity: 0; transform: translateY(16px) scale(0.8) rotateZ(-3deg); }
+          25%, 75% { opacity: 1; transform: translateY(0) scale(1) rotateZ(0deg); }
+          80%, 100% { opacity: 0; transform: translateY(-8px) scale(0.9) rotateZ(2deg); }
         }
         @keyframes simpleUnderlineGrow {
           0%, 15% { transform: scaleX(0); opacity: 0; }
@@ -179,14 +160,17 @@ function AnimatedBrand() {
           25%, 80% { transform: scaleX(1); opacity: 1; }
           90%, 100% { transform: scaleX(0); opacity: 0; }
         }
-        @keyframes sparkleMove {
-          0%, 15% { transform: translateX(-5px); opacity: 0; }
-          25% { opacity: 1; }
-          75% { opacity: 0.8; }
-          85%, 100% { transform: translateX(100px); opacity: 0; }
+        @keyframes dotMove {
+          0%   { transform: translateX(-5px); opacity: 0; }
+          25%  { opacity: 1; }
+          75%  { opacity: 0.8; }
+          100% { transform: translateX(100px); opacity: 0; }
         }
-        @media (prefers-reduced-motion: reduce) {
-          * { animation: none !important; }
+        @keyframes sparkleMove {
+          0%   { transform: translateX(-5px); opacity: 0; }
+          25%  { opacity: 1; }
+          75%  { opacity: 0.8; }
+          100% { transform: translateX(100px); opacity: 0; }
         }
       `}</style>
     </div>
@@ -196,9 +180,45 @@ function AnimatedBrand() {
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [showOwnerToggle, setShowOwnerToggle] = useState(getToggleVisible());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const tabsRef = useRef(null);
+
+  // Owner state from local token (source-of-truth for UI)
+  const { owner } = useOwnerMode();
+
+  // Whether to render the OwnerToggle at all (owner OR admin hint OR dev)
+  const [showOwnerToggle, setShowOwnerToggle] = useState(() => {
+    try { return getToggleVisible() || owner; } catch { return !!owner; }
+  });
+
+  // one-time admin query to reveal Viewer button without exposing to the world
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("admin") === "1") {
+        setShowOwnerToggle(true);
+        setToggleVisible(true); // remember visibility for later
+        url.searchParams.delete("admin");
+        window.history.replaceState({}, "", url);
+      }
+    } catch {}
+  }, []);
+
+  // when owner becomes true/false, keep the toggle visible if already revealed,
+  // but never forcibly flip owner mode from here
+  useEffect(() => {
+    if (owner) {
+      setShowOwnerToggle(true);
+      setToggleVisible(true);
+    }
+  }, [owner]);
+
+  // optional: background server check, but DO NOT flip UI on failures
+  // useEffect(() => {
+  //   (async () => {
+  //     try { const res = await authMe(); console.debug("auth/me", res); }
+  //     catch (e) { console.debug("auth/me failed", e); }
+  //   })();
+  // }, [owner]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -212,24 +232,11 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const admin = url.searchParams.get("admin");
-    if (admin !== null) {
-      const on = admin === "1" || admin === "true";
-      setToggleVisible(on);
-      setShowOwnerToggle(getToggleVisible());
-      setOwnerFlag(on);
-      url.searchParams.delete("admin");
-      window.history.replaceState({}, "", url.toString());
-    }
-  }, []);
-
   const navigationItems = [
     { to: "/", icon: Home, label: "Home" },
     { to: "/about", icon: User, label: "About" },
     { to: "/experience", icon: Briefcase, label: "Experience" },
-    { to: "/education", icon: GraduationCap, label: "Education" }, // ✅ Added here
+    { to: "/education", icon: GraduationCap, label: "Education" },
     { to: "/projects", icon: FolderOpen, label: "Projects" },
     { to: "/blog", icon: BookOpen, label: "Blog" },
     { to: "/certificates", icon: Award, label: "Certificates" },
@@ -272,11 +279,7 @@ export default function Navbar() {
           <div className="flex items-center justify-between h-16">
             <div className="hidden lg:block w-16"></div>
             <div className="hidden lg:flex items-center space-x-1 flex-1">
-              <Link
-                to="/"
-                className="flex-shrink-0 whitespace-nowrap px-3 py-2"
-                aria-label="Go to home"
-              >
+              <Link to="/" className="flex-shrink-0 whitespace-nowrap px-3 py-2" aria-label="Go to home">
                 <AnimatedBrand />
               </Link>
               {navigationItems.map(({ to, icon: Icon, label }) => (
@@ -288,11 +291,7 @@ export default function Navbar() {
             </div>
             <div className="flex items-center gap-2">
               <div className="lg:hidden absolute left-1/2 transform -translate-x-1/2">
-                <Link
-                  to="/"
-                  className="flex-shrink-0 whitespace-nowrap"
-                  aria-label="Go to home"
-                >
+                <Link to="/" className="flex-shrink-0 whitespace-nowrap" aria-label="Go to home">
                   <AnimatedBrand />
                 </Link>
               </div>

@@ -35,14 +35,17 @@ function isExpired(token) {
 }
 
 /* --------------------- Public API --------------------- */
-// owner = flag true AND token exists & not expired
+// OWNER is true if UI flag is set AND (no token required for cookie flow).
+// If a token exists (legacy/JWT), it must be valid.
 export function getOwner() {
   try {
     const mode = (ls && ls.getItem(KEY_MODE)) === "true";
     const tok  = read(KEY_TOKEN);
-    if (!mode || !tok) return false;
-    if (isExpired(tok)) { signOutOwner(); return false; }
-    return true;
+
+    if (tok && isExpired(tok)) {
+      removeBoth(KEY_TOKEN);
+    }
+    return mode && (!tok || !isExpired(tok));
   } catch { return false; }
 }
 
@@ -61,12 +64,16 @@ export function setOwnerFlag(v) {
   } catch {}
 }
 
+// Accepts optional JWT (legacy). If absent, still enable owner mode (cookie flow).
 export function signInOwner(token) {
   try {
-    if (!token || isExpired(token)) { signOutOwner(); return; }
-    writeBoth(KEY_TOKEN, token);
+    if (token) {
+      if (isExpired(token)) { signOutOwner(); return; }
+      writeBoth(KEY_TOKEN, token);
+    } else {
+      removeBoth(KEY_TOKEN);
+    }
     writeLS(KEY_MODE, "true");
-    // Ensure toggle stays visible once signed in (so user can sign out later)
     writeLS(KEY_TOGGLE, "true");
     dispatchOwnerEvent();
   } catch {}
@@ -80,12 +87,7 @@ export function signOutOwner() {
   } catch {}
 }
 
-// When should the toggle be visible?
-// - Always in Vite dev
-// - When running on localhost/127.*
-// - If already signed in (token present & valid)
-// - If user previously enabled it
-// - If URL has ?admin=1 (persist & strip)
+// Toggle visible in dev, localhost, if signed in, if previously enabled, or via ?admin=1
 export function getToggleVisible() {
   try {
     const dev = !!import.meta?.env?.DEV;
@@ -96,7 +98,6 @@ export function getToggleVisible() {
       const isLocalhost = /^localhost$|^127\.|^0\.0\.0\.0$/.test(hostname);
       if (isLocalhost) return true;
 
-      // one-shot unlock via ?admin=1
       const url = new URL(href);
       if (url.searchParams.get("admin") === "1") {
         writeLS(KEY_TOGGLE, "true");
@@ -106,7 +107,6 @@ export function getToggleVisible() {
       }
     }
 
-    // visible if signed in or user enabled previously
     if (getOwner()) return true;
     return (ls && ls.getItem(KEY_TOGGLE)) === "true";
   } catch { return false; }
@@ -125,7 +125,6 @@ export function useOwnerMode() {
     const sync = () => { setOwner(getOwner()); setTok(getToken()); };
 
     const onStorage = (e) => {
-      // some browsers dispatch null keys; resync anyway
       if (!e || !("key" in e) || [null, KEY_MODE, KEY_TOKEN, KEY_TOGGLE].includes(e.key)) sync();
     };
     const onVis = () => { if (document.visibilityState === "visible") sync(); };

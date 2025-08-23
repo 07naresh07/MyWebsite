@@ -64,6 +64,9 @@ var tokenMinutesCfg = builder.Configuration["Owner:TokenMinutes"];
 int tokenMinutes = int.TryParse(tokenMinutesCfg, out var tm) ? tm : 120; // default 2h
 var jwtKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SECRET));
 
+// ===== NEW: environment mode flag for auth handler =====
+var isDev = builder.Environment.IsDevelopment();
+
 // ===== CORS / Swagger / Static files =====
 var corsPolicyName = "Frontend";
 
@@ -109,21 +112,46 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ClockSkew = TimeSpan.FromSeconds(30)
         };
 
+        // ===== CHANGED: Read token from HttpOnly cookie first; disallow query param in prod =====
         opt.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
             {
-                var auth = context.Request.Headers["Authorization"].FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(auth) && auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-                { context.Token = auth.Substring("Bearer ".Length).Trim(); return Task.CompletedTask; }
+                // 1) HttpOnly cookie (preferred)
+                if (context.Request.Cookies.TryGetValue("auth", out var cookieToken) &&
+                    !string.IsNullOrWhiteSpace(cookieToken))
+                {
+                    context.Token = cookieToken;
+                    return Task.CompletedTask;
+                }
 
+                // 2) Authorization: Bearer <token>
+                var auth = context.Request.Headers["Authorization"].FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(auth) &&
+                    auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Token = auth.Substring("Bearer ".Length).Trim();
+                    return Task.CompletedTask;
+                }
+
+                // 3) Custom header (optional)
                 var xTok = context.Request.Headers["X-Owner-Token"].FirstOrDefault();
                 if (!string.IsNullOrWhiteSpace(xTok))
-                { context.Token = xTok.Trim(); return Task.CompletedTask; }
+                {
+                    context.Token = xTok.Trim();
+                    return Task.CompletedTask;
+                }
 
-                var q = context.Request.Query["token"].FirstOrDefault();
-                if (!string.IsNullOrWhiteSpace(q))
-                { context.Token = q.Trim(); return Task.CompletedTask; }
+                // 4) Allow query token only in Development (Swagger/testing)
+                if (isDev)
+                {
+                    var q = context.Request.Query["token"].FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(q))
+                    {
+                        context.Token = q.Trim();
+                        return Task.CompletedTask;
+                    }
+                }
 
                 return Task.CompletedTask;
             }
@@ -407,7 +435,8 @@ app.MapGet("/api/health", () => Results.Json(new { ok = true }))
    .RequireCors(corsPolicyName);
 
 // ---- Auth
-app.MapPost("/api/auth/owner", (OwnerLogin body) =>
+// ===== CHANGED: set HttpOnly cookie on successful login =====
+app.MapPost("/api/auth/owner", (OwnerLogin body, HttpResponse res) =>
 {
     var pass = (body.Pass ?? "").Trim();
 
@@ -425,13 +454,43 @@ app.MapPost("/api/auth/owner", (OwnerLogin body) =>
         expires: DateTime.UtcNow.AddMinutes(tokenMinutes),
         signingCredentials: creds);
     var tokenStr = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().WriteToken(token);
+
+    // HttpOnly cookie so JS can't read it
+    res.Cookies.Append("auth", tokenStr, new CookieOptions
+    {
+        HttpOnly = true,
+        Secure = true,
+        SameSite = SameSiteMode.Strict,
+        Path = "/",
+        Expires = DateTimeOffset.UtcNow.AddMinutes(tokenMinutes),
+        IsEssential = true
+    });
+
     return Results.Ok(new { token = tokenStr });
 }).RequireCors(corsPolicyName);
 
-app.MapGet("/api/auth/me", [Authorize] (ClaimsPrincipal user) =>
+// ===== NEW: logout clears cookie =====
+app.MapPost("/api/auth/logout", (HttpResponse res) =>
 {
-    var claims = user.Claims.Select(c => new { c.Type, c.Value }).ToArray();
-    return Results.Ok(new { ok = true, claims });
+    res.Cookies.Delete("auth", new CookieOptions
+    {
+        HttpOnly = true,
+        Secure = true,
+        SameSite = SameSiteMode.Strict,
+        Path = "/"
+    });
+    return Results.NoContent();
+}).RequireCors(corsPolicyName);
+
+// ===== CHANGED: /api/auth/me returns only { isOwner } without leaking claims =====
+app.MapGet("/api/auth/me", (HttpContext ctx) =>
+{
+    ctx.Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+    var user = ctx.User;
+    var isOwner = user?.HasClaim(c =>
+        (c.Type == "role" || c.Type == ClaimTypes.Role) && c.Value == "owner") ?? false;
+
+    return Results.Ok(new { isOwner });
 }).RequireCors(corsPolicyName);
 
 // --------------------- SAFE CERT LINK RESOLVER + PROXY ---------------------
