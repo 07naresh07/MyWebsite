@@ -214,7 +214,7 @@ if (string.IsNullOrWhiteSpace(webroot)) webroot = Path.Combine(Directory.GetCurr
 Directory.CreateDirectory(webroot);
 app.UseStaticFiles();
 
-// --- NEW: make the exception handler also emit CORS headers when returning errors ---
+// --- keep: exception handler that emits CORS headers on errors ---
 app.UseExceptionHandler(handler =>
 {
     handler.Run(async ctx =>
@@ -254,8 +254,20 @@ app.MapGet("/", () => Results.Text("Backend is up 🚀", "text/plain"));
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok", time = DateTimeOffset.UtcNow }));
 
 // ===== Connection string =====
+// NEW: also fall back to common env names and enforce SSL/TrustServerCertificate/ErrorDetail.
 string conn = builder.Configuration.GetConnectionString("Default")
-    ?? throw new Exception("Missing ConnectionStrings:Default");
+              ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+              ?? Environment.GetEnvironmentVariable("SUPABASE_DB_URL")
+              ?? Environment.GetEnvironmentVariable("POSTGRES_URL")
+              ?? throw new Exception("Missing ConnectionStrings:Default (or DATABASE_URL/SUPABASE_DB_URL/POSTGRES_URL).");
+
+// Ensure SSL requirements for hosted DBs like Supabase/Render Postgres
+bool hasSsl    = Regex.IsMatch(conn, @"(?i)\bssl\s*mode\s*=", RegexOptions.IgnoreCase);
+bool hasTrust  = Regex.IsMatch(conn, @"(?i)\btrust\s*server\s*certificate\s*=", RegexOptions.IgnoreCase);
+bool hasDetail = Regex.IsMatch(conn, @"(?i)\binclude\s*error\s*detail\s*=", RegexOptions.IgnoreCase);
+if (!hasSsl)    conn += ";Ssl Mode=Require";
+if (!hasTrust)  conn += ";Trust Server Certificate=true";
+if (!hasDetail) conn += ";Include Error Detail=true";
 
 // Log DB target
 try
@@ -264,6 +276,29 @@ try
     Console.WriteLine($"[API] DB Host -> {csb.Host}:{csb.Port}  (Database={csb.Database})");
 }
 catch { Console.WriteLine("[API] (could not parse connection string)"); }
+
+// --- NEW: DB health to confirm the connection string works in Render ---
+app.MapGet("/healthz/db", async () =>
+{
+    try
+    {
+        await using var db = new NpgsqlConnection(conn);
+        await db.OpenAsync();
+        await using var cmd = new NpgsqlCommand("select current_database(), current_schema()", db);
+        await using var rd = await cmd.ExecuteReaderAsync();
+        string? dbname = null, schema = null;
+        if (await rd.ReadAsync())
+        {
+            dbname = rd.IsDBNull(0) ? null : rd.GetString(0);
+            schema = rd.IsDBNull(1) ? null : rd.GetString(1);
+        }
+        return Results.Ok(new { ok = true, database = dbname, schema });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(statusCode: 500, title: "DB connect failed", detail: ex.Message);
+    }
+}).RequireCors(corsPolicyName);
 
 // --------------------- Utilities ---------------------
 static string Slugify(string s)
