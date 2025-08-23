@@ -1,7 +1,10 @@
+// api.ts
 import type { PagedResult, Post, Project } from "../types";
 
-// In dev we rely on Vite proxy: use relative base ("")
-const BASE = "";
+// Use env var in prod; fall back to relative for local dev with Vite proxy
+const BASE =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ??
+  "";
 
 async function toJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
