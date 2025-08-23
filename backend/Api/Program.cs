@@ -75,37 +75,35 @@ var isDev = builder.Environment.IsDevelopment();
 // ===== CORS / Swagger / Static files =====
 var corsPolicyName = "Frontend";
 
-// CORS: exact-allow list + (NEW) allow *.vercel.app for Vercel previews/production
+// Build a quick lookup of exact origins from config
 var allowedSet = new HashSet<string>(allowed, StringComparer.OrdinalIgnoreCase);
+
+// --- NEW helper: single source of truth for allowed origins (CSV + *.vercel.app) ---
+bool IsAllowedOrigin(string? origin)
+{
+    if (string.IsNullOrWhiteSpace(origin)) return false;
+    var normalized = origin.TrimEnd('/');
+
+    if (allowedSet.Contains(normalized)) return true;
+
+    try
+    {
+        var host = new Uri(normalized).Host;
+        if (host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase)) return true;
+    }
+    catch { /* ignore parse errors */ }
+
+    return false;
+}
+
+// CORS: exact-allow list + allow *.vercel.app; send credentials
 builder.Services.AddCors(o =>
 {
     o.AddPolicy(corsPolicyName, p =>
-        p.SetIsOriginAllowed(origin =>
-        {
-            if (string.IsNullOrWhiteSpace(origin)) return false;
-
-            // normalize
-            var normalized = origin.TrimEnd('/');
-
-            // exact match from AllowedOrigin list
-            if (allowedSet.Contains(normalized)) return true;
-
-            // NEW: allow any Vercel deployments (previews + prod)
-            try
-            {
-                var host = new Uri(normalized).Host;
-                if (host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase)) return true;
-            }
-            catch
-            {
-                // ignore parse failure
-            }
-
-            return false;
-        })
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials()
+        p.SetIsOriginAllowed(IsAllowedOrigin)
+         .AllowAnyHeader()
+         .AllowAnyMethod()
+         .AllowCredentials()
     );
 });
 
@@ -191,7 +189,7 @@ try
 {
     Console.WriteLine($"[API] ENV: {app.Environment.EnvironmentName}");
     Console.WriteLine($"[API] Allowed Origin(s): {string.Join(", ", allowed)}");
-    Console.WriteLine($"[API] Also allowing: *.vercel.app"); // NEW: quick hint
+    Console.WriteLine($"[API] Also allowing: *.vercel.app");
     Console.WriteLine($"[API] Owner pass configured: {(!string.IsNullOrWhiteSpace(OWNER_PASS) ? "YES" : "NO")}");
     Console.WriteLine($"[API] JWT key length: {SECRET?.Length ?? 0}");
     Console.WriteLine($"[API] Token lifetime (minutes): {tokenMinutes}");
@@ -204,6 +202,7 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor
 });
 
+// Apply CORS early
 app.UseCors(corsPolicyName);
 
 app.UseSwagger();
@@ -215,11 +214,20 @@ if (string.IsNullOrWhiteSpace(webroot)) webroot = Path.Combine(Directory.GetCurr
 Directory.CreateDirectory(webroot);
 app.UseStaticFiles();
 
-// Dev-friendly JSON errors
+// --- NEW: make the exception handler also emit CORS headers when returning errors ---
 app.UseExceptionHandler(handler =>
 {
     handler.Run(async ctx =>
     {
+        // Inject CORS headers on error responses so the browser doesn’t hide 500s as CORS issues
+        var origin = ctx.Request.Headers["Origin"].FirstOrDefault();
+        if (IsAllowedOrigin(origin))
+        {
+            ctx.Response.Headers["Access-Control-Allow-Origin"] = origin!.TrimEnd('/');
+            ctx.Response.Headers["Vary"] = "Origin";
+            ctx.Response.Headers["Access-Control-Allow-Credentials"] = "true";
+        }
+
         var feat = ctx.Features.Get<IExceptionHandlerPathFeature>();
         var ex = feat?.Error;
         ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
