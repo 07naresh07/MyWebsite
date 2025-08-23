@@ -1,9 +1,26 @@
-bin/
-obj/
+# --- repo-root .dockerignore ---
+
+# Git
+.git
+.git/*
+.gitignore
+
+# .NET build artifacts (any project)
+**/bin/
+**/obj/
+
+# IDE/OS cruft
+**/.vs/
 *.user
 *.suo
-.git/
-.gitignore
-node_modules/
-dist/
-.vs/
+*.swp
+
+# Frontend stuff (not needed to build the backend image)
+frontend/
+**/node_modules/
+**/dist/
+**/.next/
+**/out/
+
+# Logs & misc
+*.log

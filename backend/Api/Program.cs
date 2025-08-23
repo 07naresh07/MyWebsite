@@ -32,6 +32,25 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 // ===== builder =====
 var builder = WebApplication.CreateBuilder(args);
 
+// --- NEW: load external secret file (Render/host mounts) BEFORE reading config ---
+try
+{
+    var secretsPath = "/etc/secrets/secrets.json";
+    if (File.Exists(secretsPath))
+    {
+        builder.Configuration.AddJsonFile(secretsPath, optional: true, reloadOnChange: true);
+        Console.WriteLine($"[API] Loaded secrets from {secretsPath}");
+    }
+    else
+    {
+        Console.WriteLine("[API] No external secrets file at /etc/secrets/secrets.json");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[API] Failed loading external secrets file: {ex.Message}");
+}
+
 // Bind to Render's provided PORT (fallback 8080 for local)
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
