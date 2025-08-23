@@ -109,7 +109,7 @@ const getStyles = (isDark) => ({
 function Toast({ message, type = "info", onClose }) {
   const { isDark } = useTheme();
   useEffect(() => {
-    const t = setTimeout(onClose, 6000); // Longer timeout for debugging
+    const t = setTimeout(onClose, 3500);
     return () => clearTimeout(t);
   }, [onClose]);
   const typeStyles = {
@@ -209,7 +209,7 @@ function Header({ quote, editable, onOpenQuoteModal }) {
         </h1>
 
         {quote && (
-          <p className={`absolute right-4 bottom-2 text-sm italic ${isDark ? "text-slate-300" : "text-gray-600"}`}>"${quote}"</p>
+          <p className={`absolute right-4 bottom-2 text-sm italic ${isDark ? "text-slate-300" : "text-gray-600"}`}>"{quote}"</p>
         )}
 
         {editable && (
@@ -440,12 +440,16 @@ function EditableList({ items, setItems, placeholder = "Add item..." }) {
 const stripEmoji = (s = "") =>
   s.replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u{FE0F}]/gu, "").trim();
 
+function asArray(v) {
+  return Array.isArray(v) ? v : v ? [v] : [];
+}
+
 // minimal, safe sanitizer for about-html
 function sanitizeAboutHtml(raw = "") {
   if (typeof window === "undefined") return raw;
   const container = document.createElement("div");
   container.innerHTML = raw;
-  const ALLOWED = new Set(["P", "UL", "OL", "LI", "BR", "STRONG", "EM", "B", "I", "A"]);
+  const ALLOWED = new Set(["P", "UL", "OL", "LI", "BR", "STRONG", "EM", "B", "I", "A", "DIV", "SPAN"]);
   const SAFE_PROTOCOLS = ["http:", "https:", "mailto:", "tel:"];
   const walk = (node) => {
     for (const child of Array.from(node.childNodes)) {
@@ -474,6 +478,39 @@ function sanitizeAboutHtml(raw = "") {
   };
   walk(container);
   return container.innerHTML;
+}
+
+/* ---------- Profile normalizer (UI state) ---------- */
+function normalizeProfile(pr = {}, cur = {}) {
+  const extras = pr?.socials?.extras || {};
+  return {
+    id: pr?.id ?? pr?.Id ?? cur.id ?? null,
+    fullName: pr?.fullName ?? pr?.full_name ?? cur.fullName ?? "",
+    quote: pr?.headline ?? pr?.quote ?? cur.quote ?? "",
+    avatarUrl: pr?.avatarUrl ?? pr?.avatar_url ?? cur.avatarUrl ?? "",
+    about: (pr?.bio ?? pr?.about ?? pr?.About ?? cur.about ?? "").toString().trim(),
+    interests: Array.isArray(extras?.interests)
+      ? extras.interests
+      : Array.isArray(pr?.interests)
+      ? pr.interests
+      : cur.interests ?? [],
+    languages: Array.isArray(extras?.languages)
+      ? extras.languages
+      : Array.isArray(pr?.languages)
+      ? pr.languages
+      : cur.languages ?? [],
+    focus: Array.isArray(extras?.focus)
+      ? extras.focus
+      : Array.isArray(pr?.focus)
+      ? pr.focus
+      : cur.focus ?? [],
+    motto:
+      typeof extras?.motto === "string"
+        ? extras.motto
+        : typeof pr?.motto === "string"
+        ? pr.motto
+        : cur.motto ?? "",
+  };
 }
 
 /* ------------------------- Languages UI ------------------------- */
@@ -523,9 +560,8 @@ function LanguagesEditor({ items, onChange }) {
   const [list, setList] = useState(items || []);
   const [name, setName] = useState("");
   const [level, setLevel] = useState("");
-  
+
   useEffect(() => {
-    console.log("LanguagesEditor: items changed to:", list);
     onChange(list);
   }, [list, onChange]);
 
@@ -543,14 +579,12 @@ function LanguagesEditor({ items, onChange }) {
   const addLang = () => {
     if (!name.trim() || !level.trim()) return;
     const newLang = { name: stripEmoji(name.trim()), level: level.trim() };
-    console.log("Adding language:", newLang);
     setList([...(list || []), newLang]);
     setName("");
     setLevel("");
   };
 
   const removeLang = (idx) => {
-    console.log("Removing language at index:", idx);
     setList((arr) => arr.filter((_, i) => i !== idx));
   };
 
@@ -607,15 +641,19 @@ function AboutInner() {
   const [err, setErr] = useState("");
   const [toast, setToast] = useState(null);
 
+  // rawProfile = exact object from server (used to build full save payload)
+  const [rawProfile, setRawProfile] = useState({});
+  // profile = normalized UI state
   const [profile, setProfile] = useState({
+    id: null,
     fullName: "Naresh Singh Dhami",
     quote: "Practice what you preach or change your speech.",
     avatarUrl: "",
-    about: "",           
-    interests: [],       
-    languages: [],       
-    focus: [],           
-    motto: "",           
+    about: "",
+    interests: [],
+    languages: [],
+    focus: [],
+    motto: "",
   });
 
   const [edit, setEdit] = useState({ about: false, interests: false, languages: false, focus: false, motto: false });
@@ -647,40 +685,11 @@ function AboutInner() {
     setLoading(true);
     Promise.all([getProfile(), getSkills()])
       .then(([pr, sk]) => {
-        console.log("DEBUG: Raw API response for profile:", pr);
-        console.log("DEBUG: Raw API response for skills:", sk);
-        
-        // Show detailed debug info
-        showToast(`API Response Structure:\nProfile keys: ${Object.keys(pr || {}).join(', ')}\nSkills count: ${Array.isArray(sk) ? sk.length : 'not array'}`, "debug");
-        
-        // Extract exactly what the API returns (more flexible approach)
-        const extras = pr?.socials?.extras || {};
-        console.log("DEBUG: socials.extras found:", extras);
-        
-        setProfile((cur) => ({
-          ...cur,
-          fullName: pr?.fullName ?? pr?.full_name ?? cur.fullName,
-          quote: pr?.headline ?? pr?.quote ?? cur.quote,     
-          avatarUrl: pr?.avatarUrl ?? pr?.avatar_url ?? cur.avatarUrl,
-          about: (pr?.bio ?? pr?.about ?? pr?.About ?? "").toString().trim(),                  
-          interests: Array.isArray(extras?.interests) ? extras.interests : 
-                    Array.isArray(pr?.interests) ? pr.interests : 
-                    cur.interests,
-          languages: Array.isArray(extras?.languages) ? extras.languages : 
-                    Array.isArray(pr?.languages) ? pr.languages : 
-                    cur.languages,
-          focus: Array.isArray(extras?.focus) ? extras.focus : 
-                Array.isArray(pr?.focus) ? pr.focus : 
-                cur.focus,
-          motto: typeof extras?.motto === "string" ? extras.motto : 
-                typeof pr?.motto === "string" ? pr.motto : 
-                cur.motto,
-        }));
-        
+        setRawProfile(pr || {});
+        setProfile((cur) => normalizeProfile(pr, cur));
         if (Array.isArray(sk)) setSkills(sk.map(normalizeSkill));
       })
       .catch((e) => {
-        console.error("DEBUG: API Error:", e);
         const message = e?.message || "Failed to load data";
         setErr(message);
         showToast(`Load Error: ${message}`, "error");
@@ -688,92 +697,68 @@ function AboutInner() {
       .finally(() => setLoading(false));
   }, [showToast]);
 
-  /* ---------- Save ---------- */
+  /* ---------- Save (ALWAYS SEND FULL MERGED OBJECT) ---------- */
   async function saveProfilePatch(patch) {
-    console.log("DEBUG: saveProfilePatch called with:", patch);
-    
-    // Build merged state
-    const merged = { ...profile, ...patch };
-    console.log("DEBUG: Merged profile data:", merged);
+    const mergedUI = { ...profile, ...patch }; // optimistic UI merge
+    setProfile(mergedUI);
 
-    // Try multiple payload formats to ensure compatibility
-    const payload = {
-      // Primary fields - what your original code was trying
-      fullName: merged.fullName,
-      full_name: merged.fullName, // snake_case variant
-      FullName: merged.fullName,  // PascalCase variant
-      
-      headline: merged.quote,
-      quote: merged.quote,
-      Quote: merged.quote,
-      
-      avatarUrl: merged.avatarUrl,
-      avatar_url: merged.avatarUrl,
-      AvatarUrl: merged.avatarUrl,
-      
-      bio: merged.about,
-      about: merged.about,
-      About: merged.about,
-      
-      // Try nested approach (original assumption)
-      socials: {
-        extras: {
-          interests: merged.interests || [],
-          languages: merged.languages || [],
-          focus: merged.focus || [],
-          motto: merged.motto || ""
-        }
-      },
-      
-      // Try flat approach (alternative)
-      interests: merged.interests || [],
-      languages: merged.languages || [],
-      focus: merged.focus || [],
-      motto: merged.motto || "",
-      
-      // PascalCase variants
-      Interests: merged.interests || [],
-      Languages: merged.languages || [],
-      Focus: merged.focus || [],
-      Motto: merged.motto || ""
-    };
+    // Build full payload from rawProfile + changes, preserving unknown fields
+    const full = JSON.parse(JSON.stringify(rawProfile || {}));
 
-    console.log("DEBUG: Final payload being sent:", payload);
+    // Ensure ID stays
+    if (mergedUI.id) {
+      full.id = mergedUI.id;
+      full.Id = full.Id || mergedUI.id;
+    }
+
+    // Canonical fields + aliases
+    if ("fullName" in mergedUI) {
+      full.fullName = mergedUI.fullName;
+      full.full_name = mergedUI.fullName;
+    }
+    if ("quote" in mergedUI) {
+      full.quote = mergedUI.quote;
+      full.headline = mergedUI.quote;
+    }
+    if ("avatarUrl" in mergedUI) {
+      full.avatarUrl = mergedUI.avatarUrl;
+      full.avatar_url = mergedUI.avatarUrl;
+    }
+
+    // About needs to be present on every save to avoid being nulled by replace APIs
+    full.about = mergedUI.about ?? full.about ?? "";
+    full.bio = full.about;
+
+    // Collections (mirror top-level and inside socials.extras)
+    const interests = "interests" in patch ? asArray(patch.interests) : asArray(mergedUI.interests);
+    const languages = "languages" in patch ? asArray(patch.languages) : asArray(mergedUI.languages);
+    const focus = "focus" in patch ? asArray(patch.focus) : asArray(mergedUI.focus);
+    const motto = "motto" in patch ? (patch.motto || "") : (mergedUI.motto || "");
+
+    full.interests = interests;
+    full.languages = languages;
+    full.focus = focus;
+    full.motto = motto;
+
+    if (!full.socials || typeof full.socials !== "object") full.socials = {};
+    if (!full.socials.extras || typeof full.socials.extras !== "object") full.socials.extras = {};
+    full.socials.extras.interests = interests;
+    full.socials.extras.languages = languages;
+    full.socials.extras.focus = focus;
+    full.socials.extras.motto = motto;
 
     try {
-      showToast("Attempting to save...", "info");
-      const saved = await upsertProfile(payload);
-      
-      console.log("DEBUG: Save response received:", saved);
-      showToast(`Save Success!\nResponse keys: ${Object.keys(saved || {}).join(', ')}`, "success");
-
-      // Normalize from server response again (source of truth)
-      const extras = saved?.socials?.extras || {};
-      setProfile((cur) => ({
-        ...cur,
-        fullName: saved?.fullName ?? saved?.full_name ?? merged.fullName,
-        quote: saved?.headline ?? saved?.quote ?? merged.quote,
-        avatarUrl: saved?.avatarUrl ?? saved?.avatar_url ?? merged.avatarUrl,
-        about: (saved?.bio ?? saved?.about ?? saved?.About ?? merged.about ?? "").toString().trim(),
-        interests: Array.isArray(extras?.interests) ? extras.interests : 
-                  Array.isArray(saved?.interests) ? saved.interests :
-                  merged.interests ?? [],
-        languages: Array.isArray(extras?.languages) ? extras.languages : 
-                  Array.isArray(saved?.languages) ? saved.languages :
-                  merged.languages ?? [],
-        focus: Array.isArray(extras?.focus) ? extras.focus : 
-              Array.isArray(saved?.focus) ? saved.focus :
-              merged.focus ?? [],
-        motto: typeof extras?.motto === "string" ? extras.motto : 
-              typeof saved?.motto === "string" ? saved.motto :
-              merged.motto ?? "",
-      }));
-
+      showToast("Saving…", "info");
+      const saved = await upsertProfile(full);
+      setRawProfile(saved || full);                    // keep latest raw version
+      setProfile((cur) => normalizeProfile(saved || full, cur)); // re-normalize UI
+      showToast("Saved!", "success");
     } catch (e) {
-      console.error("DEBUG: Save error:", e);
+      // rollback UI
+      setProfile((_) => normalizeProfile(rawProfile, _));
       const m = e?.message || "Failed to save profile";
       setErr(m);
-      showToast(`Save Failed: ${m}\nCheck Network tab for details`, "error");
+      showToast(`Save Failed: ${m}`, "error");
       throw e;
     }
   }
@@ -949,20 +934,7 @@ function AboutInner() {
   return (
     <div className={styles.page}>
       <div className="container py-8 space-y-6 max-w-7xl mx-auto">
-        {/* Debug Panel */}
-        {isOwner && (
-          <div className="p-4 bg-purple-100 dark:bg-purple-900/20 rounded-xl border border-purple-300 dark:border-purple-700">
-            <h4 className="font-bold text-purple-800 dark:text-purple-200 mb-2">🐛 Debug Info</h4>
-            <div className="text-sm space-y-1 text-purple-700 dark:text-purple-300">
-              <div><strong>Profile State:</strong> About length: {profile.about?.length || 0}, Languages: {profile.languages?.length || 0}, Motto: {profile.motto?.length || 0}</div>
-              <div><strong>Edit State:</strong> {Object.entries(edit).filter(([,v]) => v).map(([k]) => k).join(', ') || 'None'}</div>
-              <div className="mt-2 p-2 bg-purple-50 dark:bg-purple-900/30 rounded text-xs">
-                <strong>Instructions:</strong> Open browser DevTools → Network tab → Try saving → Check the request/response details
-              </div>
-            </div>
-          </div>
-        )}
-
+        {/* Header */}
         <Header
           quote={profile?.quote}
           editable={isOwner}
@@ -1035,13 +1007,9 @@ function AboutInner() {
               title="🎯 Interests"
               canEdit={isOwner}
               editing={edit.interests}
-              onEdit={() => {
-                console.log("DEBUG: Starting to edit interests");
-                isOwner && setEdit((e) => ({ ...e, interests: true }));
-              }}
+              onEdit={() => isOwner && setEdit((e) => ({ ...e, interests: true }))}
               onCancel={() => setEdit((e) => ({ ...e, interests: false }))}
               onSave={async () => {
-                console.log("DEBUG: Saving interests:", profile.interests);
                 await saveProfilePatch({ interests: profile.interests || [] });
                 setEdit((e) => ({ ...e, interests: false }));
               }}
@@ -1061,10 +1029,7 @@ function AboutInner() {
               ) : (
                 <EditableList
                   items={profile.interests || []}
-                  setItems={(arr) => {
-                    console.log("DEBUG: Updating interests to:", arr);
-                    setProfile((p) => ({ ...p, interests: arr }));
-                  }}
+                  setItems={(arr) => setProfile((p) => ({ ...p, interests: arr }))}
                   placeholder="Add a new interest..."
                 />
               )}
@@ -1075,13 +1040,9 @@ function AboutInner() {
               title="🌍 Languages"
               canEdit={isOwner}
               editing={edit.languages}
-              onEdit={() => {
-                console.log("DEBUG: Starting to edit languages");
-                isOwner && setEdit((e) => ({ ...e, languages: true }));
-              }}
+              onEdit={() => isOwner && setEdit((e) => ({ ...e, languages: true }))}
               onCancel={() => setEdit((e) => ({ ...e, languages: false }))}
               onSave={async () => {
-                console.log("DEBUG: Saving languages:", profile.languages);
                 await saveProfilePatch({ languages: profile.languages || [] });
                 setEdit((e) => ({ ...e, languages: false }));
               }}
@@ -1091,10 +1052,7 @@ function AboutInner() {
               ) : (
                 <LanguagesEditor
                   items={profile.languages || []}
-                  onChange={(arr) => {
-                    console.log("DEBUG: LanguagesEditor onChange called with:", arr);
-                    setProfile((p) => ({ ...p, languages: arr }));
-                  }}
+                  onChange={(arr) => setProfile((p) => ({ ...p, languages: arr }))}
                 />
               )}
             </EditableCard>
@@ -1107,7 +1065,6 @@ function AboutInner() {
               onEdit={() => isOwner && setEdit((e) => ({ ...e, focus: true }))}
               onCancel={() => setEdit((e) => ({ ...e, focus: false }))}
               onSave={async () => {
-                console.log("DEBUG: Saving focus:", profile.focus);
                 await saveProfilePatch({ focus: profile.focus || [] });
                 setEdit((e) => ({ ...e, focus: false }));
               }}
@@ -1141,7 +1098,6 @@ function AboutInner() {
               onEdit={() => isOwner && setEdit((e) => ({ ...e, motto: true }))}
               onCancel={() => setEdit((e) => ({ ...e, motto: false }))}
               onSave={async () => {
-                console.log("DEBUG: Saving motto:", profile.motto);
                 await saveProfilePatch({ motto: profile.motto || "" });
                 setEdit((e) => ({ ...e, motto: false }));
               }}
@@ -1158,10 +1114,7 @@ function AboutInner() {
                 <input
                   className={`${styles.inputBase} h-12 text-[15px]`}
                   value={profile.motto || ""}
-                  onChange={(e) => {
-                    console.log("DEBUG: Motto input changed to:", e.target.value);
-                    setProfile((p) => ({ ...p, motto: e.target.value }));
-                  }}
+                  onChange={(e) => setProfile((p) => ({ ...p, motto: e.target.value }))}
                   placeholder="Your personal motto..."
                 />
               )}
@@ -1179,10 +1132,7 @@ function AboutInner() {
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       className={`${styles.btnGhost} text-xs`}
-                      onClick={() => {
-                        console.log("DEBUG: Starting to edit about section");
-                        setEdit((e) => ({ ...e, about: true }));
-                      }}
+                      onClick={() => setEdit((e) => ({ ...e, about: true }))}
                     >
                       ✏️ Edit
                     </button>
@@ -1213,7 +1163,6 @@ function AboutInner() {
                   onSave={async () => {
                     const current = aboutRef.current?.innerHTML ?? aboutDraftHtml ?? "";
                     const clean = sanitizeAboutHtml(current || "");
-                    console.log("DEBUG: Saving about section:", clean);
                     await saveProfilePatch({ about: clean });
                     setEdit((e) => ({ ...e, about: false }));
                   }}
@@ -1252,7 +1201,6 @@ function AboutInner() {
           <button
             className={styles.btnPrimary}
             onClick={async () => {
-              console.log("DEBUG: Saving quote:", quoteDraft);
               await saveProfilePatch({ quote: quoteDraft });
               setQuoteModal(false);
             }}
@@ -1326,10 +1274,7 @@ function AboutEditor({
         contentEditable
         suppressContentEditableWarning
         onPaste={onAboutPaste}
-        onInput={(e) => {
-          console.log("DEBUG: About editor input changed");
-          setAboutDraftHtml(e.currentTarget.innerHTML);
-        }}
+        onInput={(e) => setAboutDraftHtml(e.currentTarget.innerHTML)}
       />
       <div className="flex gap-2">
         <button className={styles.btnPrimary} onClick={onSave}>

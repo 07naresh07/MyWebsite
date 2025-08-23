@@ -1218,6 +1218,22 @@ app.MapPut("/api/education/{id:guid}", [Authorize(Policy = "Owner")] async (Guid
     }
 }).RequireCors(corsPolicyName);
 
+// Delete education (owner)
+app.MapDelete("/api/education/{id:guid}", [Authorize(Policy = "Owner")] async (Guid id) =>
+{
+    await using var db = new NpgsqlConnection(conn);
+    await db.OpenAsync();
+
+    const string sql = "delete from education where id = @id;";
+    await using var cmd = new NpgsqlCommand(sql, db);
+    cmd.Parameters.AddWithValue("id", id);
+
+    var affected = await cmd.ExecuteNonQueryAsync();
+    return affected == 0
+        ? Results.NotFound(new { error = "Not found" })
+        : Results.NoContent();
+}).RequireCors(corsPolicyName);
+
 // --------------------- SKILLS ---------------------
 app.MapMethods("/api/skills", new[] { "GET", "OPTIONS" }, async () =>
 {

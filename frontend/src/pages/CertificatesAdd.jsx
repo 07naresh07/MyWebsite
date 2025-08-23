@@ -11,7 +11,7 @@ import {
 import {
   createCertificate,
   updateCertificate as apiUpdateCertificate,
-  getGallery,
+  getCertificates,          // ← use detailed endpoint
   resolveCertificateUrl,
   uploadProfileImage, // reuse upload endpoint for images
 } from "../lib/api.js";
@@ -46,7 +46,8 @@ function DarkModeToggle({ darkMode, setDarkMode }) {
   return (
     <button
       onClick={() => setDarkMode(!darkMode)}
-      className="fixed top-4 right-4 z-50 p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:shadow-xl transition-all duration-300 group border border-gray-200 dark:border-gray-700"
+      className="fixed top-4 right-4 z-50 p-3 rounded-full bg-white dark:bg-gray-8
+00 shadow-lg hover:shadow-xl transition-all duration-300 group border border-gray-200 dark:border-gray-700"
       aria-label="Toggle dark mode"
       type="button"
     >
@@ -401,29 +402,39 @@ export default function CertificatesAdd() {
             setForm((f) => ({ ...f, ...local, id: local.id, updatedAt: local.updatedAt || null }));
             return;
           }
-          // 2) Fallback: query server gallery (backend returns an ARRAY)
-          const serverList = await getGallery().catch(() => []);
+          // 2) Fallback: query server certificates (full detail) and locate by id
+          const serverList = await getCertificates().catch(() => []);
           const found = Array.isArray(serverList)
             ? serverList.find((g) => String(g.id) === String(id))
             : null;
 
           if (found) {
             if (!mounted) return;
-            setForm((f) => ({
-              ...f,
-              id: found.id,
-              title: found.title || "",
-              // gallery GET may not include these — keep editable defaults
-              issuer: "",
-              type: "Certificate",
-              dateMonth: "",
-              credentialUrl: "",
-              credentialId: "",
-              image: found.imageUrl || found.image_url || "",
-              description: found.description || "",
-              skills: Array.isArray(found.tags) ? found.tags : [],
-              updatedAt: found.updatedAt || null,
-            }));
+            setForm((f) => {
+              const issuer       = found.issuer ?? found.provider ?? found.platform ?? f.issuer ?? "";
+              const type         = found.type ?? found.category ?? f.type ?? "Certificate";
+              const dateMonth    = found.dateMonth ?? found.date_month ?? f.dateMonth ?? "";
+              const credentialUrl= found.credentialUrl ?? found.verifyUrl ?? found.link ?? f.credentialUrl ?? "";
+              const credentialId = found.credentialId ?? found.certificateId ?? f.credentialId ?? "";
+              const image        = found.imageUrl ?? found.image_url ?? found.image ?? f.image ?? "";
+              const skills       = Array.isArray(found.skills) ? found.skills :
+                                   (Array.isArray(found.tags) ? found.tags : f.skills);
+
+              return {
+                ...f,
+                id: found.id ?? f.id,
+                title: found.title ?? f.title ?? "",
+                issuer,
+                type,
+                dateMonth,
+                credentialUrl,
+                credentialId,
+                image,
+                description: found.description ?? f.description ?? "",
+                skills,
+                updatedAt: found.updatedAt ?? f.updatedAt ?? null,
+              };
+            });
           } else {
             if (!mounted) return;
             setError("Certificate not found.");
@@ -434,15 +445,16 @@ export default function CertificatesAdd() {
           setForm((f) => ({
             ...f,
             id: nextId,
-            title: prefill.title || "",
-            issuer: prefill.issuer || "",
-            type: prefill.type || "Certificate",
-            dateMonth: prefill.dateMonth || "",
-            credentialUrl: prefill.credentialUrl || prefill.link || "",
-            credentialId: prefill.credentialId || "",
-            image: prefill.image || prefill.imageUrl || "",
-            description: prefill.description || "",
-            skills: Array.isArray(prefill.skills) ? prefill.skills : [],
+            title: prefill.title ?? "",
+            issuer: prefill.issuer ?? prefill.provider ?? prefill.platform ?? "",
+            type: prefill.type ?? prefill.category ?? "Certificate",
+            dateMonth: prefill.dateMonth ?? prefill.date_month ?? "",
+            credentialUrl: prefill.credentialUrl ?? prefill.verifyUrl ?? prefill.link ?? "",
+            credentialId: prefill.credentialId ?? prefill.certificateId ?? "",
+            image: prefill.image ?? prefill.imageUrl ?? prefill.image_url ?? "",
+            description: prefill.description ?? "",
+            skills: Array.isArray(prefill.skills) ? prefill.skills :
+                    (Array.isArray(prefill.tags) ? prefill.tags : []),
           }));
         }
       } catch (e) {

@@ -49,6 +49,10 @@ function getCredentialDomain(url) {
   }
 }
 
+/* GUID check (backend uses Guid for API items) */
+const isGuid = (s) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(s || ""));
+
 /* Toast notification component */
 function Toast({ message, type = 'success', onClose }) {
   useEffect(() => {
@@ -366,14 +370,13 @@ function PreviewModal({ item, onClose, onEdit, onDelete, owner, verified, darkMo
                   >
                     Edit
                   </button>
-                  {item._source === "local" && (
-                    <button
-                      onClick={() => onDelete(item)}
-                      className={`px-3 py-2 rounded-lg border text-sm ${darkMode ? "border-red-700 text-red-400 hover:bg-red-900/20" : "border-red-300 text-red-600 hover:bg-red-50"}`}
-                    >
-                      Delete
-                    </button>
-                  )}
+                  {/* allow delete for API or local */}
+                  <button
+                    onClick={() => onDelete(item)}
+                    className={`px-3 py-2 rounded-lg border text-sm ${darkMode ? "border-red-700 text-red-400 hover:bg-red-900/20" : "border-red-300 text-red-600 hover:bg-red-50"}`}
+                  >
+                    Delete
+                  </button>
                 </>
               )}
               <button
@@ -434,14 +437,19 @@ export default function Certificates() {
     }
   }, [location.search]);
 
-  // Safe dynamic import of getGallery (avoids Vite named-export crash)
+  // Prefer /api/certificates (has issuer/type/dateMonth); fallback to /api/gallery
   const fetchGallery = useCallback(async () => {
     try {
       const mod = await import("../lib/api.js");
-      const fn = mod?.getGallery;
-      if (typeof fn !== "function") return [];
-      const data = await fn();
-      return Array.isArray(data) ? data : [];
+      if (typeof mod?.getCertificates === "function") {
+        const data = await mod.getCertificates();
+        return Array.isArray(data) ? data : [];
+      }
+      if (typeof mod?.getGallery === "function") {
+        const data = await mod.getGallery();
+        return Array.isArray(data) ? data : [];
+      }
+      return [];
     } catch {
       return [];
     }
@@ -531,37 +539,49 @@ export default function Certificates() {
   }, [items, issuer, q, sortKey]);
 
   const onDelete = (item) => {
-    if (!owner || item._source !== "local") return;
+    if (!owner) return;
     setConfirmDelete(item);
   };
 
-  const confirmDeleteAction = () => {
+  const confirmDeleteAction = async () => {
     if (!confirmDelete) return;
-    
+    const target = confirmDelete;
+
     try {
-      const left = removeLocalCertificate(confirmDelete.id).map((c, i) =>
-        normalizeItem({ ...c, _source: "local" }, i)
-      );
-      const api = items.filter((x) => x._source !== "local");
-      const map = new Map();
-      [...api, ...left].forEach((c) => {
-        const key = (c.title + "|" + c.issuer).toLowerCase();
-        map.set(key, c);
-      });
-      setItems(Array.from(map.values()));
-      setToast({ message: "Certificate deleted successfully", type: "success" });
+      if (owner && isGuid(target.id)) {
+        // Delete from backend for GUID items
+        const { deleteCertificate } = await import("../lib/api.js");
+        await deleteCertificate(target.id);
+        setItems((prev) => prev.filter((x) => String(x.id) !== String(target.id)));
+        setToast({ message: "Certificate deleted from server", type: "success" });
+      } else {
+        // Local-only deletion
+        const left = removeLocalCertificate(target.id).map((c, i) =>
+          normalizeItem({ ...c, _source: "local" }, i)
+        );
+        const api = items.filter((x) => isGuid(x.id)); // keep all API items
+        const map = new Map();
+        [...api, ...left].forEach((c) => {
+          const key = (c.title + "|" + c.issuer).toLowerCase();
+          map.set(key, c);
+        });
+        setItems(Array.from(map.values()));
+        setToast({ message: "Certificate deleted locally", type: "success" });
+      }
       setPreview(null);
     } catch (error) {
       setToast({ message: "Failed to delete certificate", type: "error" });
     }
-    
+
     setConfirmDelete(null);
   };
 
   const goEdit = (c, e) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     if (!owner) return;
-    if (c._source === "local") nav(`/certificates/edit/${encodeURIComponent(c.id)}`);
+    // If it's a server item (Guid), go to edit route; otherwise local/new prefill
+    if (isGuid(c.id)) nav(`/certificates/edit/${encodeURIComponent(c.id)}`);
+    else if (c._source === "local") nav(`/certificates/edit/${encodeURIComponent(c.id)}`);
     else nav("/certificates/new", { state: { prefill: c } });
   };
 
@@ -903,20 +923,15 @@ export default function Certificates() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
                               </button>
-                              {c._source === "local" && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDelete(c);
-                                  }}
-                                  className={`p-2 rounded-lg transition-colors ${darkMode ? "text-red-400 hover:bg-red-900/20" : "text-red-600 hover:bg-red-50"}`}
-                                  title="Delete certificate"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </button>
-                              )}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onDelete(c); }}
+                                className={`p-2 rounded-lg transition-colors ${darkMode ? "text-red-400 hover:bg-red-900/20" : "text-red-600 hover:bg-red-50"}`}
+                                title="Delete certificate"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
                             </>
                           )}
                         </div>
@@ -963,20 +978,15 @@ export default function Certificates() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
-                          {c._source === "local" && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDelete(c);
-                              }}
-                              className={`p-2 rounded-lg border shadow-sm transition-colors ${darkMode ? "bg-gray-900/80 border-red-700 text-red-400 hover:bg-red-900/30" : "bg-white/90 border-red-200 text-red-600 hover:bg-red-50"}`}
-                              title="Delete certificate"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onDelete(c); }}
+                            className={`p-2 rounded-lg border shadow-sm transition-colors ${darkMode ? "bg-gray-900/80 border-red-700 text-red-400 hover:bg-red-900/30" : "bg-white/90 border-red-200 text-red-600 hover:bg-red-50"}`}
+                            title="Delete certificate"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
                         </>
                       )}
                     </div>
@@ -1010,12 +1020,12 @@ export default function Certificates() {
                         {c.credentialUrl && (
                           <span
                             className={`text-[10px] px-2 py-0.5 rounded-full border ${
-                              ok
+                              verified[c.id]
                                 ? `${darkMode ? "text-emerald-400 border-emerald-700" : "text-emerald-700 border-emerald-200"}`
                                 : `${darkMode ? "text-gray-300 border-gray-700" : "text-gray-700 border-gray-200"}`
                             }`}
                           >
-                            {ok ? "Verified" : "Unverified"}
+                            {verified[c.id] ? "Verified" : "Unverified"}
                           </span>
                         )}
                       </div>

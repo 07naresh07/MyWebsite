@@ -1,7 +1,7 @@
 // src/pages/Blog.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getPosts } from "../lib/api.js";
+import { getPosts, deletePost as apiDeletePost } from "../lib/api.js";
 import { useOwnerMode } from "../lib/owner.js";
 import Reveal from "../components/Reveal.jsx";
 
@@ -18,8 +18,13 @@ const readLocal = () => {
   }
 };
 const writeLocal = (rows) => localStorage.setItem(LS_KEY, JSON.stringify(rows));
-const removeLocal = (id) => {
+const removeLocalById = (id) => {
   writeLocal(readLocal().filter((r) => String(r.id) !== String(id)));
+  return true;
+};
+const removeLocalBySlug = (slug) => {
+  if (!slug) return false;
+  writeLocal(readLocal().filter((r) => String(r.slug) !== String(slug)));
   return true;
 };
 const getViewPrefs = () => {
@@ -50,6 +55,11 @@ const toHtml = (v) =>
 
 const clampAccent = (hex) =>
   /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex || "") ? hex : "#4f46e5";
+
+const isGuid = (s) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(s || "")
+  );
 
 // Enhanced snippet function with better truncation
 function snippetHtml(html, maxChars = 280) {
@@ -237,36 +247,47 @@ export default function Blog() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  // Load posts: API + local (local wins)
+  // Load posts: API + local (local overrides, keyed by SLUG first to prevent dupes)
   const reloadPosts = useCallback(async () => {
     setLoading(true);
     setErr("");
     try {
-      const api = await getPosts({ page: 1, pageSize: 100 }).catch(() => ({ items: [] }));
+      const api = await getPosts({ page: 1, pageSize: 200 }).catch(() => ({ items: [] }));
       const apiItems = (api?.items || []).map((x) => {
         const title = x.title || "Untitled";
+        const slug = x.slug || slugify(title);
         return {
-          id: x.id ?? x.slug ?? slugify(title),
-          slug: x.slug || slugify(title),
+          id: x.id ?? slug,
+          slug,
           title,
-          bodyHtml: x.content ? toHtml(x.content) : x.excerpt ? toHtml(x.excerpt) : "",
+          bodyHtml: x.content ? toHtml(x.content) : x.excerpt ? toHtml(x.excerpt) : (x.bodyHtml || x.contentHtml || ""),
           tags: Array.isArray(x.tags) ? x.tags : [],
           color: x.color || "#4f46e5",
           theme: x.theme || { fontFamily: "", basePx: 16, headingScale: 1.15 },
-          createdAt: x.createdAt || new Date().toISOString(),
+          createdAt: x.createdAt || x.created_at || new Date().toISOString(),
+          updatedAt: x.updatedAt || x.updated_at || null,
         };
       });
 
       const local = readLocal();
+      const keyFor = (p) => String(p.slug || p.id); // ← SLUG FIRST to dedupe
+
+      // Start with API list
       const map = new Map();
-      apiItems.forEach((p) => map.set(String(p.id || p.slug), p));
-      // local overrides API versions (edits/drafts)
-      local.forEach((p) =>
-        map.set(String(p.id || p.slug), {
-          ...p,
-          createdAt: p.createdAt || new Date().toISOString(),
-        })
-      );
+      apiItems.forEach((p) => map.set(keyFor(p), p));
+
+      // Merge local: replace if newer/override
+      local.forEach((p) => {
+        const key = keyFor(p);
+        if (!map.has(key)) {
+          map.set(key, p);
+        } else {
+          const a = map.get(key);
+          const aT = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          const bT = new Date(p.updatedAt || p.createdAt || 0).getTime();
+          map.set(key, bT >= aT ? p : a);
+        }
+      });
 
       const merged = Array.from(map.values());
       setItems(merged);
@@ -346,11 +367,26 @@ export default function Blog() {
   }, [q, items, allTags]);
 
   const onDelete = useCallback(
-    (id) => {
+    async (post) => {
       if (!owner) return;
       if (!confirm("Delete this blog post?")) return;
-      removeLocal(id);
-      setItems((prev) => prev.filter((p) => String(p.id) !== String(id)));
+
+      try {
+        // If it's a server post, delete from API
+        if (isGuid(post.id)) {
+          await apiDeletePost(post.id);
+        }
+        // In any case, remove local version by id AND by slug
+        removeLocalById(post.id);
+        removeLocalBySlug(post.slug);
+
+        // Update UI immediately
+        setItems((prev) =>
+          prev.filter((p) => String(p.slug || p.id) !== String(post.slug || post.id))
+        );
+      } catch (e) {
+        alert(e?.message || "Failed to delete post.");
+      }
     },
     [owner]
   );
@@ -458,6 +494,8 @@ export default function Blog() {
         </div>
 
         {/* Search & Controls */}
+        {/* (unchanged UI below, only minor tweaks later for delete handler & keys) */}
+
         <div className="mb-8">
           <div
             className={`backdrop-blur-xl rounded-3xl border p-6 shadow-xl ${
@@ -540,6 +578,7 @@ export default function Blog() {
             </div>
 
             {/* Control Bar */}
+            {/* (UI unchanged) */}
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative">
@@ -754,7 +793,7 @@ export default function Blog() {
             const readingTime = estimateReadingTime(p.bodyHtml);
 
             return (
-              <Reveal key={p.id}>
+              <Reveal key={p.slug || p.id}>
                 <article
                   className={`group relative backdrop-blur-sm rounded-3xl border transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 overflow-hidden ${
                     darkMode
@@ -791,7 +830,7 @@ export default function Blog() {
                           </button>
                           <button
                             title="Delete post"
-                            onClick={() => onDelete(p.id)}
+                            onClick={() => onDelete(p)}
                             className={`w-8 h-8 rounded-full transition-all duration-200 flex items-center justify-center ${
                               darkMode
                                 ? "bg-gray-700 text-gray-200 hover:bg-red-900/50 hover:text-red-300"

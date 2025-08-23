@@ -1,6 +1,5 @@
 // src/pages/Experience.jsx
-
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOwnerMode } from "../lib/owner.js";
 import { getExperience as apiGetExperience, deleteExperience as apiDeleteExperience } from "../lib/api.js";
@@ -179,6 +178,7 @@ export default function Experience() {
 
   const [items, setItems] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
 
   const [viewMode, setViewMode] = useState("grid");
   const [sortBy, setSortBy] = useState("date");
@@ -211,38 +211,65 @@ export default function Experience() {
     } catch {}
   };
 
-  // show local drafts immediately
-  useEffect(() => { setItems(readAll()); }, []);
-
-  // then try to fetch from server, merge, and persist merged set locally (non-destructive)
-  useEffect(() => {
-    (async () => {
-      try {
-        const serverList = await apiGetExperience().catch(() => []);
-        const serverItems = Array.isArray(serverList?.items)
-          ? serverList.items
-          : Array.isArray(serverList)
-          ? serverList
-          : [];
-
-        if (!serverItems.length) return; // keep local-only if nothing on server
-
-        const local = readAll();
-        const map = new Map();
-
-        // start with local (so we don't lose drafts)
-        local.forEach((x) => map.set(String(x.id), x));
-        // overlay server (prefer server version when ids match)
-        serverItems.forEach((x) => map.set(String(x.id), x));
-
-        const merged = Array.from(map.values());
-        setItems(merged);
-        writeAll(merged);
-      } catch {
-        // ignore, stay with local
+  /** Server-wins merge:
+   *  - Keep all server rows
+   *  - Keep local rows ONLY if they are drafts (non-GUID ids)
+   *  - If a GUID exists locally but is missing on the server => it's deleted => drop it
+   */
+  const mergeServerWins = (local, server) => {
+    const byServerId = new Map(server.map(x => [String(x.id), x]));
+    const result = [...server];
+    for (const row of local) {
+      const id = String(row.id);
+      if (!isGuid(id) && !byServerId.has(id)) {
+        // local draft (non-GUID) — keep
+        result.push(row);
       }
-    })();
+      // else: GUID and not in server => deleted on server => drop
+      // else: GUID and in server => already included by server
+    }
+    return result;
+  };
+
+  /** Fetch from server and update state/localStorage with server as source of truth */
+  const refresh = useCallback(async () => {
+    setIsFetching(true);
+    try {
+      const serverList = await apiGetExperience().catch(() => []);
+      const serverItems = Array.isArray(serverList?.items)
+        ? serverList.items
+        : Array.isArray(serverList)
+        ? serverList
+        : [];
+      const local = readAll();
+      const merged = mergeServerWins(local, serverItems);
+      setItems(merged);
+      writeAll(merged);
+    } finally {
+      setIsFetching(false);
+    }
   }, []);
+
+  // Show cached immediately for fast first paint
+  useEffect(() => {
+    setItems(readAll());
+  }, []);
+
+  // Then always refresh from server (server-wins)
+  useEffect(() => {
+    let alive = true;
+    (async () => { if (alive) await refresh(); })();
+    // Re-sync whenever window regains focus or tab becomes visible
+    const onFocus = () => refresh();
+    const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      alive = false;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refresh]);
 
   /* ------------------- DERIVED: TAGS, TOTALS, FILTERS, SORT ------------------- */
   const allTools = useMemo(() => {
@@ -301,24 +328,26 @@ export default function Experience() {
 
   /* ----------------------------- ACTIONS ---------------------------------- */
   const onDelete = async (id) => {
-    if (!owner) return; // guard in case UI is somehow shown
+    if (!owner) return;
     if (!window.confirm("Delete this experience? This cannot be undone.")) return;
 
-    // Update UI + local immediately (non-blocking)
+    // optimistic UI + cache update
     setItems(prev => {
       const next = prev.filter(x => String(x.id) !== String(id));
       writeAll(next);
       return next;
     });
 
-    // If it's a server row, delete there too
     try {
       if (isGuid(id)) {
         await apiDeleteExperience(id);
       }
     } catch (e) {
       console.error("Server delete failed:", e);
-      // Optional: surface a toast; keeping UI optimistic to avoid "deleting features"
+      // Up to you: show a toast; we still reconcile with server below
+    } finally {
+      // Always reconcile with server to reflect true state
+      await refresh();
     }
   };
 
@@ -428,7 +457,7 @@ export default function Experience() {
                 <Icon.Search className="w-8 h-8 text-gray-400" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                No experiences found
+                {isFetching ? "Loading…" : "No experiences found"}
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
                 Try adjusting your search criteria{owner ? " or add a new entry." : "."}

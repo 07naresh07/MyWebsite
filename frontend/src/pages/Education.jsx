@@ -5,7 +5,7 @@ import { getEducation, deleteEducation } from "../lib/api.js";
 import Reveal from "../components/Reveal.jsx";
 import { useOwnerMode } from "../lib/owner.js";
 
-/* -------------------- Local fallback -------------------- */
+/* -------------------- Local fallback (GET only) -------------------- */
 const LS_KEY = "localEducation";
 function readLocal() { try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; } }
 function writeLocal(rows) { try { localStorage.setItem(LS_KEY, JSON.stringify(rows)); } catch {} }
@@ -19,12 +19,13 @@ function statusFromError(e) {
   const m = (e?.message || "").match(/^(\d{3})\s/);
   return m ? parseInt(m[1], 10) : e?.status || e?.response?.status;
 }
-async function tryApiThenLocal(fnApi, fnLocal, ...args) {
+async function tryApiThenLocalGET(fnApi, fnLocal, ...args) {
   try {
     const r = await fnApi(...args);
     return { data: r, usedLocal: false };
   } catch (e) {
     const s = statusFromError(e);
+    // For reads, we allow a graceful local fallback (offline/dev/405)
     if (s === 404 || s === 405 || s === 0 || !s) {
       const r = await fnLocal(...args);
       return { data: r, usedLocal: true };
@@ -253,7 +254,7 @@ const Icons = {
   ),
 };
 
-/* -------------------- Marquee (for overflowing tile values) -------------------- */
+/* -------------------- Marquee -------------------- */
 function OverflowMarquee({ text, className = "" }) {
   const outerRef = useRef(null);
   const innerRef = useRef(null);
@@ -371,13 +372,12 @@ function isCertificate(it) {
 export default function Education() {
   const nav = useNavigate();
 
-  // ---- Owner mode (viewer mode hides all mutating controls) ----
-  // Safe extraction: supports boolean return or object { isOwner } / { owner } / { value }
+  // Owner mode
   let ownerCtx;
   try { ownerCtx = useOwnerMode?.(); } catch { ownerCtx = null; }
   const isOwner = !!(ownerCtx?.isOwner ?? ownerCtx?.owner ?? ownerCtx?.value ?? ownerCtx);
 
-  // Dark mode (persist) + ensure :dark styles apply
+  // Dark mode
   const [darkMode, setDarkMode] = useState(() => {
     try { return JSON.parse(localStorage.getItem("darkModeEducation") || "false"); } catch { return false; }
   });
@@ -419,7 +419,7 @@ export default function Education() {
     let mounted = true;
     (async () => {
       try {
-        const { data } = await tryApiThenLocal(getEducation, localGetEducation);
+        const { data } = await tryApiThenLocalGET(getEducation, localGetEducation);
         const apiArr = Array.isArray(data) ? data : [];
         const localArr = readLocal();
         if (mounted) setItems(mergeEdu(apiArr, localArr));
@@ -444,14 +444,28 @@ export default function Education() {
 
   const stop = useCallback((e) => { e.preventDefault(); e.stopPropagation(); }, []);
 
-  async function onDelete(id) {
+  async function onDelete(realId) {
     if (!window.confirm("Delete this entry? This cannot be undone.")) return;
+    // If we somehow don't have a real backend id, block the call
+    if (realId == null || realId === "" || String(realId).startsWith("edu-")) {
+      alert("This entry doesn’t have a real backend ID, so it can’t be deleted from the server.");
+      return;
+    }
     try {
-      await tryApiThenLocal((eid) => deleteEducation(eid), (eid) => localDeleteEducation(eid), id);
-      await localDeleteEducation(id);
-      setItems((prev) => prev.filter((r) => String(r.id) !== String(id)));
+      // IMPORTANT: Do NOT fallback to local for DELETE. We want a hard failure if the API route is missing.
+      await deleteEducation(realId);
+      // Also clear any local cache copy (if present)
+      try { await localDeleteEducation(realId); } catch {}
+      setItems((prev) => prev.filter((r) => String(r.id) !== String(realId)));
     } catch (e) {
-      alert(e?.message || "Failed to delete");
+      const s = statusFromError(e);
+      if (s === 404 || s === 405) {
+        alert("Your backend doesn’t support DELETE /api/education/:id (404/405). Please add that route. The item was not deleted on the server.");
+      } else if (s === 401 || s === 403) {
+        alert("Owner mode required. Unlock from the navbar and try again.");
+      } else {
+        alert(e?.message || "Failed to delete");
+      }
     }
   }
 
@@ -638,7 +652,8 @@ export default function Education() {
             {layout === "grid" ? (
               <div className="grid gap-6 sm:grid-cols-2">
                 {filteredItems.map((it, idx) => {
-                  const id = it.id ?? `edu-${idx}`;
+                  const realId = it.id; // real backend id (may be undefined for local-only)
+                  const canDelete = isOwner && realId != null && realId !== "";
                   const school = it.school || it.institution || "—";
                   const degree = it.degree || "";
                   const field = it.field || it.major || "";
@@ -650,17 +665,17 @@ export default function Education() {
                   const levelDisplay = displayLevelName(it);
 
                   const editPath = isCertificate(it)
-                    ? `/certificates/edit/${encodeURIComponent(id)}`
-                    : `/education/edit/${encodeURIComponent(id)}`;
+                    ? `/certificates/edit/${encodeURIComponent(realId ?? `edu-${idx}`)}`
+                    : `/education/edit/${encodeURIComponent(realId ?? `edu-${idx}`)}`;
 
                   const subtitle =
                     (levelDisplay && field) ? `${levelDisplay} · ${field}` :
                     (levelDisplay || field || degree || "");
 
                   return (
-                    <Reveal key={String(id)}>
+                    <Reveal key={String(realId ?? `edu-${idx}`)}>
                       <div className={`group relative rounded-2xl border p-5 hover:shadow-lg transition-all ${darkMode ? "bg-gray-800 border-gray-700 text-gray-100" : "bg-white border-gray-200 text-gray-900"}`}>
-                        {/* Actions (hidden in viewer mode) */}
+                        {/* Actions */}
                         {isOwner && (
                           <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-100 pointer-events-auto md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto transition-opacity">
                             <button
@@ -671,18 +686,19 @@ export default function Education() {
                             >
                               {Icons.edit()}
                             </button>
-                            <button
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(id); }}
-                              className={`p-2 rounded-lg border shadow-sm ${darkMode ? "bg-gray-900/80 border-red-700 text-red-400 hover:bg-red-900/30" : "bg-white/90 border-red-200 text-red-600 hover:bg-red-50"}`}
-                              title="Delete"
-                              type="button"
-                            >
-                              {Icons.trash()}
-                            </button>
+                            {canDelete && (
+                              <button
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(realId); }}
+                                className={`p-2 rounded-lg border shadow-sm ${darkMode ? "bg-gray-900/80 border-red-700 text-red-400 hover:bg-red-900/30" : "bg-white/90 border-red-200 text-red-600 hover:bg-red-50"}`}
+                                title="Delete"
+                                type="button"
+                              >
+                                {Icons.trash()}
+                              </button>
+                            )}
                           </div>
                         )}
 
-                        {/* MATCH list sizes: title text-base, subtitle text-sm */}
                         <div className="pr-24">
                           <h3 className="text-base font-semibold truncate">{school}</h3>
                           {subtitle && (
@@ -712,7 +728,8 @@ export default function Education() {
               <div className={`rounded-xl border ${darkMode ? "border-gray-700" : "border-gray-200"} overflow-hidden`}>
                 <div className={`${darkMode ? "bg-gray-800" : "bg-white"}`}>
                   {filteredItems.map((it, idx) => {
-                    const id = it.id ?? `edu-${idx}`;
+                    const realId = it.id;
+                    const canDelete = isOwner && realId != null && realId !== "";
                     const school = it.school || it.institution || "—";
                     const degree = it.degree || "";
                     const field = it.field || it.major || "";
@@ -722,8 +739,8 @@ export default function Education() {
                     const dur = humanDurationObj(it);
                     const levelDisplay = displayLevelName(it);
                     const editPath = isCertificate(it)
-                      ? `/certificates/edit/${encodeURIComponent(id)}`
-                      : `/education/edit/${encodeURIComponent(id)}`;
+                      ? `/certificates/edit/${encodeURIComponent(realId ?? `edu-${idx}`)}`
+                      : `/education/edit/${encodeURIComponent(realId ?? `edu-${idx}`)}`;
 
                     const subtitle =
                       (levelDisplay && field) ? `${levelDisplay} · ${field}` :
@@ -731,10 +748,10 @@ export default function Education() {
 
                     return (
                       <div
-                        key={String(id)}
+                        key={String(realId ?? `edu-${idx}`)}
                         className={`group relative flex items-start gap-4 p-4 border-b last:border-b-0 ${darkMode ? "border-gray-700 hover:bg-gray-800/70" : "border-gray-200 hover:bg-gray-50"}`}
                       >
-                        {/* Actions (hidden in viewer mode) */}
+                        {/* Actions */}
                         {isOwner && (
                           <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-100 pointer-events-auto md:opacity-0 md:group-hover:opacity-100 md:pointer-events-none md:group-hover:pointer-events-auto transition-opacity">
                             <button
@@ -745,14 +762,16 @@ export default function Education() {
                             >
                               {Icons.edit()}
                             </button>
-                            <button
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(id); }}
-                              className={`p-2 rounded-lg border shadow-sm ${darkMode ? "bg-gray-900/80 border-red-700 text-red-400 hover:bg-red-900/30" : "bg-white/90 border-red-200 text-red-600 hover:bg-red-50"}`}
-                              title="Delete"
-                              type="button"
-                            >
-                              {Icons.trash()}
-                            </button>
+                            {canDelete && (
+                              <button
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(realId); }}
+                                className={`p-2 rounded-lg border shadow-sm ${darkMode ? "bg-gray-900/80 border-red-700 text-red-400 hover:bg-red-900/30" : "bg-white/90 border-red-200 text-red-600 hover:bg-red-50"}`}
+                                title="Delete"
+                                type="button"
+                              >
+                                {Icons.trash()}
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -780,7 +799,7 @@ export default function Education() {
           </>
         )}
 
-        {/* SINGLE floating Add button (hidden in viewer mode) */}
+        {/* Add button (owner only) */}
         {isOwner && (
           <div className="fixed z-50 right-6 bottom-6 md:right-8 md:bottom-8">
             <button

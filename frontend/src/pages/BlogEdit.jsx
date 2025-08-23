@@ -39,9 +39,15 @@ const upsertLocal = (row) => {
   writeLocal(all);
   return row;
 };
-const removeLocal = (id) => {
+const removeLocalById = (id) => {
   const all = readLocal();
   writeLocal(all.filter((p) => String(p.id) !== String(id)));
+  return true;
+};
+const removeLocalBySlug = (slug) => {
+  if (!slug) return false;
+  const all = readLocal();
+  writeLocal(all.filter((p) => String(p.slug) !== String(slug)));
   return true;
 };
 
@@ -462,36 +468,41 @@ export default function BlogEdit() {
           title: titleSafe,
           slug: slug || slugify(titleSafe),
           excerpt: buildExcerpt(bodyHtml),
-          coverImageUrl: null, // add UI later to pick a cover
+          coverImageUrl: null,
           tags,
-          status: "published", // or "draft" if you add a toggle
+          status: "published",
           publishedAt: new Date().toISOString(),
-          // Back-end compatibility: send both field names and a meta blob
-          bodyHtml,                // camelCase
-          contentHtml: bodyHtml,   // snake->camel compat
+          bodyHtml,
+          contentHtml: bodyHtml,
           color: clampAccent(color),
-          theme,                   // if your backend stores these columns
-          meta: { color: clampAccent(color), theme }, // if backend uses JSONB meta
+          theme,
+          meta: { color: clampAccent(color), theme },
         };
 
         let nextSlug = payload.slug;
+        const prevId = id; // keep track of local id before we swap to server id
 
         if (isEdit && serverId && isGuid(serverId)) {
-          const saved = await updatePost(serverId, payload);       // PUT /api/posts/{guid}
+          const saved = await updatePost(serverId, payload); // PUT /api/posts/{guid}
           if (saved?.slug) {
             nextSlug = saved.slug;
             setSlug(saved.slug);
           }
         } else {
-          const created = await createPost(payload);                // POST /api/posts
+          const created = await createPost(payload); // POST /api/posts
           if (created?.id) {
             setServerId(created.id);
             setIsEdit(true);
-            setId(created.id); // switch to real server id moving forward
+            setId(created.id); // switch editor to server id
           }
           if (created?.slug) {
             nextSlug = created.slug;
             setSlug(created.slug);
+          }
+          // CLEANUP: remove the old local draft so it doesn't show as a duplicate
+          if (looksLocal(prevId)) {
+            removeLocalById(prevId);
+            removeLocalBySlug(nextSlug);
           }
         }
 
@@ -517,7 +528,8 @@ export default function BlogEdit() {
       if (serverId && isGuid(serverId)) {
         await apiDeletePost(serverId);
       }
-      removeLocal(id);
+      removeLocalById(id);
+      removeLocalBySlug(slug);
       nav("/blog");
     } catch (e) {
       const msg =
@@ -526,7 +538,7 @@ export default function BlogEdit() {
           : e?.message || "Failed to delete the post.";
       setError(msg);
     }
-  }, [id, serverId, nav]);
+  }, [id, serverId, slug, nav]);
 
   /* ----------------------------- Editor helpers ----------------------------- */
   const replaceRange = (text, start, end, insert) => text.slice(0, start) + insert + text.slice(end);
