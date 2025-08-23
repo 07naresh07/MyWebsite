@@ -19,7 +19,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.HttpOverrides; // <-- ADDED
+using Microsoft.AspNetCore.HttpOverrides; // needed for UseForwardedHeaders
 
 using Npgsql;
 using NpgsqlTypes;
@@ -32,7 +32,7 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 // ===== builder =====
 var builder = WebApplication.CreateBuilder(args);
 
-// Bind to Render's provided PORT (fallback 8080 for local)  <-- ADDED
+// Bind to Render's provided PORT (fallback 8080 for local)
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
@@ -117,12 +117,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ClockSkew = TimeSpan.FromSeconds(30)
         };
 
-        // ===== CHANGED: Read token from HttpOnly cookie first; disallow query param in prod =====
+        // Read token from HttpOnly cookie first; allow query token only in Dev
         opt.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
             {
-                // 1) HttpOnly cookie (preferred)
                 if (context.Request.Cookies.TryGetValue("auth", out var cookieToken) &&
                     !string.IsNullOrWhiteSpace(cookieToken))
                 {
@@ -130,7 +129,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     return Task.CompletedTask;
                 }
 
-                // 2) Authorization: Bearer <token>
                 var auth = context.Request.Headers["Authorization"].FirstOrDefault();
                 if (!string.IsNullOrWhiteSpace(auth) &&
                     auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
@@ -139,7 +137,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     return Task.CompletedTask;
                 }
 
-                // 3) Custom header (optional)
                 var xTok = context.Request.Headers["X-Owner-Token"].FirstOrDefault();
                 if (!string.IsNullOrWhiteSpace(xTok))
                 {
@@ -147,7 +144,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     return Task.CompletedTask;
                 }
 
-                // 4) Allow query token only in Development (Swagger/testing)
                 if (isDev)
                 {
                     var q = context.Request.Query["token"].FirstOrDefault();
@@ -183,13 +179,12 @@ try
 }
 catch { /* ignore */ }
 
-// Honor X-Forwarded-* from Render's proxy so scheme/host are correct  <-- ADDED
+// Honor X-Forwarded-* from Render's proxy so scheme/host are correct
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
-    ForwardedHeaders = ForwardedHeaders.X-ForwardedProto | ForwardedHeaders.X-ForwardedFor
+    ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor
 });
 
-// Put CORS early
 app.UseCors(corsPolicyName);
 
 app.UseSwagger();
@@ -227,7 +222,7 @@ app.UseAuthorization();
 app.MapMethods("{*any}", new[] { "OPTIONS" }, () => Results.NoContent())
    .RequireCors(corsPolicyName);
 
-// --------------------- Root & Health (for Render) ---------------------  <-- ADDED
+// --------------------- Root & Health (single mapping) ---------------------
 app.MapGet("/", () => Results.Text("Backend is up 🚀", "text/plain"));
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok", time = DateTimeOffset.UtcNow }));
 
@@ -445,16 +440,11 @@ static async Task EnsureContactMessagesTableAsync(NpgsqlConnection db)
 
 // --------------------- Routes ---------------------
 
-// Root + Health (base URL + Render health)  <-- ADDED (placed before other routes is fine)
-app.MapGet("/", () => Results.Text("Backend is up 🚀", "text/plain"));
-app.MapGet("/healthz", () => Results.Ok(new { status = "ok", time = DateTimeOffset.UtcNow }));
-
-// Health
+// Health (JSON under /api)
 app.MapGet("/api/health", () => Results.Json(new { ok = true }))
    .RequireCors(corsPolicyName);
 
 // ---- Auth
-// ===== CHANGED: set HttpOnly cookie on successful login =====
 app.MapPost("/api/auth/owner", (OwnerLogin body, HttpResponse res) =>
 {
     var pass = (body.Pass ?? "").Trim();
@@ -474,7 +464,6 @@ app.MapPost("/api/auth/owner", (OwnerLogin body, HttpResponse res) =>
         signingCredentials: creds);
     var tokenStr = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().WriteToken(token);
 
-    // HttpOnly cookie so JS can't read it
     res.Cookies.Append("auth", tokenStr, new CookieOptions
     {
         HttpOnly = true,
@@ -488,7 +477,6 @@ app.MapPost("/api/auth/owner", (OwnerLogin body, HttpResponse res) =>
     return Results.Ok(new { token = tokenStr });
 }).RequireCors(corsPolicyName);
 
-// ===== NEW: logout clears cookie =====
 app.MapPost("/api/auth/logout", (HttpResponse res) =>
 {
     res.Cookies.Delete("auth", new CookieOptions
@@ -501,7 +489,6 @@ app.MapPost("/api/auth/logout", (HttpResponse res) =>
     return Results.NoContent();
 }).RequireCors(corsPolicyName);
 
-// ===== CHANGED: /api/auth/me returns only { isOwner } without leaking claims =====
 app.MapGet("/api/auth/me", (HttpContext ctx) =>
 {
     ctx.Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
@@ -555,7 +542,6 @@ app.MapPost("/api/certificates/resolve", async (CertResolveReq body, IHttpClient
     }
 }).RequireCors(corsPolicyName);
 
-// Streaming proxy (use this URL in the frontend instead of direct LinkedIn URL)
 app.MapGet("/api/certificates/proxy", async (HttpContext ctx, string url, IHttpClientFactory cf) =>
 {
     if (string.IsNullOrWhiteSpace(url)) return Results.BadRequest(new { error = "url is required" });
@@ -628,7 +614,6 @@ app.MapGet("/api/posts", async (int page = 1, int pageSize = 10, string? tag = n
     });
 }).RequireCors(corsPolicyName);
 
-// Get a post by slug (public)
 app.MapGet("/api/posts/{slug}", async (string slug) =>
 {
     await using var db = new NpgsqlConnection(conn);
@@ -641,10 +626,9 @@ app.MapGet("/api/posts/{slug}", async (string slug) =>
 
     await using var reader = await cmd.ExecuteReaderAsync();
     if (!await reader.ReadAsync()) return Results.NotFound(new { error = "Not found" });
-    return Results.Json(Helpers.ReadPost(reader)); // PostDto excludes body_html by design
+    return Results.Json(Helpers.ReadPost(reader));
 }).RequireCors(corsPolicyName);
 
-// Create post (owner)
 app.MapPost("/api/posts", [Authorize(Policy = "Owner")] async (PostUpsertReq body) =>
 {
     await using var db = new NpgsqlConnection(conn);
@@ -698,7 +682,6 @@ app.MapPost("/api/posts", [Authorize(Policy = "Owner")] async (PostUpsertReq bod
     }
 }).RequireCors(corsPolicyName);
 
-// Update post (owner)
 app.MapPut("/api/posts/{id:guid}", [Authorize(Policy = "Owner")] async (Guid id, PostUpsertReq body) =>
 {
     await using var db = new NpgsqlConnection(conn);
@@ -754,7 +737,6 @@ app.MapPut("/api/posts/{id:guid}", [Authorize(Policy = "Owner")] async (Guid id,
     }
 }).RequireCors(corsPolicyName);
 
-// Delete post (owner)
 app.MapDelete("/api/posts/{id:guid}", [Authorize(Policy = "Owner")] async (Guid id) =>
 {
     await using var db = new NpgsqlConnection(conn);
@@ -898,7 +880,6 @@ app.MapGet("/api/profile", async () =>
     return Results.Json(Helpers.ReadProfile(reader));
 }).RequireCors(corsPolicyName);
 
-// Upsert profile; store About extras under socials.extras
 app.MapPut("/api/profile", [Authorize(Policy = "Owner")] async (ProfileUpsertReq body) =>
 {
     await using var db = new NpgsqlConnection(conn);
@@ -1145,7 +1126,7 @@ app.MapDelete("/api/experience/{id:guid}", [Authorize(Policy = "Owner")] async (
     return count == 0 ? Results.NotFound(new { error = "Not found" }) : Results.NoContent();
 }).RequireCors(corsPolicyName);
 
-// --------------------- EDUCATION (schema-flexible: details_html vs details) ---------------------
+// --------------------- EDUCATION (schema-flexible) ---------------------
 app.MapGet("/api/education", async () =>
 {
     await using var db = new NpgsqlConnection(conn);
@@ -1296,7 +1277,6 @@ app.MapPut("/api/education/{id:guid}", [Authorize(Policy = "Owner")] async (Guid
     }
 }).RequireCors(corsPolicyName);
 
-// Delete education (owner)
 app.MapDelete("/api/education/{id:guid}", [Authorize(Policy = "Owner")] async (Guid id) =>
 {
     await using var db = new NpgsqlConnection(conn);
@@ -1479,7 +1459,6 @@ app.MapGet("/api/gallery", async () =>
     return Results.Json(items);
 }).RequireCors(corsPolicyName);
 
-// Create gallery item -> certificates
 app.MapPost("/api/gallery", [Authorize(Policy = "Owner")] async (CertificateUpsertReq body) =>
 {
     await using var db = new NpgsqlConnection(conn);
@@ -1519,7 +1498,6 @@ app.MapPost("/api/gallery", [Authorize(Policy = "Owner")] async (CertificateUpse
     return Results.Created($"/api/gallery/{id}", new { id, imageUrl });
 }).RequireCors(corsPolicyName);
 
-// Update gallery item -> certificates
 app.MapPut("/api/gallery/{id:guid}", [Authorize(Policy = "Owner")] async (Guid id, CertificateUpsertReq body) =>
 {
     await using var db = new NpgsqlConnection(conn);
@@ -1560,7 +1538,6 @@ app.MapPut("/api/gallery/{id:guid}", [Authorize(Policy = "Owner")] async (Guid i
     return Results.Ok(new { id, imageUrl });
 }).RequireCors(corsPolicyName);
 
-// Delete gallery/certificate
 app.MapDelete("/api/gallery/{id:guid}", [Authorize(Policy = "Owner")] async (Guid id) =>
 {
     await using var db = new NpgsqlConnection(conn);
@@ -1754,7 +1731,6 @@ static class Helpers
         Tags = ReadStringArraySafe(r, "tags"),
         Status = r.GetString(r.GetOrdinal("status")),
         PublishedAt = ReadDateTimeOffsetSafe(r, "published_at")
-        // NOTE: PostDto in Api.Models doesn't use body_html/content
     };
 
     public static ProjectDto ReadProject(NpgsqlDataReader r) => new()
