@@ -62,7 +62,7 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 });
 
 // ===== Config =====
-var allowedCsv = builder.Configuration["AllowedOrigin"] ?? "http://localhost:5173";
+var allowedCsv = builder.Configuration["AllowedOrigin"] ?? "http://localhost:3000,http://localhost:4173,http://localhost:5173,http://localhost:8080";
 // Normalize & build an exact-match set (no trailing slashes)
 var allowed = allowedCsv
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

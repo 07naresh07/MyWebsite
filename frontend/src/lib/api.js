@@ -6,10 +6,13 @@ function computeApiBase() {
   const env = (import.meta.env?.VITE_API_URL || "").trim().replace(/\/+$/, "");
   if (env) return env;
 
-  const { protocol, hostname, port } = window.location;
-  const isViteDev = port === "5173";
-  if (isViteDev) return `${protocol}//${hostname}:5202`;
-  return "";
+  // Always use Render backend URL for now
+  return "https://mywebsite-1p3x.onrender.com";
+  
+  // Commented out local development logic
+  // const { protocol, hostname, port } = window.location;
+  // const isViteDev = port === "5173";
+  // if (isViteDev) return `${protocol}//${hostname}:5202`;
 }
 const API = computeApiBase();
 
@@ -163,7 +166,7 @@ export const deleteProject = (id)              => sendJson(`/api/projects/${id}`
 export const createEducation = (payload)       => sendJson("/api/education", "POST", payload);
 export const updateEducation = (id, payload)   => sendJson(`/api/education/${encodeURIComponent(id)}`, "PUT", payload);
 
-// IMPORTANT: This tries the canonical route and, if your backend doesn’t have it,
+// IMPORTANT: This tries the canonical route and, if your backend doesn't have it,
 // throws a clear error without touching other API functions.
 export const deleteEducation = async (id) => {
   try {
