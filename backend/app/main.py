@@ -10,10 +10,13 @@ import orjson
 
 from .config import settings
 from .db import init_pool, pool
+from .routes import home
 from .auth import create_owner_token, get_current_user, require_owner
+
 from .routes import (
     posts, projects, profile, experience, education, skills, languages,
-    certificates_gallery, contact, proxy, health, upload
+    certificates_gallery, contact, proxy, health, upload,
+    home,  # ← added
 )
 
 def orjson_dumps(v, *, default):
@@ -87,6 +90,7 @@ app.include_router(certificates_gallery.router)
 app.include_router(contact.router)
 app.include_router(proxy.router)
 app.include_router(upload.router)
+app.include_router(home.router)  # ← added
 
 def _mask_dsn(dsn: str) -> str:
     # postgresql://user:pass@host:port/db -> mask pass
@@ -135,3 +139,4 @@ async def auth_me(user = Depends(get_current_user)):
     return {"ok": True, "claims": claims}
 
 app.include_router(auth_router)
+app.include_router(home.router)

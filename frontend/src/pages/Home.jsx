@@ -1,7 +1,15 @@
 // src/pages/Home.jsx
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getProjects, getPosts } from "../lib/api.js";
+import {
+  getProjects,
+  getPosts,
+  getHome,
+  saveWelcome as apiSaveWelcome,
+  createHighlight as apiCreateHighlight,
+  updateHighlight as apiUpdateHighlight,
+  deleteHighlight as apiDeleteHighlight,
+} from "../lib/api.js";
 import { useOwnerMode } from "../lib/owner.js";
 
 /* ------------------------------ Lightweight UI primitives ------------------------------ */
@@ -41,14 +49,16 @@ const TAG_COLORS = [
   { light: "bg-indigo-100 text-indigo-900 ring-indigo-200", dark: "bg-indigo-900/30 text-indigo-200 ring-indigo-700" },
   { light: "bg-teal-100 text-teal-900 ring-teal-200", dark: "bg-teal-900/30 text-teal-200 ring-teal-700" },
 ];
+
 function hashIdx(str = "", mod = TAG_COLORS.length) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
   return h % mod;
 }
+
 function chipClassFor(tag = "", isDark = false) {
   const c = TAG_COLORS[hashIdx(tag)];
-  return `${isDark ? c.dark : c.light} ring-1 rounded-md px-2 py-0.5 text-[11px]`;
+  return `${isDark ? c.dark : c.light} ring-1 rounded-md px-2 py-0.5 text-xs font-medium`;
 }
 
 /* ------------------------------ Helpers ------------------------------ */
@@ -61,6 +71,7 @@ function projectBadges(pj) {
   if (pj.status && /in\s*progress|wip|ongoing/i.test(pj.status)) out.push([MODERN_ICONS.inProgress, "In Progress"]);
   return out;
 }
+
 function postBadges(po) {
   const out = [];
   const tags = (po.tags || []).map((t) => String(t));
@@ -69,16 +80,19 @@ function postBadges(po) {
   if (tags.some((t) => /ai|ml/i.test(t))) out.push([MODERN_ICONS.ai, "AI"]);
   return out;
 }
+
 function isRecent(dateStr) {
   const d = dateStr ? new Date(dateStr) : null;
   if (!d || isNaN(+d)) return false;
   const days = (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24);
   return days <= 30;
 }
+
 function isTrendingByTags(tags = []) {
   const t = (tags || []).join(" ").toLowerCase();
   return /ai|bim|mobility|transport|automation/.test(t);
 }
+
 function sanitizePreview(html) {
   try {
     const parser = new DOMParser();
@@ -114,6 +128,7 @@ function sanitizePreview(html) {
     return doc.body.innerHTML;
   } catch { return html || ""; }
 }
+
 function snippetHtml(html, maxChars = 420) {
   try {
     const parser = new DOMParser();
@@ -234,14 +249,13 @@ function useTheme() {
   });
 
   useEffect(() => {
-    // Apply dark mode to document root
     try {
       if (isDark) {
         document.documentElement.classList.add("dark");
-        document.body.className = "bg-slate-900 text-white";
+        document.body.className = "bg-slate-900 text-white font-sans";
       } else {
         document.documentElement.classList.remove("dark");
-        document.body.className = "bg-gray-50 text-slate-900";
+        document.body.className = "bg-gray-50 text-slate-900 font-sans";
       }
     } catch {}
   }, [isDark]);
@@ -287,24 +301,28 @@ const HIGHLIGHT_COLORS = [
 /* ------------------------------ Welcome Editor (with color palette) ------------------------------ */
 const LS_WELCOME = "welcomeContentV1";
 
-function EditableWelcomeSection({ isDark, ownerMode }) {
-  const defaultWelcomeText = `
-    <p>I'm a technology-driven Civil Engineer focused on rethinking how we design, build, and optimize infrastructure. With <strong>7+ years</strong> across Japan and Nepal, I've worked on smart-city development, transportation infrastructure, renewable energy, and BIM-driven automation.</p>
-    <p>At <strong>Woven by Toyota</strong>, I bridge civil engineering and software with advanced BIM workflows, parametric design, and data-centric automation.</p>
-    <p>I'm also deeply curious about <strong>AI and machine learning</strong> in AEC—using data to elevate design accuracy, execution, and decision-making.</p>
-  `;
+function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) {
+  const defaultWelcomeText = `<p>I'm a technology-driven Civil Engineer focused on rethinking how we design, build, and optimize infrastructure. With <strong>7+ years</strong> across Japan and Nepal, I've worked on smart-city development, transportation infrastructure, renewable energy, and BIM-driven automation.</p><p>At <strong>Woven by Toyota</strong>, I bridge civil engineering and software with advanced BIM workflows, parametric design, and data-centric automation.</p><p>I'm also deeply curious about <strong>AI and machine learning</strong> in AEC—using data to elevate design accuracy, execution, and decision-making.</p>`;
+  
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showColorPalette, setShowColorPalette] = useState(false);
   const editorRef = useRef(null);
-
-  // ✅ persist active selection while palette is open
   const savedRangeRef = useRef(null);
 
   const [welcomeContent, setWelcomeContent] = useState(() => {
-    try { return window.localStorage.getItem(LS_WELCOME) || defaultWelcomeText; }
-    catch { return defaultWelcomeText; }
+    try {
+      return initialHtml || window.localStorage.getItem(LS_WELCOME) || defaultWelcomeText;
+    } catch {
+      return initialHtml || defaultWelcomeText;
+    }
   });
+
+  useEffect(() => {
+    if (initialHtml && initialHtml !== welcomeContent) {
+      setWelcomeContent(initialHtml);
+    }
+  }, [initialHtml]);
 
   useEffect(() => {
     if (!isEditing) return;
@@ -314,7 +332,6 @@ function EditableWelcomeSection({ isDark, ownerMode }) {
     } catch {}
   }, [isEditing]);
 
-  // ✅ Track selection inside the editor while editing
   useEffect(() => {
     if (!isEditing) return;
     const onSel = () => {
@@ -329,7 +346,6 @@ function EditableWelcomeSection({ isDark, ownerMode }) {
     return () => document.removeEventListener("selectionchange", onSel);
   }, [isEditing]);
 
-  // ✅ Helper to restore selection before applying color
   const restoreSelection = () => {
     const range = savedRangeRef.current;
     if (!range) return false;
@@ -340,7 +356,6 @@ function EditableWelcomeSection({ isDark, ownerMode }) {
     return true;
   };
 
-  // ✅ Robust color/highlight applier (execCommand + manual fallback)
   const applyInlineStyle = (prop, color) => {
     if (!restoreSelection()) return;
     const sel = window.getSelection?.();
@@ -348,32 +363,23 @@ function EditableWelcomeSection({ isDark, ownerMode }) {
     const range = sel.getRangeAt(0);
     if (range.collapsed) return;
 
-    // Try execCommand first (works well in Chromium/WebKit)
     try {
-      if (prop === "backgroundColor") {
-        document.execCommand("hiliteColor", false, color);
-      } else {
-        document.execCommand("foreColor", false, color);
-      }
+      if (prop === "backgroundColor") document.execCommand("hiliteColor", false, color);
+      else document.execCommand("foreColor", false, color);
     } catch {}
-
-    // Manual fallback for browsers where execCommand is flaky
     try {
       const span = document.createElement("span");
       span.style[prop] = color;
       const contents = range.extractContents();
       span.appendChild(contents);
       range.insertNode(span);
-      // place caret after inserted span
       const newRange = document.createRange();
       newRange.setStartAfter(span);
       newRange.collapse(true);
       sel.removeAllRanges();
       sel.addRange(newRange);
       savedRangeRef.current = newRange.cloneRange();
-    } catch {
-      // noop
-    }
+    } catch {}
   };
 
   const applyColor = (color, isHighlight = false) => {
@@ -387,14 +393,39 @@ function EditableWelcomeSection({ isDark, ownerMode }) {
     setShowColorPalette(false);
   };
 
-  const handleEdit = () => { if (!ownerMode) return; setIsEditing(true); setTimeout(() => editorRef.current?.focus(), 60); };
-  const handleSave = () => {
-    const html = editorRef.current?.innerHTML || "";
+  // Fixed paragraph handling
+  const handlePaste = (e) => {
+    if (!isEditing) return;
+    e.preventDefault();
+    const text = e.clipboardData?.getData("text/plain") || "";
+    const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim());
+    const html = paragraphs.map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+    document.execCommand("insertHTML", false, html);
+  };
+
+  const handleEdit = () => { 
+    if (!ownerMode) return; 
+    setIsEditing(true); 
+    setTimeout(() => editorRef.current?.focus(), 60); 
+  };
+
+  const handleSave = async () => {
+    let html = editorRef.current?.innerHTML || "";
+    
+    // Ensure proper paragraph structure
+    if (html && !html.includes('<p>')) {
+      // If no paragraphs, wrap content in paragraphs
+      const lines = html.split('<br>').filter(line => line.trim());
+      html = lines.map(line => `<p>${line.trim()}</p>`).join('');
+    }
+    
     setWelcomeContent(html);
     try { window.localStorage.setItem(LS_WELCOME, html); } catch {}
+    try { await onSaveHtml?.(html); } catch (e) { console.error("Failed to save welcome:", e); }
     setIsEditing(false);
     setShowColorPalette(false);
   };
+
   const handleCancel = () => {
     if (editorRef.current) editorRef.current.innerHTML = welcomeContent;
     setIsEditing(false);
@@ -402,18 +433,18 @@ function EditableWelcomeSection({ isDark, ownerMode }) {
   };
 
   const panelBg = isDark ? "bg-slate-700 border-slate-600" : "bg-gray-50 border-gray-200";
-  const btnHover = isDark ? "hover:bg-slate-600" : "hover:bg-gray-200";
+  const btnHover = isDark ? "hover:bg-slate-600 text-white" : "hover:bg-gray-200 text-slate-700";
 
   return (
     <section
-      className={`container mx-auto px-4 py-10 relative group ${isDark ? 'text-white' : 'text-slate-800'}`}
+      className={`container mx-auto px-4 py-10 relative group ${isDark ? "text-white" : "text-slate-800"}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {ownerMode && !isEditing && isHovered && (
         <button
           onClick={handleEdit}
-          className={`absolute top-4 right-4 z-10 px-3 py-1.5 ${isDark ? "bg-slate-800 border-slate-600 text-white hover:bg-slate-700" : "bg-white border-gray-300 text-slate-700 hover:bg-gray-50"} border rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 text-sm font-medium`}
+          className={`absolute top-4 right-4 z-10 px-3 py-1.5 text-sm font-medium ${isDark ? "bg-slate-800 border-slate-600 text-white hover:bg-slate-700" : "bg-white border-gray-300 text-slate-700 hover:bg-gray-50"} border rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2`}
           aria-label="Edit welcome"
         >
           ✏️ Edit Welcome
@@ -431,31 +462,27 @@ function EditableWelcomeSection({ isDark, ownerMode }) {
       {isEditing && (
         <div className={`mb-4 p-3 rounded-xl border shadow-lg ${panelBg} relative`}>
           <div className="flex flex-wrap items-center gap-1">
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("bold")} className={`px-2 py-1.5 rounded-md ${btnHover} font-bold`}>B</button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("italic")} className={`px-2 py-1.5 rounded-md ${btnHover} italic`}>I</button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("underline")} className={`px-2 py-1.5 rounded-md ${btnHover} underline`}>U</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("bold")} className={`px-2 py-1.5 rounded-md ${btnHover} font-bold text-sm`}>B</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("italic")} className={`px-2 py-1.5 rounded-md ${btnHover} italic text-sm`}>I</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("underline")} className={`px-2 py-1.5 rounded-md ${btnHover} underline text-sm`}>U</button>
             <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("insertUnorderedList")} className={`px-2 py-1.5 rounded-md ${btnHover}`}>•</button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("insertOrderedList")} className={`px-2 py-1.5 rounded-md ${btnHover}`}>1</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("insertUnorderedList")} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>•</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("insertOrderedList")} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>1</button>
             <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
-            {/* ✅ preserve selection when opening & clicking palette */}
             <button
               onMouseDown={(e)=>{ e.preventDefault(); restoreSelection(); }}
               onClick={() => setShowColorPalette((v)=>!v)}
-              className={`px-2 py-1.5 rounded-md ${btnHover} ${showColorPalette ? (isDark ? 'bg-slate-600' : 'bg-gray-200') : ''}`}
+              className={`px-2 py-1.5 rounded-md ${btnHover} text-sm ${showColorPalette ? (isDark ? "bg-slate-600" : "bg-gray-200") : ""}`}
             >
               🎨
             </button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={removeFormatting} className={`px-2 py-1.5 rounded-md ${btnHover}`}>⚪</button>
-            <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyLeft")} className={`px-2 py-1.5 rounded-md ${btnHover}`}>←</button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyCenter")} className={`px-2 py-1.5 rounded-md ${btnHover}`}>↔</button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyRight")} className={`px-2 py-1.5 rounded-md ${btnHover}`}>→</button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyFull")} className={`px-2 py-1.5 rounded-md ${btnHover}`}>⤢</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={removeFormatting} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>⚪</button>
           </div>
 
           {showColorPalette && (
-            <div className={`absolute top-full left-0 mt-2 z-50 p-4 rounded-xl border shadow-xl backdrop-blur-md ${isDark ? "bg-slate-800/95 border-slate-700" : "bg-white/95 border-slate-200"}`}>
+            <div
+              className={`absolute left-0 top-full mt-2 z-50 p-4 rounded-xl border shadow-xl backdrop-blur-md ${isDark ? "bg-slate-800/95 border-slate-700" : "bg-white/95 border-slate-200"}`}
+            >
               <div className="space-y-4 min-w-[320px]">
                 <div>
                   <h4 className={`text-sm font-medium mb-2 ${isDark ? "text-slate-200" : "text-slate-700"}`}>Text Colors</h4>
@@ -504,7 +531,8 @@ function EditableWelcomeSection({ isDark, ownerMode }) {
           ref={editorRef}
           contentEditable={isEditing}
           suppressContentEditableWarning
-          className={`text-[18px] leading-8 outline-none ${
+          onPaste={handlePaste}
+          className={`text-lg leading-8 outline-none ${
             isEditing
               ? `${isDark ? "text-white bg-slate-800 border-slate-600" : "text-slate-800 bg-white border-gray-300"} ring-2 ring-violet-500/50 rounded-lg p-4 border`
               : `${isDark ? "text-white" : "text-slate-800"}`
@@ -517,13 +545,13 @@ function EditableWelcomeSection({ isDark, ownerMode }) {
           <div className="mt-4 flex gap-3">
             <button
               onClick={handleSave}
-              className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl text-sm"
             >
               Save Changes
             </button>
             <button
               onClick={handleCancel}
-              className={`px-6 py-2 font-medium rounded-lg border ${isDark ? "bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"}`}
+              className={`px-6 py-2 font-medium rounded-lg border text-sm ${isDark ? "bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"}`}
             >
               Cancel
             </button>
@@ -566,18 +594,32 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
     } catch {}
   }, [editing]);
 
-  const startEdit = () => { if (!ownerMode) return; setEditing(true); setTimeout(() => bodyRef.current?.focus(), 80); };
-  const saveEdit = () => {
-    onChange({ ...item, titleHtml: titleRef.current?.innerHTML || "", bodyHtml: bodyRef.current?.innerHTML || "" });
-    setEditing(false); setIconOpen(false);
+  const startEdit = () => { 
+    if (!ownerMode) return; 
+    setEditing(true); 
+    setTimeout(() => bodyRef.current?.focus(), 80); 
   };
+
+  const saveEdit = () => {
+    const newItem = { 
+      ...item, 
+      titleHtml: titleRef.current?.innerHTML || "", 
+      bodyHtml: bodyRef.current?.innerHTML || "" 
+    };
+    onChange(newItem);
+    setEditing(false); 
+    setIconOpen(false);
+  };
+
   const cancelEdit = () => {
     if (titleRef.current) titleRef.current.innerHTML = item.titleHtml || "";
     if (bodyRef.current) bodyRef.current.innerHTML = item.bodyHtml || "";
-    setEditing(false); setIconOpen(false);
+    setEditing(false); 
+    setIconOpen(false);
   };
 
   const escapeHtml = (s) => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  
   const handlePasteTitle = (e) => {
     if (!editing) return;
     e.preventDefault();
@@ -585,6 +627,7 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
     const html = escapeHtml(text).replace(/\s+/g, " ");
     document.execCommand("insertHTML", false, html);
   };
+  
   const handlePasteBody = (e) => {
     if (!editing) return;
     e.preventDefault();
@@ -594,9 +637,7 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
   };
 
   const stopBubble = (e) => e.stopPropagation();
-
   const gradient = isDark ? DARK_UI_GRADIENT : UI_GRADIENT;
-  const forceDarkText = !editing && isDark ? "hi-dark" : "";
 
   return (
     <>
@@ -604,15 +645,25 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
         {ownerMode && !editing && (
           <div className="absolute right-3 top-3 z-20 opacity-0 group-hover:opacity-100 transition-all">
             <div className="flex gap-2">
-              <button onClick={startEdit} className={`text-xs px-3 py-1.5 rounded-lg backdrop-blur border ${isDark ? "bg-slate-800/80 border-white/10 text-slate-200" : "bg-white/80 border-white/20 text-slate-700"}`}>✏️ Edit</button>
-              <button onClick={() => onDelete(item.id)} className={`text-xs px-3 py-1.5 rounded-lg backdrop-blur border ${isDark ? "bg-slate-800/80 border-white/10 text-slate-200 hover:bg-red-900/30" : "bg-white/80 border-white/20 text-slate-700 hover:bg-red-50"}`}>🗑️ Delete</button>
+              <button 
+                onClick={startEdit} 
+                className={`text-xs px-3 py-1.5 rounded-lg backdrop-blur border font-medium ${isDark ? "bg-slate-800/80 border-white/10 text-white" : "bg-white/80 border-white/20 text-slate-700"}`}
+              >
+                ✏️ Edit
+              </button>
+              <button 
+                onClick={() => onDelete(item.id)} 
+                className={`text-xs px-3 py-1.5 rounded-lg backdrop-blur border font-medium ${isDark ? "bg-slate-800/80 border-white/10 text-white hover:bg-red-900/30" : "bg-white/80 border-white/20 text-slate-700 hover:bg-red-50"}`}
+              >
+                🗑️ Delete
+              </button>
             </div>
           </div>
         )}
 
         <Card
           isDark={isDark}
-          className={`relative p-4 h-[260px] transition-all duration-300 hover:shadow-lg hover:-translate-y-1 rounded-2xl border-0 shadow-md ${isDark ? "bg-slate-800/50" : "bg-white/70"} backdrop-blur-sm flex flex-col`}
+          className={`relative p-6 h-[280px] transition-all duration-300 hover:shadow-lg hover:-translate-y-1 rounded-2xl border-0 shadow-md ${isDark ? "bg-slate-800/50" : "bg-white/70"} backdrop-blur-sm flex flex-col`}
         >
           <div className="relative z-10 flex-1 flex flex-col min-h-0">
             <div className="flex items-start gap-4">
@@ -638,8 +689,10 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                       {Object.keys(EMOJI_CATEGORIES).map((cat) => (
                         <button
                           key={cat}
-                          className={`px-3 py-1.5 text-sm rounded-lg whitespace-nowrap ${
-                            selectedCategory === cat ? `bg-gradient-to-r ${gradient} text-white` : `${isDark ? "text-slate-300 hover:bg-slate-700" : "text-slate-600 hover:bg-slate-100"}`
+                          className={`px-3 py-1.5 text-sm font-medium rounded-lg whitespace-nowrap ${
+                            selectedCategory === cat 
+                              ? `bg-gradient-to-r ${gradient} text-white` 
+                              : `${isDark ? "text-white/80 hover:bg-slate-700" : "text-slate-600 hover:bg-slate-100"}`
                           }`}
                           onClick={() => setSelectedCategory(cat)}
                         >
@@ -652,7 +705,11 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                         <button
                           key={emo}
                           className={`h-12 w-12 grid place-items-center text-2xl rounded-xl ${isDark ? "hover:bg-slate-700" : "hover:bg-slate-100"}`}
-                          onClick={() => { onChange({ ...item, icon: emo }); setIconOpen(false); }}
+                          onClick={() => { 
+                            const newItem = { ...item, icon: emo };
+                            onChange(newItem); 
+                            setIconOpen(false); 
+                          }}
                         >
                           {emo}
                         </button>
@@ -669,15 +726,17 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                   suppressContentEditableWarning
                   onPaste={handlePasteTitle}
                   className={`text-xl font-bold leading-tight outline-none ${
-                    editing ? `ring-2 ring-violet-500/50 rounded-lg px-2 py-1 ${isDark ? "bg-slate-700 text-slate-200" : "bg-white text-slate-800"}` : ""
-                  } bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}
+                    editing 
+                      ? `ring-2 ring-violet-500/50 rounded-lg px-2 py-1 ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-800"}` 
+                      : "bg-clip-text text-transparent bg-gradient-to-r " + gradient
+                  }`}
                   dangerouslySetInnerHTML={{ __html: item.titleHtml || "" }}
                 />
                 <div className={`mt-2 h-1 w-20 rounded-full bg-gradient-to-r ${gradient} opacity-60`} />
               </div>
             </div>
 
-            <div className="mt-3 flex-1 min-h-0 flex flex-col">
+            <div className="mt-4 flex-1 min-h-0 flex flex-col">
               <div
                 ref={bodyRef}
                 contentEditable={editing}
@@ -688,19 +747,19 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                 onTouchStart={stopBubble}
                 className={`relative z-10 text-sm leading-7 outline-none flex-1 min-h-0 overflow-y-auto pr-1 ${
                   editing
-                    ? `ring-2 ring-violet-500/50 rounded-lg p-3 ${isDark ? "bg-slate-700 text-slate-200" : "bg-white text-slate-700"}`
-                    : `${isDark ? "text-white" : "text-slate-600"} ${forceDarkText}`
+                    ? `ring-2 ring-violet-500/50 rounded-lg p-3 ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-700"}`
+                    : `${isDark ? "text-white" : "text-slate-600"}`
                 }`}
                 style={{ textAlign: "justify" }}
                 dangerouslySetInnerHTML={{ __html: item.bodyHtml || "" }}
               />
 
-              <div className="pt-2 flex justify-end">
+              <div className="pt-3 flex justify-end">
                 {!editing ? (
                   <button
                     type="button"
                     onClick={() => setShowModal(true)}
-                    className={`text-xs flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${isDark ? "text-slate-300 hover:text-violet-400 hover:bg-slate-700/50" : "text-slate-500 hover:text-violet-600 hover:bg-slate-100/50"}`}
+                    className={`text-xs font-medium flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors ${isDark ? "text-white/80 hover:text-violet-300 hover:bg-slate-700/50" : "text-slate-500 hover:text-violet-600 hover:bg-slate-100/50"}`}
                     aria-label="Read more highlight"
                     onMouseDown={stopBubble}
                     onWheel={stopBubble}
@@ -713,12 +772,42 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                   </button>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={() => document.execCommand("bold")} className={`p-2 rounded ${isDark ? "hover:bg-slate-600" : "hover:bg-slate-200"} font-bold`}>B</button>
-                    <button onClick={() => document.execCommand("italic")} className={`p-2 rounded ${isDark ? "hover:bg-slate-600" : "hover:bg-slate-200"} italic`}>I</button>
-                    <button onClick={() => document.execCommand("insertUnorderedList")} className={`p-2 rounded ${isDark ? "hover:bg-slate-600" : "hover:bg-slate-200"}`}>•</button>
-                    <button onClick={() => document.execCommand("insertOrderedList")} className={`p-2 rounded ${isDark ? "hover:bg-slate-600" : "hover:bg-slate-200"}`}>1</button>
-                    <button onClick={saveEdit} className="px-3 py-1.5 rounded-md bg-emerald-600 text-white">Save</button>
-                    <button onClick={cancelEdit} className={`px-3 py-1.5 rounded-md ${isDark ? "bg-slate-600 text-slate-200" : "bg-slate-100 text-slate-700"}`}>Cancel</button>
+                    <button 
+                      onClick={() => document.execCommand("bold")} 
+                      className={`p-2 rounded text-sm font-bold ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200"}`}
+                    >
+                      B
+                    </button>
+                    <button 
+                      onClick={() => document.execCommand("italic")} 
+                      className={`p-2 rounded text-sm italic ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200"}`}
+                    >
+                      I
+                    </button>
+                    <button 
+                      onClick={() => document.execCommand("insertUnorderedList")} 
+                      className={`p-2 rounded text-sm ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200"}`}
+                    >
+                      •
+                    </button>
+                    <button 
+                      onClick={() => document.execCommand("insertOrderedList")} 
+                      className={`p-2 rounded text-sm ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200"}`}
+                    >
+                      1
+                    </button>
+                    <button 
+                      onClick={saveEdit} 
+                      className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-sm font-medium"
+                    >
+                      Save
+                    </button>
+                    <button 
+                      onClick={cancelEdit} 
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium ${isDark ? "bg-slate-600 text-white" : "bg-slate-100 text-slate-700"}`}
+                    >
+                      Cancel
+                    </button>
                   </div>
                 )}
               </div>
@@ -741,10 +830,19 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                   dangerouslySetInnerHTML={{ __html: item.titleHtml || "" }}
                 />
               </div>
-              <button className={`h-10 w-10 grid place-items-center rounded-full ${isDark ? "hover:bg-slate-700 text-slate-200" : "hover:bg-slate-100 text-slate-700"}`} onClick={() => setShowModal(false)}>✕</button>
+              <button 
+                className={`h-10 w-10 grid place-items-center rounded-full ${isDark ? "hover:bg-slate-700 text-white" : "hover:bg-slate-100 text-slate-700"}`} 
+                onClick={() => setShowModal(false)}
+              >
+                ✕
+              </button>
             </div>
             <div className="p-6">
-              <div className={`prose prose-lg max-w-none leading-8 ${isDark ? "text-white" : "text-slate-700"}`} style={{ textAlign: "justify" }} dangerouslySetInnerHTML={{ __html: item.bodyHtml || "" }} />
+              <div 
+                className={`prose prose-lg max-w-none leading-8 ${isDark ? "text-white" : "text-slate-700"}`} 
+                style={{ textAlign: "justify" }} 
+                dangerouslySetInnerHTML={{ __html: item.bodyHtml || "" }} 
+              />
             </div>
           </div>
         </div>
@@ -757,13 +855,23 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
 function EnhancedAddHighlightCard({ onAdd, ownerMode, isDark }) {
   if (!ownerMode) return null;
   return (
-    <button onClick={onAdd} className="snap-center inline-block min-w-[320px] max-w-sm text-left group focus:outline-none" type="button" aria-label="Add section">
-      <Card isDark={isDark} className={`p-6 h-[260px] border-2 border-dashed rounded-2xl grid place-items-center transition-all hover:scale-[1.02] ${isDark ? "border-slate-600 hover:border-slate-500 bg-slate-800/30" : "border-slate-300 hover:border-slate-400 bg-slate-50/50"}`}>
+    <button 
+      onClick={onAdd} 
+      className="snap-center inline-block min-w-[320px] text-left group focus:outline-none" 
+      type="button" 
+      aria-label="Add section"
+    >
+      <Card 
+        isDark={isDark} 
+        className={`p-6 h-[280px] border-2 border-dashed rounded-2xl grid place-items-center transition-all hover:scale-[1.02] ${isDark ? "border-slate-600 hover:border-slate-500 bg-slate-800/30" : "border-slate-300 hover:border-slate-400 bg-slate-50/50"}`}
+      >
         <div className="flex flex-col items-center gap-3">
-          <div className={`text-4xl p-3 rounded-full ${isDark ? "bg-slate-700 text-slate-300" : "bg-white text-slate-600"}`}>
-            <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/></svg>
+          <div className={`text-4xl p-3 rounded-full ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-600"}`}>
+            <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/>
+            </svg>
           </div>
-          <div className={`text-sm font-medium ${isDark ? "text-slate-400" : "text-slate-600"}`}>Add New Section</div>
+          <div className={`text-sm font-medium ${isDark ? "text-white" : "text-slate-600"}`}>Add New Section</div>
         </div>
       </Card>
     </button>
@@ -776,7 +884,7 @@ function ControlPanel({ isDark, toggleTheme, viewMode, toggleViewMode }) {
     <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2">
       <button
         onClick={toggleTheme}
-        className={`px-4 py-2 rounded-full backdrop-blur-md border shadow-lg transition-all ${isDark ? "bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700/60" : "bg-white/80 border-slate-200 text-slate-700 hover:bg-white/70"}`}
+        className={`px-4 py-2 text-sm font-medium rounded-full backdrop-blur-md border shadow-lg transition-all ${isDark ? "bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700/60" : "bg-white/80 border-slate-200 text-slate-700 hover:bg-white/70"}`}
         aria-label="Toggle theme"
         title="Toggle light/dark"
       >
@@ -790,9 +898,13 @@ function ControlPanel({ isDark, toggleTheme, viewMode, toggleViewMode }) {
         title="Toggle grid/list"
       >
         {viewMode === "grid" ? (
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" strokeWidth="2"/></svg>
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" strokeWidth="2"/>
+          </svg>
         ) : (
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h16" strokeWidth="2" strokeLinecap="round"/></svg>
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M4 6h16M4 12h16M4 18h16" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
         )}
       </button>
     </div>
@@ -805,27 +917,89 @@ export default function Home() {
   const { owner } = useOwnerMode?.() || {};
   const ownerMode = !!owner;
 
-  const { isDark, toggleTheme } = useTheme(); // Page-scoped theme
+  const { isDark, toggleTheme } = useTheme();
   const { viewMode, toggleViewMode } = useViewMode();
 
   const [projects, setProjects] = useState([]);
   const [posts, setPosts] = useState([]);
-  const [highlights, setHighlights] = useState(() => {
-    try { return JSON.parse(window.localStorage.getItem(LS_HIGHLIGHTS) || "null") || DEFAULT_HIGHLIGHTS; }
-    catch { return DEFAULT_HIGHLIGHTS; }
-  });
+  const [welcomeHtml, setWelcomeHtml] = useState("");
+  const [highlights, setHighlights] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  // Load server data (welcome + highlights) with better error handling
+  useEffect(() => {
+    let mounted = true;
+    
+    const loadHomeData = async () => {
+      try {
+        console.log("Loading home data...");
+        const home = await getHome();
+        
+        if (!mounted) return;
+        
+        if (home?.welcomeHtml) {
+          console.log("Loaded welcome HTML:", home.welcomeHtml.substring(0, 100) + "...");
+          setWelcomeHtml(home.welcomeHtml);
+        }
+        
+        if (Array.isArray(home?.highlights) && home.highlights.length > 0) {
+          console.log("Loaded highlights:", home.highlights.length);
+          setHighlights(home.highlights);
+        } else {
+          console.log("No highlights from server, using defaults");
+          setHighlights(DEFAULT_HIGHLIGHTS);
+        }
+      } catch (e) {
+        console.warn("API failed, falling back to local storage:", e);
+        if (!mounted) return;
+        
+        try {
+          const localWelcome = localStorage.getItem(LS_WELCOME);
+          if (localWelcome) {
+            console.log("Using local welcome");
+            setWelcomeHtml(localWelcome);
+          }
+          
+          const localHighlights = localStorage.getItem(LS_HIGHLIGHTS);
+          if (localHighlights) {
+            const parsed = JSON.parse(localHighlights);
+            console.log("Using local highlights:", parsed.length);
+            setHighlights(parsed);
+          } else {
+            console.log("Using default highlights");
+            setHighlights(DEFAULT_HIGHLIGHTS);
+          }
+        } catch (localError) {
+          console.error("Local storage failed, using defaults:", localError);
+          setHighlights(DEFAULT_HIGHLIGHTS);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadHomeData();
+    return () => { mounted = false; };
+  }, []);
+
+  // Projects
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const pj = await getProjects();
         if (mounted) setProjects(Array.isArray(pj) ? pj : (pj?.items || []));
-      } catch (error) { console.error('Failed to load projects:', error); }
+      } catch (error) { 
+        console.error("Failed to load projects:", error); 
+        if (mounted) setProjects([]);
+      }
     })();
     return () => { mounted = false; };
   }, []);
 
+  // Posts
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -845,6 +1019,7 @@ export default function Home() {
             theme: x.theme || { fontFamily: "", basePx: 16, headingScale: 1.15 },
             createdAt: x.createdAt || new Date().toISOString(),
             updatedAt: x.updatedAt || x.createdAt || new Date().toISOString(),
+            publishedAt: x.publishedAt || x.createdAt,
           };
         });
 
@@ -867,25 +1042,95 @@ export default function Home() {
     return () => { mounted = false; };
   }, []);
 
+  // Persist highlights locally too (nice fallback)
   useEffect(() => {
-    try { window.localStorage.setItem(LS_HIGHLIGHTS, JSON.stringify(highlights)); } catch {}
+    if (highlights.length > 0) {
+      try { 
+        window.localStorage.setItem(LS_HIGHLIGHTS, JSON.stringify(highlights)); 
+        console.log("Saved highlights to localStorage:", highlights.length);
+      } catch (e) {
+        console.error("Failed to save highlights to localStorage:", e);
+      }
+    }
   }, [highlights]);
+
+  // Handlers -> DB
+  const saveWelcome = async (html) => {
+    try {
+      await apiSaveWelcome(html);
+      setWelcomeHtml(html);
+      console.log("Welcome saved successfully");
+    } catch (e) {
+      console.error("Failed to save welcome to server:", e);
+      // Still update local state
+      setWelcomeHtml(html);
+    }
+  };
+
+  const addHighlight = async () => {
+    const draft = { 
+      icon: "💡", 
+      titleHtml: "New highlight", 
+      bodyHtml: "<p>Describe your highlight…</p>", 
+      position: (highlights?.length || 0) + 1 
+    };
+    
+    try {
+      const created = await apiCreateHighlight(draft);
+      const newHighlight = created || { ...draft, id: `h-${Date.now()}` };
+      setHighlights((prev) => [...prev, newHighlight]);
+      console.log("Highlight created:", newHighlight);
+    } catch (e) {
+      console.error("Create highlight failed, using local:", e);
+      const localHighlight = { ...draft, id: `h-${Date.now()}` };
+      setHighlights((prev) => [...prev, localHighlight]);
+    }
+  };
+
+  const updateHighlightOnServer = async (next) => {
+    // Optimistically update UI first
+    setHighlights((prev) => prev.map((h) => (h.id === next.id ? next : h)));
+    
+    try { 
+      await apiUpdateHighlight(next.id, next); 
+      console.log("Highlight updated:", next.id);
+    } catch (e) { 
+      console.error("Update highlight failed:", e); 
+    }
+  };
+
+  const deleteHighlightOnServer = async (id) => {
+    // Optimistically update UI first
+    setHighlights((prev) => prev.filter((h) => h.id !== id));
+    
+    try { 
+      await apiDeleteHighlight(id); 
+      console.log("Highlight deleted:", id);
+    } catch (e) { 
+      console.error("Delete highlight failed:", e); 
+    }
+  };
 
   const hiRow = useHRow();
   const pjRow = useHRow();
   const poRow = useHRow();
 
-  const addHighlight = () => {
-    const id = `h-${Date.now()}`;
-    setHighlights((prev) => [...prev, { id, icon: "💡", titleHtml: "New highlight", bodyHtml: "Describe your highlight…" }]);
-  };
-  const updateHighlight = (next) => setHighlights((prev) => prev.map((h) => (h.id === next.id ? next : h)));
-  const deleteHighlight = (id) => setHighlights((prev) => prev.filter((h) => h.id !== id));
-
   const gradient = isDark ? DARK_UI_GRADIENT : UI_GRADIENT;
 
+  // Add loading state
+  if (loading) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? "bg-slate-900 text-white" : "bg-gray-50 text-slate-900"}`}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500 mx-auto mb-4"></div>
+          <p className="text-sm font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={isDark ? "dark bg-slate-900 text-white" : "bg-gray-50 text-slate-900"}>
+    <div className={`min-h-screen font-sans ${isDark ? "dark bg-slate-900 text-white" : "bg-gray-50 text-slate-900"}`}>
       <style>{`
         .clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         .clamp-4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
@@ -900,79 +1145,129 @@ export default function Home() {
         [contenteditable] li { margin: 0.125rem 0; }
         [contenteditable] p { margin: 0.5rem 0; }
         [contenteditable]:focus { outline: none; }
-
-        /* Force white text in dark highlight cards, overriding any pasted inline color */
-        .hi-dark, .hi-dark * { color: #fff !important; }
+        
+        /* Enhanced welcome section styling */
+        .welcome-content p { margin-bottom: 1rem; line-height: 1.7; }
+        .welcome-content p:last-child { margin-bottom: 0; }
+        
+        /* Font system improvements */
+        .font-sans { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
       `}</style>
 
       <ControlPanel isDark={isDark} toggleTheme={toggleTheme} viewMode={viewMode} toggleViewMode={toggleViewMode} />
 
-      <EditableWelcomeSection isDark={isDark} ownerMode={!!ownerMode} />
+      <EditableWelcomeSection
+        isDark={isDark}
+        ownerMode={!!ownerMode}
+        initialHtml={welcomeHtml}
+        onSaveHtml={saveWelcome}
+      />
 
       {/* Highlights */}
       <section className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl md:text-2xl font-semibold flex items-center gap-2">
-            <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}>{MODERN_ICONS.highlights} Highlights</span>
+            <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}>
+              {MODERN_ICONS.highlights} Highlights
+            </span>
           </h3>
           {hiRow.hasOverflow && (
             <div className="flex items-center gap-2">
-              <button onClick={() => hiRow.scrollBy(-1)} className={`h-9 w-9 grid place-items-center rounded-full ${isDark ? "bg-slate-700 hover:bg-slate-600 text-slate-200" : "bg-slate-100 hover:bg-slate-200 text-slate-700"}`} aria-label="Scroll left">◀</button>
-              <button onClick={() => hiRow.scrollBy(1)}  className={`h-9 w-9 grid place-items-center rounded-full ${isDark ? "bg-slate-700 hover:bg-slate-600 text-slate-200" : "bg-slate-100 hover:bg-slate-200 text-slate-700"}`} aria-label="Scroll right">▶</button>
+              <button 
+                onClick={() => hiRow.scrollBy(-1)} 
+                className={`h-9 w-9 grid place-items-center rounded-full transition-colors ${isDark ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-700"}`} 
+                aria-label="Scroll left"
+              >
+                ◀
+              </button>
+              <button 
+                onClick={() => hiRow.scrollBy(1)}  
+                className={`h-9 w-9 grid place-items-center rounded-full transition-colors ${isDark ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-700"}`} 
+                aria-label="Scroll right"
+              >
+                ▶
+              </button>
             </div>
           )}
         </div>
 
-        <div
-          ref={hiRow.rowRef}
-          className="mt-4 flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory"
-          style={{ scrollBehavior: 'smooth' }}
-          onMouseDown={hiRow.onMouseDown} onMouseMove={hiRow.onMouseMove} onMouseUp={hiRow.onMouseUp} onMouseLeave={hiRow.onMouseLeave}
-          onTouchStart={hiRow.onTouchStart} onTouchMove={hiRow.onTouchMove} onTouchEnd={hiRow.onTouchEnd}
-          onKeyDown={hiRow.onKey} onScroll={hiRow.onScroll} tabIndex={0}
-          aria-label="Highlights carousel"
-        >
-          {highlights.map((h) => (
-            <div key={h.id} className="snap-center min-w-[320px] max-w-sm">
-              <EnhancedHighlightCard
-                item={h}
-                onChange={updateHighlight}
-                onDelete={deleteHighlight}
-                ownerMode={!!ownerMode}
-                isDark={isDark}
+        {highlights.length > 0 ? (
+          <>
+            <div
+              ref={hiRow.rowRef}
+              className="flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory"
+              style={{ scrollBehavior: "smooth" }}
+              onMouseDown={hiRow.onMouseDown} 
+              onMouseMove={hiRow.onMouseMove} 
+              onMouseUp={hiRow.onMouseUp} 
+              onMouseLeave={hiRow.onMouseLeave}
+              onTouchStart={hiRow.onTouchStart} 
+              onTouchMove={hiRow.onTouchMove} 
+              onTouchEnd={hiRow.onTouchEnd}
+              onKeyDown={hiRow.onKey} 
+              onScroll={hiRow.onScroll} 
+              tabIndex={0}
+              aria-label="Highlights carousel"
+            >
+              {highlights.map((h) => (
+                <div key={h.id} className="snap-center min-w-[320px]">
+                  <EnhancedHighlightCard
+                    item={h}
+                    onChange={updateHighlightOnServer}
+                    onDelete={deleteHighlightOnServer}
+                    ownerMode={!!ownerMode}
+                    isDark={isDark}
+                  />
+                </div>
+              ))}
+              <EnhancedAddHighlightCard onAdd={addHighlight} ownerMode={!!ownerMode} isDark={isDark} />
+            </div>
+
+            <div className={`mt-3 h-1 w-full rounded ${isDark ? "bg-slate-700" : "bg-slate-200"}`}>
+              <div 
+                className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded transition-all duration-300" 
+                style={{ width: `${hiRow.progress}%` }} 
               />
             </div>
-          ))}
-          <EnhancedAddHighlightCard onAdd={addHighlight} ownerMode={!!ownerMode} isDark={isDark} />
-        </div>
-
-        <div className={`mt-3 h-1 w-full rounded ${isDark ? "bg-slate-700" : "bg-slate-200"}`}>
-          <div className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded transition-all duration-300" style={{ width: `${hiRow.progress}%` }} />
-        </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-center py-12">
+            <p className={`text-sm ${isDark ? "text-white/60" : "text-slate-400"}`}>
+              No highlights yet. 
+              {ownerMode && <button onClick={addHighlight} className="ml-2 text-violet-500 hover:text-violet-600">Add your first highlight</button>}
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Projects */}
       <section className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <button type="button" onClick={() => navigate("/projects")} className="text-left" aria-label="Go to all projects" title="Go to Projects">
-            <h3 className="text-xl md:text-2xl font-semibold flex items-center gap-2 hover:opacity-90">
-              <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}>{MODERN_ICONS.projects} Projects</span>
+            <h3 className="text-xl md:text-2xl font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity">
+              <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}>
+                {MODERN_ICONS.projects} Projects
+              </span>
             </h3>
           </button>
 
           <button
             type="button"
             onClick={() => navigate("/projects")}
-            className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${isDark ? "border-slate-600 text-slate-200 hover:bg-slate-700" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
+            className={`text-sm font-medium px-3 py-1.5 rounded-lg border transition-colors ${isDark ? "border-slate-600 text-white hover:bg-slate-700" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
             aria-label="View all projects"
           >
             View all →
           </button>
         </div>
 
-        <div className={`mt-2 text-sm flex items-center gap-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-          <span className="inline-flex items-center gap-1"><span>🔥</span> Trending tags are labeled</span>
-          <span className="inline-flex items-center gap-1"><span>🕒</span> Recent updates in last 30 days</span>
+        <div className={`mb-4 text-sm flex items-center gap-3 ${isDark ? "text-white/70" : "text-slate-500"}`}>
+          <span className="inline-flex items-center gap-1 font-medium">
+            <span>🔥</span> Trending tags are labeled
+          </span>
+          <span className="inline-flex items-center gap-1 font-medium">
+            <span>🕒</span> Recent updates in last 30 days
+          </span>
         </div>
 
         <ProjectsAndPosts
@@ -987,30 +1282,33 @@ export default function Home() {
 
       {/* Posts */}
       <section className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <button type="button" onClick={() => navigate("/blog")} className="text-left" aria-label="Go to all blog posts" title="Go to Blog">
-            <h3 className="text-xl md:text-2xl font-semibold flex items-center gap-2 hover:opacity-90">
-              <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}>{MODERN_ICONS.posts} Latest Posts</span>
+            <h3 className="text-xl md:text-2xl font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity">
+              <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}>
+                {MODERN_ICONS.posts} Latest Posts
+              </span>
             </h3>
           </button>
 
           <button
             type="button"
             onClick={() => navigate("/blog")}
-            className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${isDark ? "border-slate-600 text-slate-200 hover:bg-slate-700" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
+            className={`text-sm font-medium px-3 py-1.5 rounded-lg border transition-colors ${isDark ? "border-slate-600 text-white hover:bg-slate-700" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
             aria-label="View all blog posts"
           >
             View all →
           </button>
         </div>
 
-        {/* ✅ Posts now respect grid/list toggle */}
         <PostsRow isDark={isDark} poRow={poRow} posts={posts} navigate={navigate} viewMode={viewMode} />
 
-        {/* ✅ Progress bar only when in list (carousel) mode */}
         {viewMode !== "grid" && (
           <div className={`mt-3 h-1 w-full rounded ${isDark ? "bg-slate-700" : "bg-slate-200"}`}>
-            <div className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded transition-all duration-300" style={{ width: `${poRow.progress}%` }} />
+            <div 
+              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded transition-all duration-300" 
+              style={{ width: `${poRow.progress}%` }} 
+            />
           </div>
         )}
       </section>
@@ -1020,13 +1318,13 @@ export default function Home() {
   );
 }
 
-/* ------------- helper components for Projects/Posts rows to keep file tidy ------------- */
+/* ------------- Helper components for Projects/Posts rows ------------- */
 function ProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo, isProject=false }) {
   return (
     <div
       ref={rowHook.rowRef}
-      className={`mt-4 ${viewMode==="grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" : "flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory"}`}
-      style={viewMode !== "grid" ? { scrollBehavior: 'smooth' } : {}}
+      className={`${viewMode==="grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" : "flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory"}`}
+      style={viewMode !== "grid" ? { scrollBehavior: "smooth" } : {}}
       {...(viewMode==="grid" ? {} : {
         onMouseDown: rowHook.onMouseDown, onMouseMove: rowHook.onMouseMove, onMouseUp: rowHook.onMouseUp, onMouseLeave: rowHook.onMouseLeave,
         onTouchStart: rowHook.onTouchStart, onTouchMove: rowHook.onTouchMove, onTouchEnd: rowHook.onTouchEnd,
@@ -1038,14 +1336,14 @@ function ProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo, isProj
         const recent = isProject ? isRecent(it.updatedAt || it.createdAt) : false;
         const badges = isProject ? projectBadges(it) : [];
 
-        const go = () => { if (viewMode !== "grid" && !rowHook.canClick()) return; navigateTo(it); }; // ✅ respect drag in list mode only
+        const go = () => { if (viewMode !== "grid" && !rowHook.canClick()) return; navigateTo(it); };
         const onKey = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
 
         return (
           <Card
             isDark={isDark}
             key={it.id || it.slug || it.name || Math.random()}
-            className={`${viewMode !== "grid" ? "min-w-[320px] snap-center" : ""} p-4 rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${isDark ? "bg-slate-800/60" : "bg-white/70"}`}
+            className={`${viewMode !== "grid" ? "min-w-[320px] snap-center" : ""} p-5 rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${isDark ? "bg-slate-800/60" : "bg-white/70"}`}
           >
             <button type="button" className="absolute inset-0" onClick={go} onKeyDown={onKey} aria-label={it.name || it.title || "Open"} />
             <div className="relative pointer-events-none flex flex-col gap-3">
@@ -1056,20 +1354,20 @@ function ProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo, isProj
               )}
               {isProject && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  {trending && <span className={`text-xs px-2 py-0.5 rounded ${isDark ? "bg-pink-900/30 text-pink-200" : "bg-pink-100 text-pink-800"}`}>{MODERN_ICONS.trending} Trending</span>}
-                  {recent && <span className={`text-xs px-2 py-0.5 rounded ${isDark ? "bg-emerald-900/30 text-emerald-200" : "bg-emerald-100 text-emerald-900"}`}>{MODERN_ICONS.recent} Recent</span>}
+                  {trending && <span className={`text-xs px-2 py-1 rounded font-medium ${isDark ? "bg-pink-900/30 text-pink-200" : "bg-pink-100 text-pink-800"}`}>{MODERN_ICONS.trending} Trending</span>}
+                  {recent && <span className={`text-xs px-2 py-1 rounded font-medium ${isDark ? "bg-emerald-900/30 text-emerald-200" : "bg-emerald-100 text-emerald-900"}`}>{MODERN_ICONS.recent} Recent</span>}
                   {(it.tags || []).slice(0, 4).map((t) => <span key={t} className={chipClassFor(t, isDark)}>{t}</span>)}
                 </div>
               )}
               <div className="flex items-start justify-between gap-2">
-                <h4 className={`text-lg font-semibold ${isDark ? "text-slate-100" : "text-slate-900"}`}>{it.name || it.title}</h4>
-                {isProject && <div className="flex gap-2 flex-wrap">{badges.map(([emo,label]) => <span key={emo+label} title={label} className="text-base">{emo}</span>)}</div>}
+                <h4 className={`text-lg font-semibold leading-tight ${isDark ? "text-white" : "text-slate-900"}`}>{it.name || it.title}</h4>
+                {isProject && <div className="flex gap-2 flex-wrap">{badges.map(([emo,label]) => <span key={emo+label} title={label} className="text-lg">{emo}</span>)}</div>}
               </div>
               {isProject && it.summary && (
-                <p className={`text-sm clamp-3 ${isDark ? "text-slate-300" : "text-slate-600"}`} dangerouslySetInnerHTML={{ __html: sanitizePreview(it.summary) }} />
+                <p className={`text-sm leading-6 clamp-3 ${isDark ? "text-white/90" : "text-slate-600"}`} dangerouslySetInnerHTML={{ __html: sanitizePreview(it.summary) }} />
               )}
               {isProject && (
-                <div className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                <div className={`text-xs font-medium ${isDark ? "text-white/70" : "text-slate-500"}`}>
                   Updated {it.updatedAt ? new Date(it.updatedAt).toLocaleDateString() : (it.createdAt ? new Date(it.createdAt).toLocaleDateString() : "—")}
                 </div>
               )}
@@ -1081,7 +1379,6 @@ function ProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo, isProj
   );
 }
 
-/* ✅ PostsRow now supports grid/list via `viewMode` */
 function PostsRow({ isDark, poRow, posts, navigate, viewMode }) {
   const containerProps = (viewMode === "grid")
     ? {}
@@ -1093,9 +1390,9 @@ function PostsRow({ isDark, poRow, posts, navigate, viewMode }) {
 
   return (
     <div
-      ref={viewMode === "grid" ? null : poRow.rowRef}
-      className={`mt-4 ${viewMode==="grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" : "flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory"}`}
-      style={viewMode !== "grid" ? { scrollBehavior: 'smooth' } : {}}
+      ref={poRow.rowRef}
+      className={`${viewMode==="grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" : "flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory"}`}
+      style={viewMode !== "grid" ? { scrollBehavior: "smooth" } : {}}
       {...containerProps}
     >
       {(posts || []).map((post) => {
@@ -1103,28 +1400,28 @@ function PostsRow({ isDark, poRow, posts, navigate, viewMode }) {
         const html = sanitizePreview(post.bodyHtml || post.content || "");
         const snippet = snippetHtml(html, 320);
 
-        const goBlog = () => { if (viewMode !== "grid" && !poRow.canClick()) return; navigate("/blog", { state: { focusId: post.id || post.slug || null } }); }; // ✅ respect drag in list mode only
+        const goBlog = () => { if (viewMode !== "grid" && !poRow.canClick()) return; navigate("/blog", { state: { focusId: post.id || post.slug || null } }); };
         const onKey = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goBlog(); } };
 
         return (
           <Card
             isDark={isDark}
             key={post.id || post.slug || post.title}
-            className={`${viewMode !== "grid" ? "snap-center min-w-[320px] max-w-sm" : ""} p-4 rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${isDark ? "bg-slate-800/60" : "bg-white/70"}`}
+            className={`${viewMode !== "grid" ? "snap-center min-w-[320px]" : ""} p-5 rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${isDark ? "bg-slate-800/60" : "bg-white/70"}`}
           >
             <button type="button" className="absolute inset-0" onClick={goBlog} onKeyDown={onKey} aria-label={post.title || "Open post"} />
-            <div className="relative pointer-events-none flex flex-col gap-2">
+            <div className="relative pointer-events-none flex flex-col gap-3">
               <div className="flex items-center gap-2 flex-wrap">
                 {(post.tags || []).slice(0, 4).map((t) => <span key={t} className={chipClassFor(t, isDark)}>{t}</span>)}
               </div>
-              <h4 className={`text-lg font-semibold ${isDark ? "text-slate-100" : "text-slate-900"}`}>{post.title}</h4>
-              <div className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+              <h4 className={`text-lg font-semibold leading-tight ${isDark ? "text-white" : "text-slate-900"}`}>{post.title}</h4>
+              <div className={`text-xs font-medium ${isDark ? "text-white/70" : "text-slate-500"}`}>
                 {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : (post.updatedAt ? new Date(post.updatedAt).toLocaleDateString() : "")}
               </div>
-              <div className={`text-sm clamp-5 ${isDark ? "text-slate-300" : "text-slate-600"}`} dangerouslySetInnerHTML={{ __html: snippet }} />
+              <div className={`text-sm leading-6 clamp-5 ${isDark ? "text-white/90" : "text-slate-600"}`} dangerouslySetInnerHTML={{ __html: snippet }} />
               <div className="flex items-center justify-between pt-2">
-                <div className="flex gap-2">{badges.map(([emo,label])=> <span key={emo+label} title={label}>{emo}</span>)}</div>
-                <span className={`text-xs px-2 py-1 rounded ${isDark ? "bg-slate-700 text-slate-200" : "bg-slate-100 text-slate-700"}`}>Read more →</span>
+                <div className="flex gap-2">{badges.map(([emo,label])=> <span key={emo+label} title={label} className="text-lg">{emo}</span>)}</div>
+                <span className={`text-xs px-3 py-1.5 rounded-md font-medium ${isDark ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-700"}`}>Read more →</span>
               </div>
             </div>
           </Card>

@@ -10,8 +10,7 @@ function computeApiBase() {
   const envA = (import.meta.env?.VITE_API_URL || "").trim();
   const envB = (import.meta.env?.VITE_BACKEND_URL || "").trim();
   const env = (envA || envB).replace(/\/+$/, "");
-  // When unset -> "", so fetch("/api/...") stays same-origin and hits Vite proxy
-  return env;
+  return env; // when unset -> "", fetch("/api/...") stays same-origin and hits Vite proxy
 }
 const API = computeApiBase();
 
@@ -277,6 +276,88 @@ export const getPosts = ({ page = 1, pageSize = 10, tag } = {}) =>
   getJson(`/api/posts?page=${page}&pageSize=${pageSize}${tag ? `&tag=${encodeURIComponent(tag)}` : ""}`);
 
 export const getPost = (slug) => getJson(`/api/posts/${encodeURIComponent(slug)}`);
+
+/* ----------------------------- Home / Highlights ----------------------------- */
+
+export const getHome = () => getJson("/api/home");
+export const getHighlights = () => getJson("/api/highlights");
+
+/** Update welcome (Owner auth required).
+ * Send multiple key variants so any backend expects one of them.
+ */
+export const saveWelcome = (html) =>
+  sendJson("/api/home", "PUT", { html, welcome_html: html, welcomeHtml: html });
+
+/** Normalize highlight payload for backend shape */
+function normalizeHighlightPayload(input = {}) {
+  const icon = input.icon ?? null;
+
+  // Title HTML is required by backend; accept several aliases
+  const titleHtml =
+    input.titleHtml ??
+    input.title_html ??
+    input.title ??
+    "";
+
+  // Plain-text title (some schemas also store this); if not given, reuse titleHtml
+  const title =
+    input.title ??
+    (typeof titleHtml === "string" ? titleHtml : "");
+
+  // Body HTML: accept bodyHtml/body_html/body
+  const bodyHtml =
+    input.bodyHtml ??
+    input.body_html ??
+    input.body ??
+    "";
+
+  // Optional fields
+  const position =
+    input.position != null && !Number.isNaN(Number(input.position))
+      ? Number(input.position)
+      : undefined;
+
+  const published =
+    typeof input.published === "boolean" ? input.published : undefined;
+
+  // Send both camelCase and snake_case for max compatibility
+  const out = {
+    icon,
+    position,
+    published,
+
+    // HTML fields (required on your backend)
+    title_html: titleHtml,
+    body_html: bodyHtml,
+
+    // also include camelCase mirrors + plain title for older handlers
+    titleHtml: titleHtml,
+    bodyHtml: bodyHtml,
+    title: title,
+  };
+
+  // Remove undefined keys
+  Object.keys(out).forEach((k) => out[k] === undefined && delete out[k]);
+  return out;
+}
+
+/** Highlights CRUD (Owner auth required on write) */
+export const createHighlight = (payload) =>
+  sendJson("/api/highlights", "POST", normalizeHighlightPayload(payload));
+
+export const updateHighlight = (id, payload) =>
+  sendJson(`/api/highlights/${encodeURIComponent(String(id))}`, "PUT", normalizeHighlightPayload(payload));
+
+/** Delete: skip server for local-only ids like "h-123" */
+export const deleteHighlight = async (id) => {
+  if (id == null) throw new Error("Missing highlight id");
+  const s = String(id);
+  if (/^h-\d+/.test(s)) {
+    // client-only, nothing to delete on server
+    return { ok: true, localOnly: true, id: s };
+  }
+  return deleteWithFallback("highlights", id);
+};
 
 /* --------------------------- Owner auth --------------------------- */
 
