@@ -122,40 +122,52 @@ function getRecencyKey(p) {
   const d = ud || cd || new Date(0);
   return d.getTime?.() ?? 0;
 }
+
+/** Enhanced sanitizer that preserves formatting and text colors but removes highlights and problematic styles */
 function sanitizeHtml(html) {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(`<div>${html || ""}</div>`, "text/html");
-    const allowedTags = new Set(["a","b","strong","i","em","u","ul","ol","li","br","p","span","div","blockquote","code","mark","font","pre","h1","h2","h3","h4","h5","h6"]);
-    const allowedAttrs = { a: new Set(["href","target","rel"]), span: new Set(["style"]), p: new Set(["style"]), li: new Set(["style"]), font: new Set(["color"]), mark: new Set(["style"]), div: new Set(["style"]), pre: new Set(["style"]), code: new Set(["style"]) };
-    const filterStyle = (val = "") => {
-      const out = [];
-      val.split(";").map((s) => s.trim()).forEach((decl) => {
-        const m = decl.match(/^(color|background-color|font-size|font-family|text-align)\s*:\s*([^;]+)$/i);
-        if (m) out.push(`${m[1].toLowerCase()}: ${m[2].trim()}`);
+    
+    // Remove highlight-y inline styles & tags but preserve other formatting including text colors
+    const cleanElement = (el) => {
+      // Remove problematic tags but preserve their content
+      el.querySelectorAll("mark, font").forEach((n) => n.replaceWith(...n.childNodes));
+      
+      // Clean inline styles but preserve text colors
+      el.querySelectorAll("[style]").forEach((n) => {
+        const style = n.getAttribute("style") || "";
+        const filtered = style
+          .split(";")
+          .map((s) => s.trim())
+          .filter((decl) => {
+            // Remove only background colors, highlights, and problematic border styles
+            // but KEEP text colors (color: property)
+            return !/^background(-color)?\s*:/i.test(decl) && 
+                   !/^border\s*:/i.test(decl) &&
+                   !decl.includes("highlight") &&
+                   !decl.includes("rgba(255, 255, 255") && // Remove white text
+                   !decl.includes("rgb(255, 255, 255") &&
+                   !decl.includes("#ffffff") &&
+                   !decl.includes("#fff");
+          })
+          .join("; ");
+        
+        if (filtered.trim()) {
+          n.setAttribute("style", filtered);
+        } else {
+          n.removeAttribute("style");
+        }
       });
-      return out.join("; ");
     };
-    const walk = (node) => {
-      [...node.childNodes].forEach((n) => {
-        if (n.nodeType === 1) {
-          const tag = n.tagName.toLowerCase();
-          if (!allowedTags.has(tag)) { n.replaceWith(...[...n.childNodes]); return; }
-          const keep = allowedAttrs[tag] || new Set();
-          [...n.attributes].forEach((a) => { if (!keep.has(a.name.toLowerCase())) n.removeAttribute(a.name); });
-          if (tag === "a") { n.setAttribute("target","_blank"); n.setAttribute("rel","noopener noreferrer"); }
-          if (n.hasAttribute("style")) {
-            const v = filterStyle(n.getAttribute("style"));
-            if (v) n.setAttribute("style", v); else n.removeAttribute("style");
-          }
-          walk(n);
-        } else if (n.nodeType === 8) n.remove();
-      });
-    };
-    walk(doc.body);
+    
+    cleanElement(doc.body);
     return doc.body.innerHTML;
-  } catch { return html || ""; }
+  } catch { 
+    return html || ""; 
+  }
 }
+
 function htmlToPlain(text) {
   const tmp = document.createElement("div");
   tmp.innerHTML = sanitizeHtml(text || "");
@@ -204,10 +216,7 @@ export default function Projects() {
 
   useEffect(() => {
     let alive = true;
-    (async () => {
-      if (!alive) return;
-      await fetchProjects();
-    })();
+    (async () => { if (!alive) return; await fetchProjects(); })();
     return () => { alive = false; };
   }, [fetchProjects]);
 
@@ -321,7 +330,7 @@ export default function Projects() {
   }
 
   return (
-    <section className={`min-h-screen transition-colors duration-300 ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-gray-50 via-white to-gray-100"}`}>
+    <section className={`min-h-screen transition-colors duration-300 relative ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-gray-50 via-white to-gray-100"}`}>
       <style>{`
         .projects-grid {
           display: grid;
@@ -332,21 +341,106 @@ export default function Projects() {
             "repeat(auto-fill, minmax(280px, 1fr))"
           };
         }
+        
+        /* Fixed heights for all view modes */
         .project-card {
-          height: ${viewMode === "grid" ? "320px" : viewMode === "list" ? "auto" : "240px"};
+          position: relative;
+          height: ${
+            viewMode === "grid" ? "320px" :
+            viewMode === "list" ? "200px" :
+            "180px"
+          };
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .project-card:hover {
-          transform: translateY(-8px) scale(1.02);
-          box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+          transform: translateY(-4px) scale(1.01);
+          box-shadow: 0 20px 40px -12px rgba(0,0,0,0.25);
         }
+        
+        /* Project content styles - matching WYSIWYG editor styles with preserved colors */
+        .project-content {
+          color: ${darkMode ? '#f3f4f6' : '#1f2937'};
+          line-height: 1.6;
+        }
+        
+        /* Preserve custom text colors from editor */
+        .project-content [style*="color"] {
+          /* Don't override - let inline styles take precedence for colors */
+        }
+        
+        .project-content p {
+          margin: 0.4rem 0;
+          line-height: 1.6;
+        }
+        .project-content ul {
+          list-style: disc outside;
+          padding-left: 1.5rem;
+          margin: 0.4rem 0;
+        }
+        .project-content ol {
+          list-style: decimal outside;
+          padding-left: 1.75rem;
+          margin: 0.4rem 0;
+        }
+        .project-content li {
+          margin: 0.2rem 0;
+          line-height: 1.5;
+        }
+        .project-content a {
+          color: ${darkMode ? '#60a5fa' : '#3b82f6'};
+          text-decoration: underline;
+        }
+        .project-content strong {
+          font-weight: 600;
+        }
+        .project-content em {
+          font-style: italic;
+        }
+        .project-content h1, .project-content h2, .project-content h3, 
+        .project-content h4, .project-content h5, .project-content h6 {
+          font-weight: 600;
+          margin: 0.6rem 0 0.4rem 0;
+        }
+        .project-content h1 { font-size: 1.25rem; }
+        .project-content h2 { font-size: 1.125rem; }
+        .project-content h3 { font-size: 1rem; }
+        
+        /* Content container with proper truncation */
+        .content-container {
+          position: relative;
+          overflow: hidden;
+          margin-bottom: 3.5rem; /* Space for View Details button */
+        }
+        
+        /* Text truncation with fade effect */
+        .content-container::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 1.5rem;
+          background: linear-gradient(transparent, ${darkMode ? '#1f2937' : '#ffffff'});
+          pointer-events: none;
+        }
+        
+        /* Different truncation heights for different view modes */
+        .project-content.truncated {
+          max-height: ${
+            viewMode === "grid" ? "140px" :
+            viewMode === "list" ? "80px" :
+            "60px"
+          };
+          overflow: hidden;
+        }
+        
         @media (min-width: 1024px) {
           .main-layout { grid-template-columns: ${sidebarCollapsed ? "80px 1fr" : "320px 1fr"}; }
         }
       `}</style>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Header - removed dark mode button */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="space-y-2">
@@ -354,15 +448,6 @@ export default function Projects() {
                 <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                   Projects
                 </h1>
-                <motion.button
-                  whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                  onClick={() => setDarkMode((v) => !v)}
-                  className={`px-4 py-2 rounded-full border text-sm ${
-                    darkMode ? "border-gray-600 hover:bg-gray-800 text-white" : "border-gray-300 hover:bg-gray-100 text-gray-700"
-                  } transition-colors`}
-                >
-                  {darkMode ? "🌙 Dark" : "☀️ Light"} Mode
-                </motion.button>
               </div>
 
               <div className="h-1 w-24 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-full" />
@@ -374,7 +459,7 @@ export default function Projects() {
               </div>
             </div>
 
-            {/* Single Add button (owner-only) — Top right only */}
+            {/* Add Project Button (owner-only) */}
             {owner && (
               <motion.button
                 whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
@@ -525,6 +610,25 @@ export default function Projects() {
           darkMode={darkMode}
         />
       </div>
+
+      {/* Dark/Light Mode Toggle - Bottom Right Corner */}
+      <motion.button
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setDarkMode((v) => !v)}
+        className={`fixed bottom-6 right-6 z-40 p-4 rounded-full shadow-lg border-2 font-medium transition-all ${
+          darkMode 
+            ? "bg-gray-800 border-gray-600 hover:bg-gray-700 text-white" 
+            : "bg-white border-gray-300 hover:bg-gray-50 text-gray-700"
+        }`}
+        title={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
+      >
+        <span className="text-lg">
+          {darkMode ? "☀️" : "🌙"}
+        </span>
+      </motion.button>
     </section>
   );
 }
@@ -692,8 +796,8 @@ function EnhancedControls({
             className={`p-4 rounded-xl border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
             <div className={`text-sm font-medium mb-3 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Advanced Filters</div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <input type="text" placeholder="React, Node.js..." className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`} />
-              <select className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"}`}>
+              <input type="text" placeholder="React, Node.js..." className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"}`} />
+              <select className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
                 <option>All time</option><option>Last month</option><option>Last 6 months</option><option>Last year</option>
               </select>
             </div>
@@ -710,18 +814,16 @@ function EnhancedSkeletonGrid({ viewMode, darkMode }) {
     <div className="projects-grid">
       {Array.from({ length: itemCount }).map((_, i) => (
         <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-          className={`project-card rounded-2xl p-6 shadow-lg border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
-          <div className="space-y-4">
+          className={`project-card rounded-2xl p-4 shadow-lg border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+          <div className="space-y-4 h-full flex flex-col">
             <div className="h-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full animate-pulse" />
             <div className="space-y-3">
               <div className={`h-6 rounded-lg animate-pulse ${darkMode ? "bg-gray-700" : "bg-gray-200"}`} />
               <div className={`h-4 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"} animate-pulse`} />
               <div className={`h-4 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"} animate-pulse w-3/4`} />
             </div>
-            {viewMode === "grid" && <div className={`h-32 rounded-xl animate-pulse ${darkMode ? "bg-gray-700" : "bg-gray-200"}`} />}
-            <div className="flex justify-between items-center">
-              <div className={`h-4 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"} animate-pulse w-1/3`} />
-              <div className={`h-8 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-200"} animate-pulse w-20`} />
+            <div className="mt-auto flex items-center justify-end">
+              <div className={`h-8 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-200"} animate-pulse w-24`} />
             </div>
           </div>
         </motion.div>
@@ -755,21 +857,20 @@ function EnhancedEmptyState({ hasFilters, clearFilters, owner, darkMode }) {
               Clear Filters
             </motion.button>
           )}
-          {/* NOTE: Removed the second Add button here to keep only the top-right one */}
         </div>
       </div>
     </motion.div>
   );
 }
 
+/** Enhanced Projects Grid with fixed heights and proper text truncation */
 function EnhancedProjectsGrid({ projects, owner, busyId, onEdit, onDelete, openModal, viewMode, darkMode }) {
   return (
     <div className="projects-grid">
       <AnimatePresence mode="popLayout">
         {projects.map((p, index) => {
           const linkUrl = p?.links?.url || p?.links?.link || null;
-          const plain = htmlToPlain(p?.summary);
-          const rich = sanitizeHtml(p?.summary);
+          const sanitizedSummary = sanitizeHtml(p?.summary);
 
           return (
             <motion.div
@@ -780,23 +881,23 @@ function EnhancedProjectsGrid({ projects, owner, busyId, onEdit, onDelete, openM
               transition={{ duration: 0.25, delay: index * 0.04, type: "spring", stiffness: 120 }}
               className="project-card"
             >
-              {/* list view no longer forces a two-column flex with an empty left rail */}
-              <div className={`h-full rounded-2xl shadow-lg border overflow-hidden relative ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} ${viewMode === "list" ? "" : "flex flex-col"}`}>
+              <div className={`h-full rounded-2xl shadow-lg border overflow-hidden relative ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} flex flex-col`}>
+                {/* Accent */}
                 <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
 
                 {/* Owner controls */}
                 {owner && (
-                  <div className="absolute top-4 right-4 flex gap-2 z-10 opacity-100">
+                  <div className="absolute top-4 right-4 flex gap-2 z-10">
                     <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.96 }}
                       onClick={() => onEdit(p?.id)}
-                      className={`p-2 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-600 hover:border-indigo-500 text-white" : "bg-white border-gray-200 hover:border-indigo-300 text-gray-800"}`}
+                      className={`p-2 rounded-lg border ${darkMode ? "bg-gray-800/90 border-gray-600 hover:border-indigo-500 text-white backdrop-blur-sm" : "bg-white/90 border-gray-200 hover:border-indigo-300 text-gray-800 backdrop-blur-sm"} transition-all`}
                       title="Edit" aria-label={`Edit ${p?.name || "project"}`}
                     >
                       {ICONS.edit}
                     </motion.button>
                     <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.96 }}
                       onClick={() => onDelete(p?.id)}
-                      className={`p-2 rounded-lg border ${darkMode ? "bg-gray-800 border-gray-600 hover:border-red-500 text-white" : "bg-white border-gray-200 hover:border-red-300 text-gray-800"} disabled:opacity-50`}
+                      className={`p-2 rounded-lg border ${darkMode ? "bg-gray-800/90 border-gray-600 hover:border-red-500 text-white backdrop-blur-sm" : "bg-white/90 border-gray-200 hover:border-red-300 text-gray-800 backdrop-blur-sm"} disabled:opacity-50 transition-all`}
                       title="Delete" aria-label={`Delete ${p?.name || "project"}`} disabled={busyId === String(p?.id)}
                     >
                       {busyId === String(p?.id) ? ICONS.loading : ICONS.delete}
@@ -804,23 +905,24 @@ function EnhancedProjectsGrid({ projects, owner, busyId, onEdit, onDelete, openM
                   </div>
                 )}
 
-                <div className={`p-6 ${viewMode === "list" ? "" : "flex-1 flex flex-col"}`}>
+                {/* Content */}
+                <div className="p-4 flex-1 flex flex-col">
                   {/* Title + badges */}
-                  <div className="space-y-3 mb-4">
+                  <div className="space-y-2 mb-3">
                     <div className="flex items-start justify-between gap-4">
-                      <h3 className={`text-xl font-bold leading-tight ${darkMode ? "text-white" : "text-gray-900"}`}>{p?.name || "Untitled Project"}</h3>
+                      <h3 className={`text-lg font-bold leading-tight ${darkMode ? "text-white" : "text-gray-900"}`}>{p?.name || "Untitled Project"}</h3>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
                       {p?.featured && (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-full text-xs font-bold shadow">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-full text-xs font-bold shadow">
                           {ICONS.star} Featured
                         </span>
                       )}
                       {linkUrl && (
                         <a
                           href={linkUrl} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full text-xs font-bold shadow"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full text-xs font-bold shadow"
                           title="View live project" onClick={(e) => e.stopPropagation()}
                         >
                           {ICONS.externalLink} Live
@@ -829,65 +931,56 @@ function EnhancedProjectsGrid({ projects, owner, busyId, onEdit, onDelete, openM
                     </div>
                   </div>
 
-                  {/* Description */}
-                  <div>
-                    {viewMode === "list" ? (
-                      <div
-                        className={`prose prose-sm max-w-none leading-relaxed ${darkMode ? "prose-invert text-gray-300" : "text-gray-700"}`}
-                        dangerouslySetInnerHTML={{ __html: rich || "<p>No description available for this project.</p>" }}
-                      />
-                    ) : (
-                      <p className={`leading-relaxed ${darkMode ? "text-gray-300" : "text-gray-600"} ${viewMode === "grid" ? "line-clamp-4" : "line-clamp-2"}`}>
-                        {plain || "No description available for this project."}
-                      </p>
-                    )}
-
-                    {/* Tech chips */}
-                    {toArray(p?.techStack).length > 0 && (
-                      <div className="mt-4 flex flex-wrap gap-1">
-                        {toArray(p?.techStack).slice(0, viewMode === "compact" ? 3 : 8).map((tech, idx) => (
-                          <span key={`${tech}-${idx}`} className={`px-2 py-1 rounded-md text-xs font-medium ${darkMode ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700"}`}>
-                            {tech}
-                          </span>
-                        ))}
-                        {toArray(p?.techStack).length > (viewMode === "compact" ? 3 : 8) && (
-                          <span className={`px-2 py-1 rounded-md text-xs font-medium ${darkMode ? "bg-gray-600 text-gray-300" : "bg-gray-200 text-gray-600"}`}>
-                            +{toArray(p?.techStack).length - (viewMode === "compact" ? 3 : 8)}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Meta (list view) */}
-                    {viewMode === "list" && (
-                      <div className="mt-4 grid gap-2 sm:grid-cols-2 text-sm">
-                        {p?.client && <div className={darkMode ? "text-gray-300" : "text-gray-700"}><span className="font-medium">Client: </span>{p.client}</div>}
-                        {p?.role && <div className={darkMode ? "text-gray-300" : "text-gray-700"}><span className="font-medium">Role: </span>{p.role}</div>}
-                        {p?.location && <div className={darkMode ? "text-gray-300" : "text-gray-700"}><span className="font-medium">Location: </span>{p.location}</div>}
-                        <div className={darkMode ? "text-gray-400" : "text-gray-500"}>
-                          {p?.createdAt && <span>Created {new Date(p.createdAt).toLocaleDateString()}</span>}
-                          {p?.updatedAt && <span> • Updated {new Date(p.updatedAt).toLocaleDateString()}</span>}
-                        </div>
-                      </div>
-                    )}
+                  {/* HTML Content with proper formatting and truncation */}
+                  <div className="content-container flex-1 relative">
+                    <div
+                      className={`project-content text-sm leading-relaxed truncated`}
+                      dangerouslySetInnerHTML={{ 
+                        __html: sanitizedSummary || "<p>No description available for this project.</p>" 
+                      }}
+                    />
                   </div>
 
-                  {/* Footer */}
-                  <div className="mt-6 flex items-center justify-between">
-                    {viewMode !== "list" && (
-                      <div className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                        {p?.createdAt && <span>Created {new Date(p.createdAt).toLocaleDateString()}</span>}
-                      </div>
-                    )}
+                  {/* Tech chips */}
+                  {toArray(p?.techStack).length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {toArray(p?.techStack).slice(0, viewMode === "compact" ? 3 : viewMode === "list" ? 4 : 6).map((tech, idx) => (
+                        <span key={`${tech}-${idx}`} className={`px-2 py-1 rounded-md text-xs font-medium ${darkMode ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700"}`}>
+                          {tech}
+                        </span>
+                      ))}
+                      {toArray(p?.techStack).length > (viewMode === "compact" ? 3 : viewMode === "list" ? 4 : 6) && (
+                        <span className={`px-2 py-1 rounded-md text-xs font-medium ${darkMode ? "bg-gray-600 text-gray-300" : "bg-gray-200 text-gray-600"}`}>
+                          +{toArray(p?.techStack).length - (viewMode === "compact" ? 3 : viewMode === "list" ? 4 : 6)}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-                    <motion.button whileHover={{ x: 4 }} whileTap={{ scale: 0.95 }} onClick={() => openModal(p)}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${darkMode ? "bg-indigo-900/30 text-indigo-300 hover:bg-indigo-900/50" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"}`}
-                      aria-label={`View details for ${p?.name || "project"}`}
-                    >
-                      <span>View Details</span>
-                      {ICONS.chevronRight}
-                    </motion.button>
-                  </div>
+                  {/* Optional meta at bottom */}
+                  {(p?.createdAt || p?.updatedAt) && (
+                    <div className="mt-2 text-xs">
+                      <span className={darkMode ? "text-gray-400" : "text-gray-500"}>
+                        {p?.createdAt && <>Created {new Date(p.createdAt).toLocaleDateString()}</>}
+                        {p?.updatedAt && <> • Updated {new Date(p.updatedAt).toLocaleDateString()}</>}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* View Details — pinned bottom-right with proper margin */}
+                <div className="absolute right-4 bottom-4">
+                  <motion.button
+                    whileHover={{ x: 4 }} whileTap={{ scale: 0.95 }}
+                    onClick={() => openModal(p)}
+                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-xs transition-all shadow-sm ${
+                      darkMode ? "bg-indigo-900/60 text-indigo-200 hover:bg-indigo-900/80 border border-indigo-800/50" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200"
+                    }`}
+                    aria-label={`View details for ${p?.name || "project"}`}
+                  >
+                    <span>View Details</span>
+                    {ICONS.chevronRight}
+                  </motion.button>
                 </div>
               </div>
             </motion.div>
@@ -901,6 +994,7 @@ function EnhancedProjectsGrid({ projects, owner, busyId, onEdit, onDelete, openM
 function EnhancedProjectModal({ open, active, setOpen, backdropRef, modalRef, darkMode }) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const images = toArray(active?.images);
+  
   if (!open || !active) return null;
 
   return (
@@ -951,7 +1045,7 @@ function EnhancedProjectModal({ open, active, setOpen, backdropRef, modalRef, da
                   <>
                     <button onClick={() => setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length)}
                       className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors" aria-label="Previous image">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6-6-6" /></svg>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" /></svg>
                     </button>
                     <button onClick={() => setActiveImageIndex((prev) => (prev + 1) % images.length)}
                       className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors" aria-label="Next image">
@@ -971,8 +1065,11 @@ function EnhancedProjectModal({ open, active, setOpen, backdropRef, modalRef, da
               {active?.summary && (
                 <div className="space-y-3">
                   <h3 className={`text-lg font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>About This Project</h3>
-                  <div className={`prose prose-sm max-w-none leading-relaxed ${darkMode ? "prose-invert text-gray-300" : "text-gray-700"}`}
-                       dangerouslySetInnerHTML={{ __html: sanitizeHtml(active.summary) }} />
+                  {/* Render HTML content with proper styling in modal */}
+                  <div 
+                    className={`project-content leading-relaxed ${darkMode ? "text-gray-300" : "text-gray-700"}`}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(active.summary) }} 
+                  />
                 </div>
               )}
 

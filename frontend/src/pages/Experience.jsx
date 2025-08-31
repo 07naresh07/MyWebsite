@@ -1,5 +1,5 @@
 // src/pages/Experience.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOwnerMode } from "../lib/owner.js";
 import { getExperience, deleteExperience } from "../lib/api.js";
@@ -90,10 +90,16 @@ const Icon = {
       <path d="M9 22v-4h6v4" />
     </svg>
   ),
+  ChevronDown: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={p.className ?? "w-4 h-4"}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  ),
 };
 
 /* ----------------------------- Helpers ----------------------------- */
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 const fmtYM = (v) => {
   if (!v) return "Present";
   const [y, m] = String(v).split("-");
@@ -108,6 +114,7 @@ function monthDiff(start, end) {
   const ed = end ? new Date(Number(end.split("-")[0]), Number(end.split("-")[1]) - 1, 1) : new Date();
   return Math.max(0, (ed.getFullYear() - sy) * 12 + (ed.getMonth() + 1 - sm));
 }
+
 function humanDuration(start, end) {
   const months = monthDiff(start, end);
   const y = Math.floor(months / 12), m = months % 12;
@@ -117,18 +124,34 @@ function humanDuration(start, end) {
   return `${m} mo`;
 }
 
-/* Simple markdown conversion that preserves HTML lists */
+/* Enhanced markdown conversion with better HTML structure */
 function mdLiteToHtml(text) {
   if (!text) return "";
   if (/<[^>]+>/.test(text)) return text;
+  
   const safe = text.toString();
   const lines = safe.split(/\r?\n/).filter((l) => l.trim() !== "");
   if (!lines.length) return "";
+  
   const isUL = lines.every((l) => /^(-|\*|•)\s+/.test(l.trim()));
   const isOL = lines.every((l) => /^\d+[.)]\s+/.test(l.trim()));
-  const inline = (s) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
-  if (isUL) return `<ul>${lines.map((l) => `<li>${inline(l.trim().replace(/^(-|\*|•)\s+/, ""))}</li>`).join("")}</ul>`;
-  if (isOL) return `<ol>${lines.map((l) => `<li>${inline(l.trim().replace(/^\d+[.)]\s+/, ""))}</li>`).join("")}</ol>`;
+  
+  const inline = (s) => s
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>");
+  
+  if (isUL) {
+    return `<ul>${lines.map((l) => 
+      `<li>${inline(l.trim().replace(/^(-|\*|•)\s+/, ""))}</li>`
+    ).join("")}</ul>`;
+  }
+  
+  if (isOL) {
+    return `<ol>${lines.map((l) => 
+      `<li>${inline(l.trim().replace(/^\d+[.)]\s+/, ""))}</li>`
+    ).join("")}</ol>`;
+  }
+  
   return `<p>${inline(lines.join("<br>"))}</p>`;
 }
 
@@ -148,31 +171,56 @@ function toArray(value) {
   if (typeof value === "string") {
     const t = value.trim();
     if (t.startsWith("[") && t.endsWith("]")) {
-      try { const parsed = JSON.parse(t); if (Array.isArray(parsed)) return toArray(parsed); } catch {}
+      try { 
+        const parsed = JSON.parse(t); 
+        if (Array.isArray(parsed)) return toArray(parsed); 
+      } catch {}
     }
     return t.split(",").map((v) => v.trim()).filter(Boolean);
   }
   return [];
 }
 
-/* ----------------------------- Card ----------------------------- */
+/* ----------------------------- Enhanced Components ----------------------------- */
 const Card = ({ children, className = "", dark = false, ...props }) => (
-  <div
-    className={`experience-card rounded-xl border shadow-sm
-      ${dark ? "bg-gray-800 text-white border-gray-700" : "bg-white text-gray-900 border-gray-200"}
+  <article
+    className={`experience-card rounded-xl border shadow-sm transition-all duration-300
+      ${dark 
+        ? "bg-gray-800/90 backdrop-blur-sm text-white border-gray-700/50 hover:bg-gray-800" 
+        : "bg-white/90 backdrop-blur-sm text-gray-900 border-gray-200/50 hover:bg-white"
+      }
       ${className}`}
     {...props}
   >
     {children}
-  </div>
+  </article>
 );
 
-/* ----------------------------- Reveal ----------------------------- */
 const Reveal = ({ children, delay = 0 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setIsVisible(true), delay); return () => clearTimeout(t); }, [delay]);
-  return <div className={`transition-all duration-700 transform ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>{children}</div>;
+  
+  useEffect(() => { 
+    const t = setTimeout(() => setIsVisible(true), delay); 
+    return () => clearTimeout(t); 
+  }, [delay]);
+  
+  return (
+    <div className={`transition-all duration-700 transform ${
+      isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+    }`}>
+      {children}
+    </div>
+  );
 };
+
+const LoadingSpinner = ({ dark }) => (
+  <div className="flex items-center justify-center py-20">
+    <div className={`relative w-12 h-12 animate-spin rounded-full border-4 border-solid ${
+      dark ? "border-gray-600 border-t-blue-400" : "border-gray-200 border-t-blue-600"
+    }`} />
+    <span className="sr-only">Loading experience data...</span>
+  </div>
+);
 
 /* ----------------------------- Normalizer ----------------------------- */
 function normalize(row = {}) {
@@ -187,70 +235,115 @@ function normalize(row = {}) {
   const htmlDesc = getField(row, ["descriptionHtml", "description_html", "html"]);
   const textDesc = getField(row, ["description", "body", "content"]);
   const descriptionHtml = htmlDesc || mdLiteToHtml(textDesc);
+  
   return { id, company, role, project, location, startDate, endDate, descriptionHtml, tools };
 }
 
-/* =============================== Main =============================== */
+/* =============================== Main Component =============================== */
 export default function Experience() {
   const navigate = useNavigate();
   const { owner } = useOwnerMode();
 
+  // State management
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Theme and view preferences
   const [darkMode, setDarkMode] = useState(() => {
-    try { return (localStorage.getItem("experience_theme") || "light") === "dark"; } catch { return false; }
+    try { 
+      return (localStorage.getItem("experience_theme") || "light") === "dark"; 
+    } catch { 
+      return false; 
+    }
   });
+  
   const [viewMode, setViewMode] = useState(() => {
-    try { return localStorage.getItem("experience_view") || "grid"; } catch { return "grid"; }
+    try { 
+      return localStorage.getItem("experience_view") || "grid"; 
+    } catch { 
+      return "grid"; 
+    }
   });
 
+  // Filters and search
   const [sortBy] = useState("date");
   const [filterBy, setFilterBy] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [selectedTags, setSelectedTags] = useState([]);
 
-  useEffect(() => { try { localStorage.setItem("experience_theme", darkMode ? "dark" : "light"); } catch {} }, [darkMode]);
-  useEffect(() => { try { localStorage.setItem("experience_view", viewMode); } catch {} }, [viewMode]);
-  useEffect(() => { document.documentElement.classList.toggle("dark", darkMode); }, [darkMode]);
+  // Persist preferences
+  useEffect(() => { 
+    try { 
+      localStorage.setItem("experience_theme", darkMode ? "dark" : "light"); 
+    } catch {} 
+  }, [darkMode]);
+  
+  useEffect(() => { 
+    try { 
+      localStorage.setItem("experience_view", viewMode); 
+    } catch {} 
+  }, [viewMode]);
+  
+  useEffect(() => { 
+    document.documentElement.classList.toggle("dark", darkMode); 
+  }, [darkMode]);
 
-  async function load() {
-    setLoading(true); setErrorMsg("");
+  // Data loading with better error handling
+  const load = useCallback(async () => {
+    setLoading(true);
+    setErrorMsg("");
+    
     try {
       const data = await getExperience();
       const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
       setItems(list.map(normalize));
     } catch (e) {
-      setErrorMsg(e?.message || "Failed to load experience.");
-    } finally { setLoading(false); }
-  }
+      console.error("Failed to load experience:", e);
+      setErrorMsg(e?.message || "Failed to load experience data. Please try again.");
+    } finally { 
+      setLoading(false); 
+    }
+  }, []);
 
   useEffect(() => {
     load();
+    
     const onSaved = () => load();
     window.addEventListener("experience:saved", onSaved);
     return () => window.removeEventListener("experience:saved", onSaved);
-  }, []);
+  }, [load]);
 
-  useMemo(() => {
+  // Computed values with better memoization
+  const allTags = useMemo(() => {
     const s = new Set();
-    items.forEach((i) => Array.isArray(i.tools) && i.tools.forEach((t) => t && s.add(String(t))));
+    items.forEach((i) => {
+      if (Array.isArray(i.tools)) {
+        i.tools.forEach((t) => t && s.add(String(t)));
+      }
+    });
     return Array.from(s).sort();
   }, [items]);
 
-  const totalExperience = useMemo(() => {
+  const stats = useMemo(() => {
     const totalMonths = items.reduce((acc, it) => acc + monthDiff(it?.startDate, it?.endDate), 0);
     const y = Math.floor(totalMonths / 12), m = totalMonths % 12;
-    if (!totalMonths) return "0 mo";
-    if (y && m) return `${y} yr ${m} mo`;
-    if (y) return `${y} yr${y > 1 ? "s" : ""}`;
-    return `${m} mo`;
-  }, [items]);
+    
+    let totalExperience = "0 mo";
+    if (totalMonths) {
+      if (y && m) totalExperience = `${y} yr ${m} mo`;
+      else if (y) totalExperience = `${y} yr${y > 1 ? "s" : ""}`;
+      else totalExperience = `${m} mo`;
+    }
 
-  const currentJobs = items.filter((i) => !i.endDate).length;
-  const completedJobs = items.filter((i) => i.endDate).length;
+    return {
+      totalExperience,
+      currentJobs: items.filter((i) => !i.endDate).length,
+      completedJobs: items.filter((i) => i.endDate).length,
+      totalPositions: items.length
+    };
+  }, [items]);
 
   const filteredAndSortedItems = useMemo(() => {
     let arr = items.filter((item) => {
@@ -260,17 +353,22 @@ export default function Experience() {
         item.role?.toLowerCase().includes(q) ||
         item.company?.toLowerCase().includes(q) ||
         item.project?.toLowerCase().includes(q) ||
+        item.location?.toLowerCase().includes(q) ||
         (Array.isArray(item.tools) && item.tools.some((t) => String(t).toLowerCase().includes(q)));
 
       const matchesFilter =
-        filterBy === "all" || (filterBy === "current" && !item.endDate) || (filterBy === "past" && !!item.endDate);
+        filterBy === "all" || 
+        (filterBy === "current" && !item.endDate) || 
+        (filterBy === "past" && !!item.endDate);
 
       const matchesTags =
-        selectedTags.length === 0 || (Array.isArray(item.tools) && selectedTags.every((tag) => item.tools.includes(tag)));
+        selectedTags.length === 0 || 
+        (Array.isArray(item.tools) && selectedTags.every((tag) => item.tools.includes(tag)));
 
       return matchesSearch && matchesFilter && matchesTags;
     });
 
+    // Enhanced sorting
     arr.sort((a, b) => {
       if (sortBy === "date") {
         const aEnd = a.endDate || "9999-12";
@@ -287,38 +385,77 @@ export default function Experience() {
     return arr;
   }, [items, searchTerm, filterBy, sortBy, selectedTags]);
 
-  /* actions */
-  const onDelete = async (id) => {
+  // Enhanced actions with better UX
+  const onDelete = useCallback(async (id, itemTitle) => {
     if (!owner) return;
-    if (!window.confirm("Delete this experience? This cannot be undone.")) return;
-    try { await deleteExperience(id); await load(); }
-    catch (e) { alert(e?.message || "Failed to delete experience."); }
-  };
+    
+    const confirmMsg = itemTitle 
+      ? `Delete "${itemTitle}"? This cannot be undone.`
+      : "Delete this experience? This cannot be undone.";
+    
+    if (!window.confirm(confirmMsg)) return;
+    
+    try { 
+      await deleteExperience(id); 
+      await load(); 
+    } catch (e) { 
+      console.error("Failed to delete experience:", e);
+      alert(e?.message || "Failed to delete experience. Please try again."); 
+    }
+  }, [owner, load]);
 
-  const exportData = () => {
+  const exportData = useCallback(() => {
     if (!owner) return;
-    const dataStr = JSON.stringify(items, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "experience-data.json"; a.click();
-    URL.revokeObjectURL(url);
-  };
+    
+    try {
+      const dataStr = JSON.stringify(items, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `experience-data-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Failed to export data:", e);
+      alert("Failed to export data. Please try again.");
+    }
+  }, [owner, items]);
 
-  /* UI */
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showFilters) {
+        setShowFilters(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showFilters]);
+
+  // Loading state
   if (loading) {
     return (
-      <section className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-gradient-to-br from-slate-50 to-blue-50"}`}>
-        <div className="container mx-auto px-4 py-20 text-center">Loading…</div>
+      <section className={`min-h-screen transition-colors duration-300 ${
+        darkMode ? "bg-gray-900 text-white" : "bg-gradient-to-br from-slate-50 to-blue-50 text-gray-900"
+      }`}>
+        <div className="container mx-auto px-4">
+          <LoadingSpinner dark={darkMode} />
+        </div>
       </section>
     );
   }
 
   return (
-    <section className={`min-h-screen transition-colors duration-300 ${darkMode ? "bg-gray-900 text-white" : "bg-gradient-to-br from-slate-50 to-blue-50"}`}>
+    <section className={`min-h-screen transition-colors duration-300 ${
+      darkMode ? "bg-gray-900 text-white" : "bg-gradient-to-br from-slate-50 to-blue-50 text-gray-900"
+    }`}>
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
+        {/* Enhanced Header */}
+        <header className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="space-y-4">
               <div>
@@ -328,55 +465,100 @@ export default function Experience() {
                 <div className="mt-3 h-1 w-32 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500" />
               </div>
 
-              {/* Quick stats */}
-              <div className="flex flex-wrap gap-4">
+              {/* Enhanced stats with better responsive design */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/30 dark:to-green-900/30 rounded-xl border border-emerald-200 dark:border-emerald-700 shadow-sm">
                   <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                    Total Experience: {totalExperience}
+                  <span className={`text-sm font-semibold ${
+                    darkMode ? "text-emerald-300" : "text-emerald-700"
+                  }`}>
+                    Total: {stats.totalExperience}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl border border-blue-200 dark:border-blue-700 shadow-sm">
-                  <Icon.TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-                    Active Roles: {currentJobs}
+                  <Icon.TrendingUp className={`w-4 h-4 ${darkMode ? "text-blue-400" : "text-blue-600"}`} />
+                  <span className={`text-sm font-semibold ${
+                    darkMode ? "text-blue-300" : "text-blue-700"
+                  }`}>
+                    Active: {stats.currentJobs}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl border border-purple-200 dark:border-purple-700 shadow-sm">
-                  <Icon.Award className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
-                    Completed: {completedJobs}
+                  <Icon.Award className={`w-4 h-4 ${darkMode ? "text-purple-400" : "text-purple-600"}`} />
+                  <span className={`text-sm font-semibold ${
+                    darkMode ? "text-purple-300" : "text-purple-700"
+                  }`}>
+                    Completed: {stats.completedJobs}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30 rounded-xl border border-orange-200 dark:border-orange-700 shadow-sm">
+                  <Icon.Briefcase className={`w-4 h-4 ${darkMode ? "text-orange-400" : "text-orange-600"}`} />
+                  <span className={`text-sm font-semibold ${
+                    darkMode ? "text-orange-300" : "text-orange-700"
+                  }`}>
+                    Positions: {stats.totalPositions}
                   </span>
                 </div>
               </div>
 
-              {errorMsg && <div className="text-red-600 dark:text-red-400 text-sm">{errorMsg}</div>}
+              {errorMsg && (
+                <div className={`p-4 rounded-lg border ${
+                  darkMode 
+                    ? "bg-red-900/20 border-red-800 text-red-300" 
+                    : "bg-red-50 border-red-200 text-red-600"
+                }`}>
+                  <p className="text-sm font-medium">{errorMsg}</p>
+                </div>
+              )}
             </div>
 
-            {/* Controls */}
+            {/* Enhanced Controls */}
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => setDarkMode((v) => !v)}
-                className={`px-4 py-2 rounded-full border transition-colors ${darkMode ? "border-gray-600 hover:bg-gray-800" : "border-gray-300 hover:bg-gray-100"}`}
+                className={`px-4 py-2 rounded-full border transition-all duration-200 font-medium ${
+                  darkMode 
+                    ? "border-gray-600 hover:bg-gray-800 text-white" 
+                    : "border-gray-300 hover:bg-gray-100 text-gray-700"
+                }`}
+                aria-label={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
               >
                 {darkMode ? "🌙 Dark" : "☀️ Light"} Mode
               </button>
 
-              <div className="flex rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+              <div className={`flex rounded-xl border shadow-sm overflow-hidden ${
+                darkMode 
+                  ? "bg-gray-800 border-gray-700" 
+                  : "bg-white border-gray-200"
+              }`}>
                 <button
                   type="button"
                   onClick={() => setViewMode("grid")}
-                  className={`p-3 transition-all duration-200 ${viewMode === "grid" ? "bg-blue-500 text-white" : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
+                  className={`p-3 transition-all duration-200 ${
+                    viewMode === "grid" 
+                      ? "bg-blue-500 text-white" 
+                      : darkMode 
+                        ? "text-gray-400 hover:bg-gray-700" 
+                        : "text-gray-600 hover:bg-gray-50"
+                  }`}
                   aria-pressed={viewMode === "grid"}
+                  aria-label="Grid view"
                 >
                   <Icon.Grid />
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode("list")}
-                  className={`p-3 transition-all duration-200 ${viewMode === "list" ? "bg-blue-500 text-white" : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
+                  className={`p-3 transition-all duration-200 ${
+                    viewMode === "list" 
+                      ? "bg-blue-500 text-white" 
+                      : darkMode 
+                        ? "text-gray-400 hover:bg-gray-700" 
+                        : "text-gray-600 hover:bg-gray-50"
+                  }`}
                   aria-pressed={viewMode === "list"}
+                  aria-label="List view"
                 >
                   <Icon.List />
                 </button>
@@ -385,10 +567,16 @@ export default function Experience() {
               <button
                 type="button"
                 onClick={() => setShowFilters((s) => !s)}
-                className={`p-3 rounded-xl border shadow-sm transition-all duration-200 ${showFilters ? "bg-blue-500 text-white border-blue-500" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:shadow-md"}`}
+                className={`p-3 rounded-xl border shadow-sm transition-all duration-200 ${
+                  showFilters 
+                    ? "bg-blue-500 text-white border-blue-500" 
+                    : darkMode
+                      ? "bg-gray-800 text-gray-400 border-gray-700 hover:shadow-md hover:text-white"
+                      : "bg-white text-gray-600 border-gray-200 hover:shadow-md hover:text-gray-900"
+                }`}
                 aria-expanded={showFilters}
                 aria-controls="filters-panel"
-                title="Toggle filters"
+                aria-label="Toggle filters"
               >
                 <Icon.Filter />
               </button>
@@ -397,32 +585,162 @@ export default function Experience() {
                 <button
                   type="button"
                   onClick={exportData}
-                  className="p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                  className={`p-3 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 ${
+                    darkMode
+                      ? "bg-gray-800 border-gray-700 text-gray-400 hover:text-blue-400"
+                      : "bg-white border-gray-200 text-gray-600 hover:text-blue-600"
+                  }`}
                   title="Export experience data"
+                  aria-label="Export data"
                 >
                   <Icon.Download />
                 </button>
               )}
             </div>
           </div>
-        </div>
+        </header>
+
+        {/* Enhanced Search and Filters */}
+        {showFilters && (
+          <Reveal>
+            <div className={`mb-8 p-6 rounded-xl border shadow-sm ${
+              darkMode 
+                ? "bg-gray-800/50 border-gray-700 text-white" 
+                : "bg-white/50 border-gray-200 text-gray-900"
+            }`} id="filters-panel">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="search-input" className={`block text-sm font-medium mb-2 ${
+                    darkMode ? "text-gray-200" : "text-gray-700"
+                  }`}>
+                    Search
+                  </label>
+                  <div className="relative">
+                    <Icon.Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                      darkMode ? "text-gray-400" : "text-gray-500"
+                    }`} />
+                    <input
+                      id="search-input"
+                      type="text"
+                      placeholder="Search roles, companies, projects..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className={`w-full pl-10 pr-4 py-2 rounded-lg border transition-colors ${
+                        darkMode
+                          ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-400"
+                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:border-blue-500"
+                      } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="filter-select" className={`block text-sm font-medium mb-2 ${
+                    darkMode ? "text-gray-200" : "text-gray-700"
+                  }`}>
+                    Filter by Status
+                  </label>
+                  <select
+                    id="filter-select"
+                    value={filterBy}
+                    onChange={(e) => setFilterBy(e.target.value)}
+                    className={`w-full px-4 py-2 rounded-lg border transition-colors ${
+                      darkMode
+                        ? "bg-gray-700 border-gray-600 text-white focus:border-blue-400"
+                        : "bg-white border-gray-300 text-gray-900 focus:border-blue-500"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500/20`}
+                  >
+                    <option value="all">All Positions</option>
+                    <option value="current">Current Roles</option>
+                    <option value="past">Past Roles</option>
+                  </select>
+                </div>
+
+                {allTags.length > 0 && (
+                  <div>
+                    <label className={`block text-sm font-medium mb-2 ${
+                      darkMode ? "text-gray-200" : "text-gray-700"
+                    }`}>
+                      Skills & Technologies
+                    </label>
+                    <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                      {allTags.slice(0, 12).map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTags(prev => 
+                              prev.includes(tag) 
+                                ? prev.filter(t => t !== tag)
+                                : [...prev, tag]
+                            );
+                          }}
+                          className={`px-3 py-1 text-xs rounded-full border transition-all ${
+                            selectedTags.includes(tag)
+                              ? "bg-blue-500 text-white border-blue-500"
+                              : darkMode
+                                ? "bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600"
+                                : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {(searchTerm || filterBy !== "all" || selectedTags.length > 0) && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setFilterBy("all");
+                      setSelectedTags([]);
+                    }}
+                    className={`text-sm hover:underline ${
+                      darkMode ? "text-blue-400" : "text-blue-600"
+                    }`}
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              )}
+            </div>
+          </Reveal>
+        )}
 
         {/* Content */}
         {filteredAndSortedItems.length === 0 ? (
           <Reveal>
             <div className="text-center py-16">
-              <div className="mx-auto w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-full flex items-center justify-center mb-6 shadow-inner">
-                <Icon.Search className="w-8 h-8 text-gray-400" />
+              <div className={`mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-inner ${
+                darkMode 
+                  ? "bg-gradient-to-br from-gray-800 to-gray-700" 
+                  : "bg-gradient-to-br from-gray-100 to-gray-200"
+              }`}>
+                <Icon.Search className={`w-8 h-8 ${darkMode ? "text-gray-400" : "text-gray-500"}`} />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">No experiences found</h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
-                Try adjusting your search criteria{owner ? " or add a new entry." : "."}
+              <h3 className={`text-xl font-semibold mb-2 ${
+                darkMode ? "text-gray-100" : "text-gray-900"
+              }`}>
+                No experiences found
+              </h3>
+              <p className={`mb-8 max-w-md mx-auto ${
+                darkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
+                {items.length === 0 
+                  ? "Get started by adding your first professional experience."
+                  : "Try adjusting your search criteria or filters."
+                }
               </p>
               {owner && (
                 <button
                   type="button"
                   onClick={() => navigate("/experience/new")}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md"
                 >
                   <Icon.Plus className="w-5 h-5" />
                   Add Experience
@@ -431,26 +749,43 @@ export default function Experience() {
             </div>
           </Reveal>
         ) : (
-          <div className={viewMode === "grid" ? "grid gap-6 md:grid-cols-2 xl:grid-cols-3" : "space-y-4"}>
+          <main className={viewMode === "grid" ? "grid gap-6 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : "space-y-4"}>
             {filteredAndSortedItems.map((item, idx) => (
               <Reveal key={item.id} delay={idx * 50}>
                 {viewMode === "grid" ? (
-                  <Card dark={darkMode} className="group relative p-6 hover:shadow-xl transition-all duration-300 h-full flex flex-col overflow-hidden">
+                  /* Grid Card View */
+                  <Card dark={darkMode} className="group relative p-6 hover:shadow-xl transition-all duration-300 h-full flex flex-col">
                     {owner && (
-                      <div className="owner-actions absolute top-4 right-4 flex gap-2 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity">
+                      <div className="owner-actions absolute top-4 right-4 flex gap-2 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); navigate(`/experience/edit/${item.id}`); }}
-                          className="p-2 bg-white/95 dark:bg-gray-700/95 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow"
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            navigate(`/experience/edit/${item.id}`); 
+                          }}
+                          className={`p-2 rounded-lg border transition-all duration-200 ${
+                            darkMode
+                              ? "bg-gray-700/95 border-gray-600 hover:bg-gray-600 text-gray-300 hover:text-white"
+                              : "bg-white/95 border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-gray-900"
+                          }`}
                           title="Edit experience"
+                          aria-label={`Edit ${item.role} at ${item.company}`}
                         >
                           <Icon.Edit />
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
-                          className="p-2 bg-white/95 dark:bg-gray-700/95 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:shadow"
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            onDelete(item.id, `${item.role} at ${item.company}`); 
+                          }}
+                          className={`p-2 rounded-lg border transition-all duration-200 ${
+                            darkMode
+                              ? "bg-gray-700/95 border-red-800 text-red-400 hover:bg-red-900/50"
+                              : "bg-white/95 border-red-200 text-red-600 hover:bg-red-50"
+                          }`}
                           title="Delete experience"
+                          aria-label={`Delete ${item.role} at ${item.company}`}
                         >
                           <Icon.Trash />
                         </button>
@@ -458,11 +793,23 @@ export default function Experience() {
                     )}
 
                     <div className="flex flex-wrap items-start justify-between gap-2 mb-4 pr-20">
-                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${item.endDate ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300" : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"}`}>
+                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        item.endDate 
+                          ? darkMode
+                            ? "bg-gray-700 text-gray-300" 
+                            : "bg-gray-100 text-gray-700"
+                          : darkMode
+                            ? "bg-green-900/30 text-green-300" 
+                            : "bg-green-100 text-green-700"
+                      }`}>
                         {item.endDate ? "Completed" : "Current"}
                       </div>
                       {item.project && (
-                        <div className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 rounded-full text-indigo-700 dark:text-indigo-300 text-xs">
+                        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                          darkMode
+                            ? "bg-indigo-900/30 text-indigo-300"
+                            : "bg-indigo-50 text-indigo-700"
+                        }`}>
                           <Icon.Briefcase className="w-3 h-3" />
                           <span className="font-medium">{item.project}</span>
                         </div>
@@ -470,18 +817,30 @@ export default function Experience() {
                     </div>
 
                     <div className="mb-3">
-                      <h3 className="exp-title text-lg font-bold text-gray-900 dark:text-white mb-1">{item.role}</h3>
-                      <div className="exp-company flex items-center gap-2 text-gray-700 dark:text-white flex-wrap">
+                      <h3 className={`text-lg font-bold mb-1 ${
+                        darkMode ? "text-white" : "text-gray-900"
+                      }`}>
+                        {item.role}
+                      </h3>
+                      <div className={`flex items-center gap-2 flex-wrap ${
+                        darkMode ? "text-gray-300" : "text-gray-700"
+                      }`}>
                         <Icon.Building className="w-4 h-4" />
                         <span className="font-medium">{item.company}</span>
                       </div>
                     </div>
 
-                    <div className="exp-meta space-y-2 mb-3 text-sm text-gray-700 dark:text-white">
+                    <div className={`space-y-2 mb-3 text-sm ${
+                      darkMode ? "text-gray-300" : "text-gray-600"
+                    }`}>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Icon.Calendar className="w-4 h-4" />
                         <span>{fmtYM(item.startDate)} – {fmtYM(item.endDate)}</span>
-                        <span className="text-blue-600 dark:text-blue-400 font-medium">({humanDuration(item.startDate, item.endDate)})</span>
+                        <span className={`font-medium ${
+                          darkMode ? "text-blue-400" : "text-blue-600"
+                        }`}>
+                          ({humanDuration(item.startDate, item.endDate)})
+                        </span>
                       </div>
                       {item.location && (
                         <div className="flex items-center gap-2">
@@ -493,7 +852,9 @@ export default function Experience() {
 
                     <div className="flex-grow mb-4">
                       <div
-                        className="experience-description prose prose-sm max-w-none"
+                        className={`experience-description prose prose-sm max-w-none ${
+                          darkMode ? "prose-invert" : ""
+                        }`}
                         dangerouslySetInnerHTML={{ __html: item.descriptionHtml }}
                       />
                     </div>
@@ -501,7 +862,14 @@ export default function Experience() {
                     {Array.isArray(item.tools) && item.tools.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {item.tools.map((tool, i) => (
-                          <span key={`tool-${item.id}-${i}`} className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                          <span 
+                            key={`tool-${item.id}-${i}`} 
+                            className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                              darkMode
+                                ? "bg-gray-700 text-gray-300"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
                             {String(tool)}
                           </span>
                         ))}
@@ -509,30 +877,56 @@ export default function Experience() {
                     )}
                   </Card>
                 ) : (
+                  /* List View */
                   <Card dark={darkMode} className="group p-6 hover:shadow-lg transition-all duration-200">
                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                       <div className="flex-grow min-w-0">
                         <div className="flex flex-wrap items-center gap-3 mb-2">
-                          <h3 className="exp-title text-lg font-bold text-gray-900 dark:text-white">{item.role}</h3>
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${item.endDate ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300" : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"}`}>
+                          <h3 className={`text-lg font-bold ${
+                            darkMode ? "text-white" : "text-gray-900"
+                          }`}>
+                            {item.role}
+                          </h3>
+                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            item.endDate 
+                              ? darkMode
+                                ? "bg-gray-700 text-gray-300" 
+                                : "bg-gray-100 text-gray-700"
+                              : darkMode
+                                ? "bg-green-900/30 text-green-300" 
+                                : "bg-green-100 text-green-700"
+                          }`}>
                             {item.endDate ? "Completed" : "Current"}
                           </div>
                           {item.project && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 rounded-full text-indigo-700 dark:text-indigo-300 text-xs">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                              darkMode
+                                ? "bg-indigo-900/30 text-indigo-300"
+                                : "bg-indigo-50 text-indigo-700"
+                            }`}>
                               <Icon.Briefcase className="w-3 h-3" />
                               {item.project}
                             </span>
                           )}
                         </div>
 
-                        <div className="exp-meta flex flex-wrap items-center gap-4 text-sm text-gray-700 dark:text-white mb-3">
+                        <div className={`flex flex-wrap items-center gap-4 text-sm mb-3 ${
+                          darkMode ? "text-gray-300" : "text-gray-600"
+                        }`}>
                           <div className="flex items-center gap-1">
                             <Icon.Building className="w-4 h-4" />
                             <span className="font-medium">{item.company}</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <Icon.Calendar className="w-4 h-4" />
-                            <span>{fmtYM(item.startDate)} – {fmtYM(item.endDate)} ({humanDuration(item.startDate, item.endDate)})</span>
+                            <span>
+                              {fmtYM(item.startDate)} – {fmtYM(item.endDate)} 
+                              <span className={`ml-1 font-medium ${
+                                darkMode ? "text-blue-400" : "text-blue-600"
+                              }`}>
+                                ({humanDuration(item.startDate, item.endDate)})
+                              </span>
+                            </span>
                           </div>
                           {item.location && (
                             <div className="flex items-center gap-1">
@@ -543,14 +937,23 @@ export default function Experience() {
                         </div>
 
                         <div
-                          className="experience-description prose prose-sm max-w-none mb-3"
+                          className={`experience-description prose prose-sm max-w-none mb-3 ${
+                            darkMode ? "prose-invert" : ""
+                          }`}
                           dangerouslySetInnerHTML={{ __html: item.descriptionHtml }}
                         />
 
                         {Array.isArray(item.tools) && item.tools.length > 0 && (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {item.tools.map((tool, i) => (
-                              <span key={`tool-${item.id}-${i}`} className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                              <span 
+                                key={`tool-${item.id}-${i}`} 
+                                className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  darkMode
+                                    ? "bg-gray-700 text-gray-300"
+                                    : "bg-gray-100 text-gray-700"
+                                }`}
+                              >
                                 {String(tool)}
                               </span>
                             ))}
@@ -559,20 +962,30 @@ export default function Experience() {
                       </div>
 
                       {owner && (
-                        <div className="owner-actions flex gap-2 lg:flex-col lg:items-end shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity">
+                        <div className="owner-actions flex gap-2 lg:flex-col lg:items-end shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
                           <button
                             type="button"
                             onClick={() => navigate(`/experience/edit/${item.id}`)}
-                            className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400"
+                            className={`p-2 rounded-lg transition-all duration-200 ${
+                              darkMode
+                                ? "bg-blue-900/30 hover:bg-blue-900/50 text-blue-400"
+                                : "bg-blue-50 hover:bg-blue-100 text-blue-600"
+                            }`}
                             title="Edit experience"
+                            aria-label={`Edit ${item.role} at ${item.company}`}
                           >
                             <Icon.Edit />
                           </button>
                           <button
                             type="button"
-                            onClick={() => onDelete(item.id)}
-                            className="p-2 bg-red-50 dark:bg-red-900/30 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400"
+                            onClick={() => onDelete(item.id, `${item.role} at ${item.company}`)}
+                            className={`p-2 rounded-lg transition-all duration-200 ${
+                              darkMode
+                                ? "bg-red-900/30 hover:bg-red-900/50 text-red-400"
+                                : "bg-red-50 hover:bg-red-100 text-red-600"
+                            }`}
                             title="Delete experience"
+                            aria-label={`Delete ${item.role} at ${item.company}`}
                           >
                             <Icon.Trash />
                           </button>
@@ -584,28 +997,35 @@ export default function Experience() {
               </Reveal>
             ))}
 
+            {/* Add New Experience Card for Grid View */}
             {owner && viewMode === "grid" && (
               <Reveal delay={filteredAndSortedItems.length * 50}>
                 <button
                   type="button"
                   onClick={() => navigate("/experience/new")}
-                  className="h-full w-full rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 p-8 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-all duration-200 flex flex-col items-center justify-center gap-3"
+                  className={`h-full min-h-[300px] w-full rounded-xl border-2 border-dashed p-8 transition-all duration-200 flex flex-col items-center justify-center gap-3 ${
+                    darkMode
+                      ? "border-gray-600 hover:border-blue-500 hover:bg-blue-900/10 text-gray-400 hover:text-blue-400"
+                      : "border-gray-300 hover:border-blue-400 hover:bg-blue-50/50 text-gray-500 hover:text-blue-600"
+                  }`}
+                  aria-label="Add new experience"
                 >
-                  <Icon.Plus className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                  <Icon.Plus className="w-8 h-8" />
                   <span className="font-medium">Add Experience</span>
                 </button>
               </Reveal>
             )}
-          </div>
+          </main>
         )}
 
+        {/* Add New Experience Button for List View */}
         {owner && viewMode === "list" && filteredAndSortedItems.length > 0 && (
           <Reveal delay={300}>
             <div className="mt-8 text-center">
               <button
                 type="button"
                 onClick={() => navigate("/experience/new")}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 <Icon.Plus className="w-5 h-5" />
                 Add New Experience
@@ -615,29 +1035,101 @@ export default function Experience() {
         )}
       </div>
 
-      {/* Styling: theme-aware text, preserve user colors/highlights, bullet color, hover-owner actions */}
+      {/* Enhanced Styling with Proper Theme Support */}
       <style>{`
-        /* Lists */
-        .experience-description ul { list-style-type: disc !important; margin: 1rem 0 !important; padding-left: 1.5rem !important; }
-        .experience-description ol { list-style-type: decimal !important; margin: 1rem 0 !important; padding-left: 1.5rem !important; }
-        .experience-description li { display: list-item !important; margin: 0.25rem 0 !important; }
+        /* Enhanced list styling with proper theme support */
+        .experience-description ul {
+          list-style-type: disc !important;
+          margin: 1rem 0 !important;
+          padding-left: 1.5rem !important;
+        }
+        
+        .experience-description ol {
+          list-style-type: decimal !important;
+          margin: 1rem 0 !important;
+          padding-left: 1.5rem !important;
+        }
+        
+        .experience-description li {
+          display: list-item !important;
+          margin: 0.25rem 0 !important;
+          line-height: 1.5;
+        }
+
+        /* Theme-aware text colors - fixed for proper visibility */
+        .experience-description {
+          color: inherit;
+        }
+
+        /* Light mode: ensure good contrast */
+        .experience-card:not(.dark .experience-card) .experience-description {
+          color: rgb(55 65 81); /* gray-700 */
+        }
+
+        /* Dark mode: ensure white text */
+        .dark .experience-card .experience-description {
+          color: rgb(255 255 255) !important;
+        }
+
+        /* Preserve inline colors and highlights in both modes */
+        .experience-description [style*="color"] {
+          color: inherit !important;
+        }
+
+        /* Enhanced link styling */
+        .experience-description a {
+          text-decoration: underline;
+          text-underline-offset: 2px;
+          transition: opacity 0.2s ease;
+        }
+
+        .experience-description a:hover {
+          opacity: 0.8;
+        }
+
+        /* Light mode links */
+        .experience-card:not(.dark .experience-card) .experience-description a {
+          color: rgb(37 99 235); /* blue-600 */
+        }
+
+        /* Dark mode links */
+        .dark .experience-card .experience-description a {
+          color: rgb(147 197 253); /* blue-300 */
+        }
+
+        /* Enhanced markers with theme support */
         .experience-description ul li::marker,
-        .experience-description ol li::marker { color: currentColor !important; }
+        .experience-description ol li::marker {
+          color: currentColor !important;
+          opacity: 0.7;
+        }
 
-        /* --- Theme-aware default text ---
-           Light mode: inherit normal text color.
-           Dark mode: default to white, but DO NOT override inline colors/highlights. */
-        .experience-card .experience-description { color: inherit; }
-        .dark .experience-card .experience-description { color: #ffffff; }
+        /* Smooth transitions for theme switching */
+        .experience-card,
+        .experience-description,
+        .experience-description * {
+          transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+        }
 
-        /* Ensure prose children follow container color unless explicitly styled inline */
-        .experience-card .experience-description :where(p,li,span,em,strong,div,blockquote,code,h1,h2,h3,h4,a) { color: inherit; }
+        /* Enhanced focus states for accessibility */
+        .experience-card:focus-within {
+          ring: 2px solid rgb(59 130 246);
+          ring-offset: 2px;
+        }
 
-        /* Links stay readable in dark mode if no inline color was set */
-        .dark .experience-card .experience-description a { color: #93c5fd; }
+        /* Improved owner actions visibility */
+        .owner-actions {
+          transition: opacity 0.2s ease;
+        }
 
-        /* Owner actions: show on hover/focus only */
-        .owner-actions { transition: opacity .2s ease; }
+        @media (prefers-reduced-motion: reduce) {
+          .experience-card,
+          .experience-description,
+          .experience-description *,
+          .owner-actions {
+            transition: none !important;
+          }
+        }
       `}</style>
     </section>
   );

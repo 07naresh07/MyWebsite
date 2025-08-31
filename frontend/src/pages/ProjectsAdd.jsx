@@ -222,7 +222,7 @@ function MonthYearPicker({
               <select
                 value={month}
                 onChange={(e) => { const m = e.target.value; setMonth(m); updateValue(year, m); }}
-                className="h-9 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 text-sm dark:text-gray-200"
+                className="h-9 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 text-sm text-gray-900 dark:text-gray-200"
               >
                 <option value="">Month</option>
                 {months.map((m) => (
@@ -232,7 +232,7 @@ function MonthYearPicker({
               <select
                 value={year}
                 onChange={(e) => { const y = e.target.value; setYear(y); updateValue(y, month); }}
-                className="h-9 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 text-sm dark:text-gray-200"
+                className="h-9 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 text-sm text-gray-900 dark:text-gray-200"
               >
                 <option value="">Year</option>
                 {years.map((y) => (
@@ -271,7 +271,7 @@ function MonthYearPicker({
 }
 
 /* ------------------------------------------------------------------ */
-/* WYSIWYG (stable)                                                    */
+/* WYSIWYG (stable) - Simplified without highlighting                  */
 /* ------------------------------------------------------------------ */
 function Wysiwyg({ html, onChange, disabled = false }) {
   const ref = useRef(null);
@@ -386,10 +386,26 @@ function Wysiwyg({ html, onChange, disabled = false }) {
     if (disabled) return;
     e.preventDefault();
     isSelfEditing.current = true;
+    
     const d = e.clipboardData;
     const h = d.getData("text/html");
     const t = d.getData("text/plain");
-    const toInsert = h ? h : t.replace(/\n/g, "<br>");
+    
+    let toInsert;
+    if (h) {
+      // Simple cleaning - just remove common problematic color styles
+      toInsert = h
+        .replace(/color:\s*white/gi, "")
+        .replace(/color:\s*#fff([^0-9a-f]|$)/gi, "")
+        .replace(/color:\s*#ffffff/gi, "")
+        .replace(/color:\s*rgb\(255,\s*255,\s*255\)/gi, "")
+        .replace(/color:\s*rgba\(255,\s*255,\s*255[^)]*\)/gi, "")
+        .replace(/background-color:[^;]*;?/gi, "")
+        .replace(/background:[^;]*;?/gi, "");
+    } else {
+      toInsert = t.replace(/\n/g, "<br>");
+    }
+    
     focusAndEnsureCaret();
     document.execCommand("insertHTML", false, toInsert);
     const htmlNow = ref.current?.innerHTML || "";
@@ -398,9 +414,8 @@ function Wysiwyg({ html, onChange, disabled = false }) {
     safeQueueMicrotask(() => { isSelfEditing.current = false; });
   }, [disabled, focusAndEnsureCaret, onChange]);
 
-  // Color popover
+  // Simplified color picker - only text colors, no highlights
   const [showColors, setShowColors] = useState(false);
-  const [colorTab, setColorTab] = useState("text");
   const [customHex, setCustomHex] = useState("");
   const [rgb, setRgb] = useState({ r: "", g: "", b: "" });
   const popRef = useRef(null);
@@ -416,17 +431,11 @@ function Wysiwyg({ html, onChange, disabled = false }) {
 
   const applyColor = useCallback((color) => {
     if (disabled) return;
-    const hiliteSupported =
-      document.queryCommandSupported?.("hiliteColor") || document.queryCommandSupported?.("backColor");
-    const type =
-      colorTab === "highlight" && hiliteSupported
-        ? (document.queryCommandSupported?.("hiliteColor") ? "hiliteColor" : "backColor")
-        : "foreColor";
-    exec(type, color);
+    exec("foreColor", color);
     setShowColors(false);
     setCustomHex("");
     setRgb({ r: "", g: "", b: "" });
-  }, [colorTab, disabled, exec]);
+  }, [disabled, exec]);
 
   const TBtn = ({ label, onClick, icon, active = false }) => (
     <button
@@ -447,30 +456,66 @@ function Wysiwyg({ html, onChange, disabled = false }) {
 
   const TSep = () => <span className="mx-1 h-6 w-px bg-gray-300 dark:bg-gray-600" />;
 
-  const PALETTE = [
+  // Simplified color palette - only text colors
+  const TEXT_COLORS = [
     "#000000","#1f2937","#374151","#4b5563","#6b7280","#9ca3af","#d1d5db","#f3f4f6",
     "#ef4444","#f97316","#f59e0b","#eab308","#84cc16","#22c55e","#06b6d4","#3b82f6",
     "#6366f1","#8b5cf6","#a855f7","#ec4899","#f43f5e","#14b8a6","#10b981","#0ea5e9",
     "#dc2626","#ea580c","#d97706","#ca8a04","#65a30d","#16a34a","#0891b2","#2563eb",
     "#4f46e5","#7c3aed","#9333ea","#db2777","#be123c","#0d9488","#059669","#0284c7"
   ];
-  const HIGHLIGHTS = [
-    "#fff7ed","#fffbeb","#fefce8","#f7fee7","#ecfeff","#eef2ff","#fdf4ff","#fee2e2",
-    "#fde68a","#fde047","#bef264","#86efac","#a5f3fc","#93c5fd","#c4b5fd","#f5d0fe",
-    "#fecaca","#fee4e2","#e0f2fe","#dcfce7","#fef9c3","#e9d5ff","#fae8ff","#ffe4e6"
-  ];
 
   return (
     <div>
       <style>{`
-        .wys { direction: ltr; text-align: left; color: #1f2937; min-height: 9rem; }
-        .wys:empty:before { content: attr(data-placeholder); color: #9ca3af; pointer-events: none; }
-        .wys ul { list-style: disc outside; padding-left: 1.5rem; margin: 0.5rem 0; }
-        .wys ol { list-style: decimal outside; padding-left: 1.75rem; margin: 0.5rem 0; }
-        .wys a { color: #3b82f6; text-decoration: underline; }
-        .wys img { max-width: 100%; height: auto; }
-        .dark .wys { color: #f3f4f6; }
-        .dark .wys:empty:before { color: #6b7280; }
+        .wys { 
+          direction: ltr; 
+          text-align: left; 
+          color: #1f2937 !important; 
+          min-height: 9rem; 
+        }
+        .dark .wys { 
+          color: #f3f4f6 !important; 
+        }
+        .wys:empty:before { 
+          content: attr(data-placeholder); 
+          color: #9ca3af; 
+          pointer-events: none; 
+        }
+        .dark .wys:empty:before { 
+          color: #6b7280; 
+        }
+        .wys ul { 
+          list-style: disc outside; 
+          padding-left: 1.5rem; 
+          margin: 0.5rem 0; 
+        }
+        .wys ol { 
+          list-style: decimal outside; 
+          padding-left: 1.75rem; 
+          margin: 0.5rem 0; 
+        }
+        .wys a { 
+          color: #3b82f6 !important; 
+          text-decoration: underline; 
+        }
+        .dark .wys a {
+          color: #60a5fa !important;
+        }
+        .wys img { 
+          max-width: 100%; 
+          height: auto; 
+        }
+        .wys p {
+          margin: 0.5rem 0;
+        }
+        .wys h1, .wys h2, .wys h3, .wys h4, .wys h5, .wys h6 {
+          font-weight: 600;
+          margin: 0.75rem 0 0.5rem 0;
+        }
+        .wys h1 { font-size: 1.5rem; }
+        .wys h2 { font-size: 1.25rem; }
+        .wys h3 { font-size: 1.125rem; }
       `}</style>
 
       <div className="mb-2 relative flex flex-wrap gap-1">
@@ -490,7 +535,7 @@ function Wysiwyg({ html, onChange, disabled = false }) {
         <TSep />
         <TBtn label="Link" onClick={insertLink} icon={<Ic.Link />} />
         <TSep />
-        {/* Color popover */}
+        {/* Simplified color picker - text only */}
         <div ref={popRef} className="relative">
           <button
             type="button"
@@ -499,8 +544,8 @@ function Wysiwyg({ html, onChange, disabled = false }) {
             className={`inline-flex items-center justify-center h-8 w-8 rounded-lg text-sm transition-colors ${
               disabled ? "opacity-50 cursor-not-allowed" : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
             }`}
-            title="Color"
-            aria-label="Color"
+            title="Text Color"
+            aria-label="Text Color"
           >
             <Ic.Palette />
           </button>
@@ -512,33 +557,12 @@ function Wysiwyg({ html, onChange, disabled = false }) {
                 exit={{ opacity: 0, y: 10 }}
                 className="absolute z-30 mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 shadow-lg w-[280px]"
               >
-                <div className="mb-2 flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setColorTab("text")}
-                    className={`px-2 py-1 rounded-md text-xs border transition-colors ${
-                      colorTab === "text"
-                        ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200"
-                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    Text
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setColorTab("highlight")}
-                    className={`px-2 py-1 rounded-md text-xs border transition-colors ${
-                      colorTab === "highlight"
-                        ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200"
-                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    Highlight
-                  </button>
+                <div className="mb-2">
+                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Text Color</span>
                 </div>
 
                 <div className="grid grid-cols-8 gap-1 max-h-48 overflow-auto pr-1">
-                  {(colorTab === "text" ? PALETTE : HIGHLIGHTS).map((c) => (
+                  {TEXT_COLORS.map((c) => (
                     <button
                       key={c}
                       type="button"
@@ -550,22 +574,24 @@ function Wysiwyg({ html, onChange, disabled = false }) {
                   ))}
                 </div>
 
-                <div className="mt-2 flex items-center gap-2">
-                  <input
-                    value={customHex}
-                    onChange={(e) => setCustomHex(e.target.value)}
-                    placeholder="#RRGGBB"
-                    className="h-8 w-28 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 text-xs dark:text-gray-200"
-                  />
-                  <button
-                    type="button"
-                    className="h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    onClick={() => {
-                      if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(customHex)) applyColor(customHex);
-                    }}
-                  >
-                    Apply
-                  </button>
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={customHex}
+                      onChange={(e) => setCustomHex(e.target.value)}
+                      placeholder="#RRGGBB"
+                      className="h-8 w-28 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 text-xs text-gray-900 dark:text-gray-200"
+                    />
+                    <button
+                      type="button"
+                      className="h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      onClick={() => {
+                        if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(customHex)) applyColor(customHex);
+                      }}
+                    >
+                      Apply
+                    </button>
+                  </div>
 
                   <div className="flex items-center gap-1">
                     <RgbInput label="R" value={rgb.r} onChange={(v) => setRgb((p) => ({ ...p, r: v }))} />
@@ -583,6 +609,14 @@ function Wysiwyg({ html, onChange, disabled = false }) {
                       Apply RGB
                     </button>
                   </div>
+                  
+                  <button
+                    type="button"
+                    className="w-full h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    onClick={() => applyColor("")}
+                  >
+                    Reset to Default
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -617,7 +651,7 @@ function RgbInput({ label, value, onChange }) {
       onChange={(e) => onChange(e.target.value)}
       placeholder={label}
       aria-label={label}
-      className="h-8 w-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1 text-xs dark:text-gray-200"
+      className="h-8 w-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1 text-xs text-gray-900 dark:text-gray-200"
     />
   );
 }
@@ -662,7 +696,7 @@ function UrlInput({ value, onChange, placeholder, disabled }) {
           inputMode="url"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="mt-1 w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mt-1 w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           placeholder={placeholder}
           disabled={disabled}
         />
@@ -681,7 +715,7 @@ function UrlInput({ value, onChange, placeholder, disabled }) {
 
       {loading && (
         <div className="mt-2 h-20 w-full rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse flex items-center justify-center">
-          <span className="text-sm text-gray-500">Loading preview...</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">Loading preview...</span>
         </div>
       )}
 
@@ -740,7 +774,7 @@ function ImageUrlsInput({ value, onChange, disabled }) {
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="mt-1 w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mt-1 w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           placeholder="https://.../cover.jpg, https://.../screen-1.png"
           disabled={disabled}
         />
@@ -748,7 +782,7 @@ function ImageUrlsInput({ value, onChange, disabled }) {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
-          className="mt-1 p-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+          className="mt-1 p-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
           title="Upload image"
         >
           <Ic.Image />
@@ -834,7 +868,7 @@ function TechStackInput({ value, onChange, disabled }) {
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="mt-1 w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-1 w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         placeholder="Type and press Enter or comma to add"
         disabled={disabled}
       />
@@ -924,7 +958,7 @@ export default function ProjectsAdd() {
   const [saving, setSaving] = useState(false);
   const [allNames, setAllNames] = useState([]); // for duplicate-name warning
 
-  // draft/dirty tracking
+  // draft/dirty tracking - Safe localStorage usage
   const initialRef = useRef(empty);
   const draftKey = useMemo(() => (editing ? `projectDraft:edit:${id}` : "projectDraft:new"), [editing, id]);
   const [draftAvailable, setDraftAvailable] = useState(false);
@@ -977,11 +1011,13 @@ export default function ProjectsAdd() {
     return () => { cancelled = true; };
   }, [editing, id]);
 
-  // Existing draft?
+  // Check for existing draft
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(draftKey);
-      if (raw) setDraftAvailable(true);
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(draftKey);
+        if (raw) setDraftAvailable(true);
+      }
     } catch {}
   }, [draftKey]);
 
@@ -1003,7 +1039,9 @@ export default function ProjectsAdd() {
   useEffect(() => {
     const t = setTimeout(() => {
       try {
-        if (isDirty) localStorage.setItem(draftKey, JSON.stringify(form));
+        if (typeof localStorage !== 'undefined' && isDirty) {
+          localStorage.setItem(draftKey, JSON.stringify(form));
+        }
       } catch {}
     }, 800);
     return () => clearTimeout(t);
@@ -1011,17 +1049,23 @@ export default function ProjectsAdd() {
 
   const restoreDraft = () => {
     try {
-      const raw = localStorage.getItem(draftKey);
-      if (raw) {
-        const data = JSON.parse(raw);
-        setForm(data);
-        setDraftAvailable(false);
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(draftKey);
+        if (raw) {
+          const data = JSON.parse(raw);
+          setForm(data);
+          setDraftAvailable(false);
+        }
       }
     } catch {}
   };
 
   const dismissDraft = () => {
-    try { localStorage.removeItem(draftKey); } catch {}
+    try { 
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(draftKey); 
+      }
+    } catch {}
     setDraftAvailable(false);
   };
 
@@ -1034,8 +1078,7 @@ export default function ProjectsAdd() {
       if (!prev.endYM && prev.status === "Completed") return { ...prev, status: "In Progress" };
       return prev;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.endYM]); // only reacts to end date changes
+  }, [form.endYM]);
 
   // Date consistency check
   useEffect(() => {
@@ -1051,21 +1094,7 @@ export default function ProjectsAdd() {
     else setDateError("");
   }, [form.startYM, form.endYM]);
 
-  // Keyboard shortcuts: Ctrl/Cmd+S, Ctrl/Cmd+Enter
-  useEffect(() => {
-    const onKey = (e) => {
-      const meta = e.metaKey || e.ctrlKey;
-      if (!meta) return;
-      if (e.key.toLowerCase() === "s" || e.key === "Enter") {
-        e.preventDefault();
-        handleSubmit();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []); // stable
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e?.preventDefault();
     setForbidden(false);
     if (!owner) {
@@ -1093,7 +1122,6 @@ export default function ProjectsAdd() {
         summary: form.summaryHtml || "",
         techStack: toArray(form.techStack),
         images: toArray(form.images),
-        // links added conditionally below (URL is optional)
         featured: !!form.featured,
         sortOrder: Number(form.sortOrder || 0),
         client: form.client.trim(),
@@ -1115,10 +1143,18 @@ export default function ProjectsAdd() {
       else await createProject(payload);
 
       // Signal the list page to refresh (works even in same tab)
-      try { localStorage.setItem("projects:dirty", "1"); } catch {}
+      try { 
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem("projects:dirty", "1"); 
+        }
+      } catch {}
       window.dispatchEvent(new Event("projects:updated"));
 
-      try { localStorage.removeItem(draftKey); } catch {}
+      try { 
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(draftKey); 
+        }
+      } catch {}
       initialRef.current = payload; // reset dirty state
       nav("/projects");
     } catch (e2) {
@@ -1128,7 +1164,21 @@ export default function ProjectsAdd() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [editing, id, form, owner, draftKey, nav]);
+
+  // Keyboard shortcuts: Ctrl/Cmd+S, Ctrl/Cmd+Enter
+  useEffect(() => {
+    const onKey = (e) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta) return;
+      if (e.key.toLowerCase() === "s" || e.key === "Enter") {
+        e.preventDefault();
+        handleSubmit();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleSubmit]);
 
   // Name-based AI suggestions
   const generateAiSuggestions = async () => {
@@ -1182,15 +1232,22 @@ export default function ProjectsAdd() {
             <button
               type="button"
               onClick={() => nav("/projects")}
-              className="rounded-lg border px-3 py-2 text-sm text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="rounded-lg border px-3 py-2 text-sm text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               disabled={saving}
             >
               Cancel
             </button>
             <button
               type="button"
-              onClick={() => { setForm({ ...empty }); try { localStorage.removeItem(draftKey); } catch {} }}
-              className="rounded-lg border px-3 py-2 text-sm text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+              onClick={() => { 
+                setForm({ ...empty }); 
+                try { 
+                  if (typeof localStorage !== 'undefined') {
+                    localStorage.removeItem(draftKey); 
+                  }
+                } catch {} 
+              }}
+              className="rounded-lg border px-3 py-2 text-sm text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
               disabled={disabled || saving}
               title="Clear form"
             >
@@ -1231,14 +1288,14 @@ export default function ProjectsAdd() {
             <div className="flex gap-2">
               <button
                 type="button"
-                className="px-3 py-1.5 rounded-md text-sm bg-indigo-600 text-white hover:bg-indigo-700"
+                className="px-3 py-1.5 rounded-md text-sm bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                 onClick={restoreDraft}
               >
                 Restore draft
               </button>
               <button
                 type="button"
-                className="px-3 py-1.5 rounded-md text-sm border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/50"
+                className="px-3 py-1.5 rounded-md text-sm border border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/50 transition-colors"
                 onClick={dismissDraft}
               >
                 Dismiss
@@ -1273,7 +1330,7 @@ export default function ProjectsAdd() {
               <button
                 type="button"
                 onClick={() => setActiveTab("details")}
-                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === "details"
                     ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
                     : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
@@ -1284,7 +1341,7 @@ export default function ProjectsAdd() {
               <button
                 type="button"
                 onClick={() => setActiveTab("media")}
-                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === "media"
                     ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
                     : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
@@ -1295,7 +1352,7 @@ export default function ProjectsAdd() {
               <button
                 type="button"
                 onClick={() => setActiveTab("settings")}
-                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === "settings"
                     ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
                     : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
@@ -1324,7 +1381,7 @@ export default function ProjectsAdd() {
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                           Project Name *
                         </label>
-                        <span className={`text-xs ${form.name.length > 80 ? "text-red-600" : "text-gray-400"}`}>
+                        <span className={`text-xs ${form.name.length > 80 ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-gray-500"}`}>
                           {form.name.length}/80
                         </span>
                       </div>
@@ -1333,7 +1390,7 @@ export default function ProjectsAdd() {
                         maxLength={80}
                         value={form.name}
                         onChange={(e) => update("name", e.target.value)}
-                        className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-3 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         placeholder="Digital Twin for Urban Transit"
                         disabled={disabled}
                         required
@@ -1380,7 +1437,7 @@ export default function ProjectsAdd() {
                           type="text"
                           value={form.client}
                           onChange={(e) => update("client", e.target.value)}
-                          className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-3 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           placeholder="Metro Authority"
                           disabled={disabled}
                         />
@@ -1393,7 +1450,7 @@ export default function ProjectsAdd() {
                           type="text"
                           value={form.role}
                           onChange={(e) => update("role", e.target.value)}
-                          className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-3 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           placeholder="BIM Coordinator"
                           disabled={disabled}
                         />
@@ -1409,7 +1466,7 @@ export default function ProjectsAdd() {
                           type="text"
                           value={form.location}
                           onChange={(e) => update("location", e.target.value)}
-                          className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-3 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           placeholder="Tokyo, JP"
                           disabled={disabled}
                         />
@@ -1421,7 +1478,7 @@ export default function ProjectsAdd() {
                         <select
                           value={form.status}
                           onChange={(e) => update("status", e.target.value)}
-                          className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className="w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-4 py-3 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           disabled={disabled}
                         >
                           <option>Planned</option>
@@ -1495,7 +1552,7 @@ export default function ProjectsAdd() {
               {activeTab === "settings" && (
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-6">
-                    <div className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
                       <label className="inline-flex items-center gap-3">
                         <input
                           type="checkbox"
@@ -1508,7 +1565,7 @@ export default function ProjectsAdd() {
                       </label>
                     </div>
 
-                    <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Sort Order
                       </label>
@@ -1516,7 +1573,7 @@ export default function ProjectsAdd() {
                         type="number"
                         value={form.sortOrder}
                         onChange={(e) => update("sortOrder", e.target.value)}
-                        className="w-24 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="w-24 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         disabled={disabled}
                       />
                       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">

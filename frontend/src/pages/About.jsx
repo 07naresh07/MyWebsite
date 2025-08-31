@@ -102,7 +102,7 @@ const getStyles = (isDark) => ({
       ? "border-slate-600/50 bg-slate-800 text-slate-100 placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500/20"
       : "border-gray-300/60 bg-white text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:ring-blue-500/20"
   }`,
-  paragraphMain: `leading-relaxed text-[16px] md:text-[17px] ${
+  paragraphMain: `leading-relaxed text-[16px] md:text-[17px] w-full ${
     isDark ? "text-slate-200" : "text-gray-800"
   }`,
   text: {
@@ -211,23 +211,31 @@ function Header({ fullName, quote, editable, onOpenQuoteModal }) {
         isDark ? "border-slate-700/50 bg-slate-800/60" : "border-slate-200/60 bg-white/90"
       }`}
     >
-      <div className="flex flex-col gap-1 relative">
-        <h1 className={`text-2xl md:text-3xl font-bold ${isDark ? "text-slate-100" : "text-gray-900"}`}>
-          {fullName || "Your Name"}
-        </h1>
+      {/* Mobile: Always stack vertically. Desktop (lg+): Side by side */}
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 relative">
+        {/* Name section */}
+        <div className="flex-1 min-w-0">
+          <h1 className={`text-2xl md:text-3xl font-bold ${isDark ? "text-slate-100" : "text-gray-900"}`}>
+            {fullName || "Your Name"}
+          </h1>
+        </div>
 
+        {/* Quote section - Always stacked on mobile, right-aligned on desktop */}
         {quote && (
-          <p
-            className={`absolute right-4 bottom-2 text-sm italic ${
-              isDark ? "text-slate-300" : "text-gray-600"
-            }`}
-          >
-            “{quote}”
-          </p>
+          <div className="lg:flex-shrink-0 lg:ml-4 lg:max-w-md">
+            <p
+              className={`text-sm italic text-left lg:text-right ${
+                isDark ? "text-slate-300" : "text-gray-600"
+              }`}
+            >
+              "{quote}"
+            </p>
+          </div>
         )}
 
+        {/* Edit button - Position adjusted for mobile */}
         {editable && (
-          <div className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity z-10">
             <button className={`${styles.btnGhost} text-xs`} onClick={onOpenQuoteModal}>
               ✏️ Edit quote
             </button>
@@ -327,10 +335,10 @@ function SkillsCard({ grouped, onAdd, onDelete, openEditModal, busy, isOwner }) 
             <button
               disabled={busy || !name.trim()}
               onClick={add}
-              className={`px-5 py-3 rounded-xl font-medium text-base transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`px-5 py-2 rounded-xl border text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
                 isDark
-                  ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:from-blue-500 hover:to-purple-500 border border-blue-600 shadow-lg shadow-blue-500/25"
-                  : "bg-gradient-to-r from-gray-900 to-gray-700 text-white hover:from-gray-800 hover:to-gray-600 border border-gray-900 shadow-lg shadow-gray-900/25"
+                  ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-blue-600 hover:from-blue-500 hover:to-purple-500 shadow-lg shadow-blue-500/25"
+                  : "bg-gradient-to-r from-gray-900 to-gray-700 text-white border-gray-900 hover:from-gray-800 hover:to-gray-600 shadow-lg shadow-gray-900/25"
               }`}
             >
               {busy ? "✨ Adding..." : "➕ Add Skill"}
@@ -582,6 +590,10 @@ function LanguagesEditor({ items, onChange }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-sm font-medium text-blue-500">➕</span>
+        <span className={`text-sm font-medium ${isDark ? "text-slate-100" : "text-gray-900"}`}>Add New Language</span>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-stretch">
         <input
           className={`${styles.inputBase} h-12`}
@@ -650,7 +662,7 @@ function AboutInner() {
 
   const [edit, setEdit] = useState({ about: false, interests: false, languages: false, focus: false, motto: false });
 
-  // Uncontrolled editor state + ref (fixes caret jumping / “reverse typing”)
+  // Uncontrolled editor state + ref (fixes caret jumping / "reverse typing")
   const [aboutDraftHtml, setAboutDraftHtml] = useState("");
   const aboutEditorRef = useRef(null);
 
@@ -1102,7 +1114,7 @@ function AboutInner() {
                     isDark ? "text-slate-300 bg-transparent" : "text-gray-700 bg-gradient-to-r from-purple-50 to-blue-50"
                   }`}
                 >
-                  {profile?.motto ? `“${profile.motto}”` : ""}
+                  {profile?.motto ? `"${profile.motto}"` : ""}
                 </div>
               ) : (
                 <input
@@ -1117,10 +1129,24 @@ function AboutInner() {
 
           {/* MAIN CONTENT */}
           <section className="lg:col-span-3 space-y-6">
-            {/* About Paragraph */}
-            <div className={`${styles.card} p-6 group`}>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`font-semibold ${styles.text.primary}`}>👋 About Me</h3>
+            {/* About Paragraph - FIXED: Reduced padding and full-width justified text */}
+            <div className={`${styles.card} group`}>
+              {/* Header with reduced horizontal padding */}
+              <div className="px-6 pt-6 pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-1 h-8 rounded-full ${
+                      isDark ? "bg-gradient-to-b from-purple-400 to-pink-500" : "bg-gradient-to-b from-purple-500 to-pink-600"
+                    }`}
+                  />
+                  <h3
+                    className={`text-xl md:text-2xl font-bold bg-gradient-to-r ${
+                      isDark ? "from-purple-400 to-pink-400" : "from-purple-600 to-pink-600"
+                    } bg-clip-text text-transparent`}
+                  >
+                    👤 About Me
+                  </h3>
+                </div>
 
                 {isOwner && !edit.about && (
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1135,25 +1161,43 @@ function AboutInner() {
               </div>
 
               {!edit.about ? (
-                <div
-                  className={`${styles.paragraphMain} text-justify space-y-4 
-                  [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:leading-relaxed
-                  [&_*]:bg-transparent`}
-                  dangerouslySetInnerHTML={{
-                    __html: sanitizeAboutHtml((profile?.about || "").trim()) || "",
-                  }}
-                />
+                /* FIXED: Full-width text container with proper justification */
+                <div className="px-6 pb-6">
+                  <div
+                    className={`${styles.paragraphMain} space-y-4 w-full
+                    [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:leading-relaxed
+                    ${isDark ? '[&_*]:!text-slate-200' : '[&_*]:!text-gray-800'}`}
+                    style={{
+                      textAlign: 'justify',
+                      textJustify: 'inter-word',
+                      wordSpacing: '0.05em',
+                      lineHeight: '1.7',
+                      hyphens: 'auto',
+                      WebkitHyphens: 'auto',
+                      MozHyphens: 'auto',
+                      width: '100%',
+                      maxWidth: '100%'
+                    }}
+                    dangerouslySetInnerHTML={{
+                      __html: sanitizeAboutHtml((profile?.about || "").trim()) || "",
+                    }}
+                  />
+                </div>
               ) : (
-                <div className="space-y-3">
-                  {/* FIXED: uncontrolled contentEditable (no dangerouslySetInnerHTML binding) */}
+                <div className="px-6 pb-6 space-y-3">
+                  {/* FIXED: Full-width editor with proper styling */}
                   <div
                     id="about-editor"
                     ref={aboutEditorRef}
                     dir="ltr"
-                    className={`min-h-[220px] border rounded p-3 text-sm overflow-auto outline-none ${
-                      isDark ? "bg-slate-800 text-slate-100 border-slate-600" : "bg-white text-slate-900 border-slate-300"
+                    className={`min-h-[220px] border rounded-xl p-4 text-base overflow-auto outline-none w-full ${
+                      isDark ? "bg-slate-800 text-white border-slate-600" : "bg-white text-gray-900 border-slate-300"
                     }`}
-                    style={{ textAlign: "left" }}
+                    style={{ 
+                      textAlign: "justify",
+                      color: isDark ? "white" : "#111827",
+                      width: '100%'
+                    }}
                     contentEditable
                     suppressContentEditableWarning
                     onPaste={onAboutPaste}
@@ -1241,7 +1285,7 @@ function AboutInner() {
               />
             </div>
           </div>
-          {skillInlineError && <div className="text-sm text-red-500">{skillInlineError}</div>}
+          skillInlineError && <div className="text-sm text-red-500">{skillInlineError}</div>
           <div className="flex gap-2 justify-end">
             <button className={styles.btnGhost} onClick={() => setSkillModal(false)}>
               Cancel
