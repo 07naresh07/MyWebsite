@@ -21,15 +21,43 @@ def orjson_dumps(v, *, default):
 
 app = FastAPI(default_response_class=JSONResponse)
 
-# CORS: exact allow list
-_allowed = set([o.rstrip("/") for o in settings.allowed_origins])
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=list(_allowed),
+# ----------------------------- CORS ---------------------------------
+# Accept ALLOWED_ORIGINS as comma-separated list or python list
+_raw = settings.allowed_origins
+if isinstance(_raw, str):
+    _iter = _raw.split(",")
+else:
+    _iter = _raw or []
+
+# Normalize: strip spaces, drop trailing slashes, ignore empties
+_allowed = {
+    o.strip().rstrip("/")
+    for o in _iter
+    if isinstance(o, str) and o.strip()
+}
+
+# Optional regex (e.g., to allow all Vercel previews: https://.*\.vercel\.app)
+_allowed_regex = getattr(settings, "allowed_origin_regex", None)
+
+cors_common = dict(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+if _allowed_regex:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=_allowed_regex,
+        **cors_common,
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(_allowed),
+        **cors_common,
+    )
+# --------------------------------------------------------------------
 
 # web root for uploads
 webroot = settings.web_root or os.path.join(os.path.dirname(__file__), "..", "uploads")
@@ -70,7 +98,9 @@ async def _startup():
     masked = _mask_dsn(settings.database_url or "")
     print(f"[API] DATABASE_URL = {masked}")
     print(f"[API] DB_SSL_INSECURE = {os.getenv('DB_SSL_INSECURE','0')}")
-    print(f"[API] Allowed Origins: {', '.join(sorted(_allowed))}")
+    print(f"[API] Allowed Origins: {', '.join(sorted(_allowed)) or '(none)'}")
+    if _allowed_regex:
+        print(f"[API] Allowed Origin Regex: {_allowed_regex}")
     print(f"[API] Token lifetime (minutes): {settings.token_minutes}")
 
     # Robust DB init with small retry/backoff (helps when pooler/DB is waking up)
