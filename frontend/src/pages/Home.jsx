@@ -12,6 +12,28 @@ import {
 } from "../lib/api.js";
 import { useOwnerMode } from "../lib/owner.js";
 
+/* ------------------------------ Data normalizers ------------------------------ */
+function normalizeHighlight(h = {}) {
+  return {
+    id: h.id,
+    icon: h.icon ?? "💡",
+    titleHtml: h.titleHtml ?? h.title_html ?? h.title ?? "",
+    bodyHtml:  h.bodyHtml  ?? h.body_html  ?? h.description ?? "",
+    sortOrder: h.sortOrder ?? h.sort_order ?? h.position ?? 0,
+    // keep legacy fields around (optional)
+    title: h.title ?? null,
+    description: h.description ?? null,
+    url: h.url ?? null,
+  };
+}
+
+function normalizeHomePayload(home = {}) {
+  return {
+    welcomeHtml: home.welcomeHtml ?? home.welcome_html ?? "",
+    highlights: Array.isArray(home.highlights) ? home.highlights.map(normalizeHighlight) : [],
+  };
+}
+
 /* ------------------------------ Lightweight UI primitives ------------------------------ */
 const Card = ({ children, className = "", isDark = false, ...props }) => (
   <div
@@ -93,7 +115,12 @@ function isTrendingByTags(tags = []) {
   return /ai|bim|mobility|transport|automation/.test(t);
 }
 
-function sanitizePreview(html) {
+/**
+ * Sanitize HTML for preview.
+ * NEW: when forceDark is true, strip inline 'color' and 'background-color'
+ * so dark mode can control text colors.
+ */
+function sanitizePreview(html, { forceDark = false } = {}) {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(`<div>${html || ""}</div>`, "text/html");
@@ -109,7 +136,11 @@ function sanitizePreview(html) {
     };
     const filterStyle = (v="") => v.split(";").map(s=>s.trim()).filter(Boolean).map(d=>{
       const m=d.match(/^(color|background-color|font-size|font-weight|font-style|text-decoration)\s*:\s*([^;]+)$/i);
-      return m?`${m[1].toLowerCase()}: ${m[2].trim()}`:"";
+      if (!m) return "";
+      const prop = m[1].toLowerCase();
+      const val  = m[2].trim();
+      if (forceDark && (prop === "color" || prop === "background-color")) return ""; // strip for dark mode
+      return `${prop}: ${val}`;
     }).filter(Boolean).join("; ");
     const walk=(node)=>{
       [...node.childNodes].forEach((n)=>{
@@ -275,7 +306,7 @@ function useViewMode() {
   return { viewMode, toggleViewMode };
 }
 
-/* ------------------------------ Color Palette ------------------------------ */
+/* ------------------------------ Color Palettes ------------------------------ */
 const COLOR_PALETTE = [
   { name: "Black", value: "#000000", bg: "bg-black" },
   { name: "Gray", value: "#6b7280", bg: "bg-gray-500" },
@@ -298,12 +329,10 @@ const HIGHLIGHT_COLORS = [
   { name: "Orange", value: "#fed7aa", bg: "bg-orange-200" },
 ];
 
-/* ------------------------------ Welcome Editor (with color palette) ------------------------------ */
+/* ------------------------------ Welcome Editor ------------------------------ */
 const LS_WELCOME = "welcomeContentV1";
 
 function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) {
-  const defaultWelcomeText = `<p>I'm a technology-driven Civil Engineer focused on rethinking how we design, build, and optimize infrastructure. With <strong>7+ years</strong> across Japan and Nepal, I've worked on smart-city development, transportation infrastructure, renewable energy, and BIM-driven automation.</p><p>At <strong>Woven by Toyota</strong>, I bridge civil engineering and software with advanced BIM workflows, parametric design, and data-centric automation.</p><p>I'm also deeply curious about <strong>AI and machine learning</strong> in AEC—using data to elevate design accuracy, execution, and decision-making.</p>`;
-  
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showColorPalette, setShowColorPalette] = useState(false);
@@ -312,9 +341,9 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
 
   const [welcomeContent, setWelcomeContent] = useState(() => {
     try {
-      return initialHtml || window.localStorage.getItem(LS_WELCOME) || defaultWelcomeText;
+      return initialHtml || window.localStorage.getItem(LS_WELCOME) || "";
     } catch {
-      return initialHtml || defaultWelcomeText;
+      return initialHtml || "";
     }
   });
 
@@ -351,39 +380,41 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
     if (!range) return false;
     const sel = window.getSelection?.();
     if (!sel) return false;
-    sel.removeAllRanges();
-    sel.addRange(range);
-    return true;
+    try {
+      sel.removeAllRanges();
+      sel.addRange(range.cloneRange());
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const applyInlineStyle = (prop, color) => {
-    if (!restoreSelection()) return;
+    const range = savedRangeRef.current;
+    if (!range || !editorRef.current) return;
     const sel = window.getSelection?.();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    if (range.collapsed) return;
-
+    if (!sel) return;
     try {
-      if (prop === "backgroundColor") document.execCommand("hiliteColor", false, color);
-      else document.execCommand("foreColor", false, color);
-    } catch {}
-    try {
-      const span = document.createElement("span");
-      span.style[prop] = color;
-      const contents = range.extractContents();
-      span.appendChild(contents);
-      range.insertNode(span);
-      const newRange = document.createRange();
-      newRange.setStartAfter(span);
-      newRange.collapse(true);
       sel.removeAllRanges();
-      sel.addRange(newRange);
-      savedRangeRef.current = newRange.cloneRange();
-    } catch {}
+      sel.addRange(range.cloneRange());
+      if (sel.rangeCount === 0 || range.collapsed) return;
+      if (prop === "backgroundColor") {
+        document.execCommand("hiliteColor", false, color);
+      } else {
+        document.execCommand("foreColor", false, color);
+      }
+      if (sel.rangeCount > 0) {
+        savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+      }
+    } catch (e) {
+      console.error("Error applying color:", e);
+    }
   };
 
   const applyColor = (color, isHighlight = false) => {
-    applyInlineStyle(isHighlight ? "backgroundColor" : "color", color);
+    if (savedRangeRef.current && !savedRangeRef.current.collapsed) {
+      applyInlineStyle(isHighlight ? "backgroundColor" : "color", color);
+    }
     setShowColorPalette(false);
   };
 
@@ -393,32 +424,90 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
     setShowColorPalette(false);
   };
 
-  // Fixed paragraph handling
   const handlePaste = (e) => {
     if (!isEditing) return;
     e.preventDefault();
     const text = e.clipboardData?.getData("text/plain") || "";
-    const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim());
-    const html = paragraphs.map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
-    document.execCommand("insertHTML", false, html);
+    const html = e.clipboardData?.getData("text/html") || "";
+    if (html) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html;
+      const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_ELEMENT, null, false);
+      let node;
+      while (node = walker.nextNode()) {
+        if (node.tagName === 'DIV') {
+          const p = document.createElement('p');
+          while (node.firstChild) p.appendChild(node.firstChild);
+          node.parentNode.replaceChild(p, node);
+        }
+      }
+      document.execCommand("insertHTML", false, tempDiv.innerHTML);
+    } else if (text) {
+      const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim());
+      const html2 = paragraphs.map(p => {
+        const lines = p.split('\n').map(line => line.trim()).filter(line => line);
+        return lines.map(line => `<p>${line}</p>`).join('');
+      }).join('');
+      document.execCommand("insertHTML", false, html2);
+    }
   };
 
-  const handleEdit = () => { 
-    if (!ownerMode) return; 
-    setIsEditing(true); 
-    setTimeout(() => editorRef.current?.focus(), 60); 
+  const handleKeyDown = (e) => {
+    if (!isEditing) return;
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      document.execCommand("insertLineBreak", false);
+    }
+  };
+
+  const handleInput = (e) => {
+    if (!isEditing) return;
+    const content = e.target.innerHTML;
+    if (content && !content.includes('<p>') && !content.includes('<ul>') && !content.includes('<ol>')) {
+      const lines = content.split('<br>').filter(line => line.trim());
+      if (lines.length > 0) {
+        const newContent = lines.map(line => `<p>${line}</p>`).join('');
+        e.target.innerHTML = newContent;
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(e.target);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+  };
+
+  const handleEdit = () => {
+    if (!ownerMode) return;
+    setIsEditing(true);
+    setTimeout(() => {
+      if (editorRef.current) {
+        editorRef.current.focus();
+        if (!editorRef.current.innerHTML.trim()) {
+          editorRef.current.innerHTML = '<p><br></p>';
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.setStart(editorRef.current.firstChild, 0);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+    }, 60);
   };
 
   const handleSave = async () => {
     let html = editorRef.current?.innerHTML || "";
-    
-    // Ensure proper paragraph structure
-    if (html && !html.includes('<p>')) {
-      // If no paragraphs, wrap content in paragraphs
-      const lines = html.split('<br>').filter(line => line.trim());
-      html = lines.map(line => `<p>${line.trim()}</p>`).join('');
+    if (html) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html;
+      const hasBlocks = tempDiv.querySelector('p, ul, ol, h1, h2, h3, h4, h5, h6');
+      if (!hasBlocks && tempDiv.textContent.trim()) {
+        const lines = html.split('<br>').map(line => line.trim()).filter(line => line);
+        html = lines.map(line => `<p>${line}</p>`).join('');
+      }
     }
-    
     setWelcomeContent(html);
     try { window.localStorage.setItem(LS_WELCOME, html); } catch {}
     try { await onSaveHtml?.(html); } catch (e) { console.error("Failed to save welcome:", e); }
@@ -477,52 +566,11 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
               🎨
             </button>
             <button onMouseDown={(e)=>e.preventDefault()} onClick={removeFormatting} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>⚪</button>
+            <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyLeft")} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>←</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyCenter")} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>↔</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyRight")} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>→</button>
           </div>
-
-          {showColorPalette && (
-            <div
-              className={`absolute left-0 top-full mt-2 z-50 p-4 rounded-xl border shadow-xl backdrop-blur-md ${isDark ? "bg-slate-800/95 border-slate-700" : "bg-white/95 border-slate-200"}`}
-            >
-              <div className="space-y-4 min-w-[320px]">
-                <div>
-                  <h4 className={`text-sm font-medium mb-2 ${isDark ? "text-slate-200" : "text-slate-700"}`}>Text Colors</h4>
-                  <div className="grid grid-cols-5 gap-2">
-                    {COLOR_PALETTE.map((color) => (
-                      <button
-                        key={color.value}
-                        onMouseDown={(e) => { e.preventDefault(); restoreSelection(); }}
-                        onClick={() => applyColor(color.value)}
-                        className={`w-8 h-8 rounded-lg ${color.bg} hover:scale-110 transition-transform border-2 ${isDark ? "border-slate-600 hover:border-slate-400" : "border-gray-300 hover:border-gray-500"}`}
-                        title={`Apply ${color.name} color`}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <h4 className={`text-sm font-medium mb-2 ${isDark ? "text-slate-200" : "text-slate-700"}`}>Highlight Colors</h4>
-                  <div className="grid grid-cols-6 gap-2">
-                    {HIGHLIGHT_COLORS.map((color) => (
-                      <button
-                        key={color.value}
-                        onMouseDown={(e) => { e.preventDefault(); restoreSelection(); }}
-                        onClick={() => applyColor(color.value, true)}
-                        className={`w-8 h-8 rounded-lg ${color.bg} hover:scale-110 transition-transform border-2 ${isDark ? "border-slate-600 hover:border-slate-400" : "border-gray-300 hover:border-gray-500"}`}
-                        title={`Highlight with ${color.name}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="flex justify-end pt-2 border-t border-slate-600">
-                  <button
-                    onClick={() => setShowColorPalette(false)}
-                    className={`px-3 py-1.5 text-sm rounded-md ${isDark ? "text-slate-300 hover:bg-slate-700" : "text-slate-600 hover:bg-gray-100"}`}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -532,7 +580,9 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
           contentEditable={isEditing}
           suppressContentEditableWarning
           onPaste={handlePaste}
-          className={`text-lg leading-8 outline-none ${
+          onKeyDown={handleKeyDown}
+          onInput={handleInput}
+          className={`text-lg leading-8 outline-none welcome-content ${
             isEditing
               ? `${isDark ? "text-white bg-slate-800 border-slate-600" : "text-slate-800 bg-white border-gray-300"} ring-2 ring-violet-500/50 rounded-lg p-4 border`
               : `${isDark ? "text-white" : "text-slate-800"}`
@@ -564,11 +614,6 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
 
 /* ------------------------------ Highlights ------------------------------ */
 const LS_HIGHLIGHTS = "homeHighlightsV1";
-const DEFAULT_HIGHLIGHTS = [
-  { id: "h-1", icon: "🌐", titleHtml: "Engineering Tomorrow's Infrastructure", bodyHtml: "Smart-city, transportation, and BIM-first automation for efficient, sustainable outcomes." },
-  { id: "h-2", icon: "🧩", titleHtml: "Bridging Civil & Technology", bodyHtml: "Parametric design + data-centric workflows that improve coordination and speed." },
-  { id: "h-3", icon: "🤖", titleHtml: "AI & ML in AEC", bodyHtml: "Data-driven methods to power better design and decisions across the built world." },
-];
 
 const EMOJI_CATEGORIES = {
   Tech: ["🌐", "🧩", "🤖", "⚙️", "🧠", "💡", "🛠️", "💾", "🧰", "💻", "🖥️", "📱"],
@@ -578,7 +623,7 @@ const EMOJI_CATEGORIES = {
   Objects: ["🔧", "🗜️", "🔩", "📦", "🧱", "📎", "🖇️", "✏️", "🖊️", "📝", "📚", "📄"],
 };
 
-/* ------------------------------ Highlight Card ------------------------------ */
+/* ------------------------------ Fixed Highlight Card ------------------------------ */
 function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) {
   const [editing, setEditing] = useState(false);
   const [iconOpen, setIconOpen] = useState(false);
@@ -588,38 +633,34 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
   const bodyRef = useRef(null);
 
   useEffect(() => {
+    if (!editing && titleRef.current) titleRef.current.innerHTML = item.titleHtml || "";
+    if (!editing && bodyRef.current) bodyRef.current.innerHTML = item.bodyHtml || "";
+  }, [item.titleHtml, item.bodyHtml, editing]);
+
+  useEffect(() => {
     if (editing) try {
       document.execCommand("styleWithCSS", false, true);
       document.execCommand("defaultParagraphSeparator", false, "p");
     } catch {}
   }, [editing]);
 
-  const startEdit = () => { 
-    if (!ownerMode) return; 
-    setEditing(true); 
-    setTimeout(() => bodyRef.current?.focus(), 80); 
-  };
+  const startEdit = () => { if (!ownerMode) return; setEditing(true); setTimeout(() => bodyRef.current?.focus(), 80); };
 
   const saveEdit = () => {
-    const newItem = { 
-      ...item, 
-      titleHtml: titleRef.current?.innerHTML || "", 
-      bodyHtml: bodyRef.current?.innerHTML || "" 
-    };
-    onChange(newItem);
-    setEditing(false); 
-    setIconOpen(false);
+    const titleContent = titleRef.current?.innerHTML || "";
+    const bodyContent = bodyRef.current?.innerHTML || "";
+    onChange({ ...item, titleHtml: titleContent, bodyHtml: bodyContent });
+    setEditing(false); setIconOpen(false);
   };
 
   const cancelEdit = () => {
     if (titleRef.current) titleRef.current.innerHTML = item.titleHtml || "";
     if (bodyRef.current) bodyRef.current.innerHTML = item.bodyHtml || "";
-    setEditing(false); 
-    setIconOpen(false);
+    setEditing(false); setIconOpen(false);
   };
 
   const escapeHtml = (s) => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  
+
   const handlePasteTitle = (e) => {
     if (!editing) return;
     e.preventDefault();
@@ -627,7 +668,7 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
     const html = escapeHtml(text).replace(/\s+/g, " ");
     document.execCommand("insertHTML", false, html);
   };
-  
+
   const handlePasteBody = (e) => {
     if (!editing) return;
     e.preventDefault();
@@ -639,20 +680,23 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
   const stopBubble = (e) => e.stopPropagation();
   const gradient = isDark ? DARK_UI_GRADIENT : UI_GRADIENT;
 
+  const displayTitle = item.titleHtml || "Untitled";
+  const displayBody = item.bodyHtml || "No description available";
+
   return (
     <>
       <div className="relative group h-full">
         {ownerMode && !editing && (
           <div className="absolute right-3 top-3 z-20 opacity-0 group-hover:opacity-100 transition-all">
             <div className="flex gap-2">
-              <button 
-                onClick={startEdit} 
+              <button
+                onClick={startEdit}
                 className={`text-xs px-3 py-1.5 rounded-lg backdrop-blur border font-medium ${isDark ? "bg-slate-800/80 border-white/10 text-white" : "bg-white/80 border-white/20 text-slate-700"}`}
               >
                 ✏️ Edit
               </button>
-              <button 
-                onClick={() => onDelete(item.id)} 
+              <button
+                onClick={() => onDelete(item.id)}
                 className={`text-xs px-3 py-1.5 rounded-lg backdrop-blur border font-medium ${isDark ? "bg-slate-800/80 border-white/10 text-white hover:bg-red-900/30" : "bg-white/80 border-white/20 text-slate-700 hover:bg-red-50"}`}
               >
                 🗑️ Delete
@@ -663,14 +707,14 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
 
         <Card
           isDark={isDark}
-          className={`relative p-6 h-[280px] transition-all duration-300 hover:shadow-lg hover:-translate-y-1 rounded-2xl border-0 shadow-md ${isDark ? "bg-slate-800/50" : "bg-white/70"} backdrop-blur-sm flex flex-col`}
+          className={`relative p-6 h-[300px] w-[340px] transition-all duration-300 hover:shadow-lg hover:-translate-y-1 rounded-2xl border-0 shadow-md ${isDark ? "bg-slate-800/50" : "bg-white/70"} backdrop-blur-sm flex flex-col flex-shrink-0`}
         >
           <div className="relative z-10 flex-1 flex flex-col min-h-0">
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-4 mb-3">
               <div className="relative flex-shrink-0">
                 <button
                   type="button"
-                  className={`text-4xl transition-all p-2 rounded-xl ${ownerMode ? "hover:scale-110" : ""} ${isDark ? "hover:bg-slate-700" : "hover:bg-slate-100"}`}
+                  className={`text-3xl transition-all p-2 rounded-xl ${ownerMode ? "hover:scale-110" : ""} ${isDark ? "hover:bg-slate-700" : "hover:bg-slate-100"}`}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={(e) => { e.stopPropagation(); ownerMode && setIconOpen((v) => !v); }}
                   aria-label="Choose icon"
@@ -690,8 +734,8 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                         <button
                           key={cat}
                           className={`px-3 py-1.5 text-sm font-medium rounded-lg whitespace-nowrap ${
-                            selectedCategory === cat 
-                              ? `bg-gradient-to-r ${gradient} text-white` 
+                            selectedCategory === cat
+                              ? `bg-gradient-to-r ${gradient} text-white`
                               : `${isDark ? "text-white/80 hover:bg-slate-700" : "text-slate-600 hover:bg-slate-100"}`
                           }`}
                           onClick={() => setSelectedCategory(cat)}
@@ -705,10 +749,10 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                         <button
                           key={emo}
                           className={`h-12 w-12 grid place-items-center text-2xl rounded-xl ${isDark ? "hover:bg-slate-700" : "hover:bg-slate-100"}`}
-                          onClick={() => { 
+                          onClick={() => {
                             const newItem = { ...item, icon: emo };
-                            onChange(newItem); 
-                            setIconOpen(false); 
+                            onChange(newItem);
+                            setIconOpen(false);
                           }}
                         >
                           {emo}
@@ -720,39 +764,46 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
               </div>
 
               <div className="flex-1 min-w-0">
-                <div
-                  ref={titleRef}
-                  contentEditable={editing}
-                  suppressContentEditableWarning
-                  onPaste={handlePasteTitle}
-                  className={`text-xl font-bold leading-tight outline-none ${
-                    editing 
-                      ? `ring-2 ring-violet-500/50 rounded-lg px-2 py-1 ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-800"}` 
-                      : "bg-clip-text text-transparent bg-gradient-to-r " + gradient
-                  }`}
-                  dangerouslySetInnerHTML={{ __html: item.titleHtml || "" }}
-                />
-                <div className={`mt-2 h-1 w-20 rounded-full bg-gradient-to-r ${gradient} opacity-60`} />
+                {editing ? (
+                  <div
+                    ref={titleRef}
+                    contentEditable={true}
+                    suppressContentEditableWarning
+                    onPaste={handlePasteTitle}
+                    className={`text-lg font-bold leading-tight outline-none ring-2 ring-violet-500/50 rounded-lg px-2 py-1 ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-800"}`}
+                    dangerouslySetInnerHTML={{ __html: item.titleHtml || "" }}
+                  />
+                ) : (
+                  <h3
+                    className={`text-lg font-bold leading-tight bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}
+                    dangerouslySetInnerHTML={{ __html: displayTitle }}
+                  />
+                )}
+                <div className={`mt-2 h-1 w-16 rounded-full bg-gradient-to-r ${gradient} opacity-60`} />
               </div>
             </div>
 
-            <div className="mt-4 flex-1 min-h-0 flex flex-col">
-              <div
-                ref={bodyRef}
-                contentEditable={editing}
-                suppressContentEditableWarning
-                onPaste={handlePasteBody}
-                onWheel={stopBubble}
-                onMouseDown={stopBubble}
-                onTouchStart={stopBubble}
-                className={`relative z-10 text-sm leading-7 outline-none flex-1 min-h-0 overflow-y-auto pr-1 ${
-                  editing
-                    ? `ring-2 ring-violet-500/50 rounded-lg p-3 ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-700"}`
-                    : `${isDark ? "text-white" : "text-slate-600"}`
-                }`}
-                style={{ textAlign: "justify" }}
-                dangerouslySetInnerHTML={{ __html: item.bodyHtml || "" }}
-              />
+            <div className="flex-1 min-h-0 flex flex-col">
+              {editing ? (
+                <div
+                  ref={bodyRef}
+                  contentEditable={true}
+                  suppressContentEditableWarning
+                  onPaste={handlePasteBody}
+                  onWheel={stopBubble}
+                  onMouseDown={stopBubble}
+                  onTouchStart={stopBubble}
+                  className={`relative z-10 text-sm leading-6 outline-none flex-1 min-h-0 overflow-y-auto pr-1 ring-2 ring-violet-500/50 rounded-lg p-3 ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-700"}`}
+                  style={{ textAlign: "justify" }}
+                  dangerouslySetInnerHTML={{ __html: item.bodyHtml || "" }}
+                />
+              ) : (
+                <div
+                  className={`relative z-10 text-sm leading-6 flex-1 min-h-0 overflow-y-auto pr-1 ${isDark ? "text-white" : "text-slate-600"}`}
+                  style={{ textAlign: "justify" }}
+                  dangerouslySetInnerHTML={{ __html: displayBody }}
+                />
+              )}
 
               <div className="pt-3 flex justify-end">
                 {!editing ? (
@@ -772,38 +823,26 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                   </button>
                 ) : (
                   <div className="flex gap-2">
-                    <button 
-                      onClick={() => document.execCommand("bold")} 
-                      className={`p-2 rounded text-sm font-bold ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200"}`}
+                    <button
+                      onClick={() => document.execCommand("bold")}
+                      className={`p-2 rounded text-sm font-bold ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200 text-slate-700"}`}
                     >
                       B
                     </button>
-                    <button 
-                      onClick={() => document.execCommand("italic")} 
-                      className={`p-2 rounded text-sm italic ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200"}`}
+                    <button
+                      onClick={() => document.execCommand("italic")}
+                      className={`p-2 rounded text-sm italic ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200 text-slate-700"}`}
                     >
                       I
                     </button>
-                    <button 
-                      onClick={() => document.execCommand("insertUnorderedList")} 
-                      className={`p-2 rounded text-sm ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200"}`}
-                    >
-                      •
-                    </button>
-                    <button 
-                      onClick={() => document.execCommand("insertOrderedList")} 
-                      className={`p-2 rounded text-sm ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200"}`}
-                    >
-                      1
-                    </button>
-                    <button 
-                      onClick={saveEdit} 
+                    <button
+                      onClick={saveEdit}
                       className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-sm font-medium"
                     >
                       Save
                     </button>
-                    <button 
-                      onClick={cancelEdit} 
+                    <button
+                      onClick={cancelEdit}
                       className={`px-3 py-1.5 rounded-md text-sm font-medium ${isDark ? "bg-slate-600 text-white" : "bg-slate-100 text-slate-700"}`}
                     >
                       Cancel
@@ -827,21 +866,21 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                 <span className="text-3xl">{item.icon || "💡"}</span>
                 <div
                   className={`text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${isDark ? DARK_UI_GRADIENT : UI_GRADIENT}`}
-                  dangerouslySetInnerHTML={{ __html: item.titleHtml || "" }}
+                  dangerouslySetInnerHTML={{ __html: displayTitle }}
                 />
               </div>
-              <button 
-                className={`h-10 w-10 grid place-items-center rounded-full ${isDark ? "hover:bg-slate-700 text-white" : "hover:bg-slate-100 text-slate-700"}`} 
+              <button
+                className={`h-10 w-10 grid place-items-center rounded-full ${isDark ? "hover:bg-slate-700 text-white" : "hover:bg-slate-100 text-slate-700"}`}
                 onClick={() => setShowModal(false)}
               >
                 ✕
               </button>
             </div>
             <div className="p-6">
-              <div 
-                className={`prose prose-lg max-w-none leading-8 ${isDark ? "text-white" : "text-slate-700"}`} 
-                style={{ textAlign: "justify" }} 
-                dangerouslySetInnerHTML={{ __html: item.bodyHtml || "" }} 
+              <div
+                className={`prose prose-lg max-w-none leading-8 ${isDark ? "text-white [&_*]:text-white" : "text-slate-700"}`}
+                style={{ textAlign: "justify" }}
+                dangerouslySetInnerHTML={{ __html: displayBody }}
               />
             </div>
           </div>
@@ -855,15 +894,15 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
 function EnhancedAddHighlightCard({ onAdd, ownerMode, isDark }) {
   if (!ownerMode) return null;
   return (
-    <button 
-      onClick={onAdd} 
-      className="snap-center inline-block min-w-[320px] text-left group focus:outline-none" 
-      type="button" 
+    <button
+      onClick={onAdd}
+      className="snap-center inline-block flex-shrink-0 text-left group focus:outline-none"
+      type="button"
       aria-label="Add section"
     >
-      <Card 
-        isDark={isDark} 
-        className={`p-6 h-[280px] border-2 border-dashed rounded-2xl grid place-items-center transition-all hover:scale-[1.02] ${isDark ? "border-slate-600 hover:border-slate-500 bg-slate-800/30" : "border-slate-300 hover:border-slate-400 bg-slate-50/50"}`}
+      <Card
+        isDark={isDark}
+        className={`p-6 h-[300px] w-[340px] border-2 border-dashed rounded-2xl grid place-items-center transition-all hover:scale-[1.02] ${isDark ? "border-slate-600 hover:border-slate-500 bg-slate-800/30" : "border-slate-300 hover:border-slate-400 bg-slate-50/50"}`}
       >
         <div className="flex flex-col items-center gap-3">
           <div className={`text-4xl p-3 rounded-full ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-600"}`}>
@@ -926,57 +965,31 @@ export default function Home() {
   const [highlights, setHighlights] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Load server data (welcome + highlights) with better error handling
+  // Load server data (welcome + highlights)
   useEffect(() => {
     let mounted = true;
-    
+
     const loadHomeData = async () => {
       try {
-        console.log("Loading home data...");
-        const home = await getHome();
-        
+        const homeRaw = await getHome();
         if (!mounted) return;
-        
-        if (home?.welcomeHtml) {
-          console.log("Loaded welcome HTML:", home.welcomeHtml.substring(0, 100) + "...");
-          setWelcomeHtml(home.welcomeHtml);
-        }
-        
-        if (Array.isArray(home?.highlights) && home.highlights.length > 0) {
-          console.log("Loaded highlights:", home.highlights.length);
-          setHighlights(home.highlights);
-        } else {
-          console.log("No highlights from server, using defaults");
-          setHighlights(DEFAULT_HIGHLIGHTS);
-        }
+        const home = normalizeHomePayload(homeRaw);
+        setWelcomeHtml(home.welcomeHtml);
+        setHighlights(home.highlights);
       } catch (e) {
-        console.warn("API failed, falling back to local storage:", e);
+        // Fallback to local
         if (!mounted) return;
-        
         try {
           const localWelcome = localStorage.getItem(LS_WELCOME);
-          if (localWelcome) {
-            console.log("Using local welcome");
-            setWelcomeHtml(localWelcome);
-          }
-          
+          setWelcomeHtml(localWelcome || "");
           const localHighlights = localStorage.getItem(LS_HIGHLIGHTS);
-          if (localHighlights) {
-            const parsed = JSON.parse(localHighlights);
-            console.log("Using local highlights:", parsed.length);
-            setHighlights(parsed);
-          } else {
-            console.log("Using default highlights");
-            setHighlights(DEFAULT_HIGHLIGHTS);
-          }
-        } catch (localError) {
-          console.error("Local storage failed, using defaults:", localError);
-          setHighlights(DEFAULT_HIGHLIGHTS);
+          const parsed = localHighlights ? JSON.parse(localHighlights) : [];
+          setHighlights(Array.isArray(parsed) ? parsed.map(normalizeHighlight) : []);
+        } catch {
+          setHighlights([]);
         }
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       }
     };
 
@@ -991,8 +1004,7 @@ export default function Home() {
       try {
         const pj = await getProjects();
         if (mounted) setProjects(Array.isArray(pj) ? pj : (pj?.items || []));
-      } catch (error) { 
-        console.error("Failed to load projects:", error); 
+      } catch {
         if (mounted) setProjects([]);
       }
     })();
@@ -1034,24 +1046,16 @@ export default function Home() {
           .sort((a, b) => new Date(b.createdAt || b.updatedAt || 0) - new Date(a.createdAt || a.updatedAt || 0));
 
         if (mounted) setPosts(merged.slice(0, 12));
-      } catch (error) {
-        console.error("Failed to load posts:", error);
+      } catch {
         if (mounted) setPosts([]);
       }
     })();
     return () => { mounted = false; };
   }, []);
 
-  // Persist highlights locally too (nice fallback)
+  // Persist normalized highlights locally
   useEffect(() => {
-    if (highlights.length > 0) {
-      try { 
-        window.localStorage.setItem(LS_HIGHLIGHTS, JSON.stringify(highlights)); 
-        console.log("Saved highlights to localStorage:", highlights.length);
-      } catch (e) {
-        console.error("Failed to save highlights to localStorage:", e);
-      }
-    }
+    try { window.localStorage.setItem(LS_HIGHLIGHTS, JSON.stringify(highlights.map(normalizeHighlight))); } catch {}
   }, [highlights]);
 
   // Handlers -> DB
@@ -1059,56 +1063,36 @@ export default function Home() {
     try {
       await apiSaveWelcome(html);
       setWelcomeHtml(html);
-      console.log("Welcome saved successfully");
-    } catch (e) {
-      console.error("Failed to save welcome to server:", e);
-      // Still update local state
+    } catch {
       setWelcomeHtml(html);
     }
   };
 
   const addHighlight = async () => {
-    const draft = { 
-      icon: "💡", 
-      titleHtml: "New highlight", 
-      bodyHtml: "<p>Describe your highlight…</p>", 
-      position: (highlights?.length || 0) + 1 
+    const draft = {
+      icon: "💡",
+      titleHtml: "New highlight",
+      bodyHtml: "<p>Describe your highlight…</p>",
+      position: (highlights?.length || 0) + 1
     };
-    
     try {
       const created = await apiCreateHighlight(draft);
-      const newHighlight = created || { ...draft, id: `h-${Date.now()}` };
+      const newHighlight = created ? normalizeHighlight(created) : { ...draft, id: `h-${Date.now()}` };
       setHighlights((prev) => [...prev, newHighlight]);
-      console.log("Highlight created:", newHighlight);
-    } catch (e) {
-      console.error("Create highlight failed, using local:", e);
+    } catch {
       const localHighlight = { ...draft, id: `h-${Date.now()}` };
       setHighlights((prev) => [...prev, localHighlight]);
     }
   };
 
   const updateHighlightOnServer = async (next) => {
-    // Optimistically update UI first
-    setHighlights((prev) => prev.map((h) => (h.id === next.id ? next : h)));
-    
-    try { 
-      await apiUpdateHighlight(next.id, next); 
-      console.log("Highlight updated:", next.id);
-    } catch (e) { 
-      console.error("Update highlight failed:", e); 
-    }
+    setHighlights((prev) => prev.map((h) => (h.id === next.id ? normalizeHighlight(next) : h)));
+    try { await apiUpdateHighlight(next.id, next); } catch {}
   };
 
   const deleteHighlightOnServer = async (id) => {
-    // Optimistically update UI first
     setHighlights((prev) => prev.filter((h) => h.id !== id));
-    
-    try { 
-      await apiDeleteHighlight(id); 
-      console.log("Highlight deleted:", id);
-    } catch (e) { 
-      console.error("Delete highlight failed:", e); 
-    }
+    try { await apiDeleteHighlight(id); } catch {}
   };
 
   const hiRow = useHRow();
@@ -1117,7 +1101,6 @@ export default function Home() {
 
   const gradient = isDark ? DARK_UI_GRADIENT : UI_GRADIENT;
 
-  // Add loading state
   if (loading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${isDark ? "bg-slate-900 text-white" : "bg-gray-50 text-slate-900"}`}>
@@ -1140,18 +1123,37 @@ export default function Home() {
         .animate-fade-in { animation: fadeIn 0.6s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-        [contenteditable] ul { list-style: disc outside; padding-left: 1.25rem; margin: 0.25rem 0; }
-        [contenteditable] ol { list-style: decimal outside; padding-left: 1.75rem; margin: 0.25rem 0; }
-        [contenteditable] li { margin: 0.125rem 0; }
-        [contenteditable] p { margin: 0.5rem 0; }
+        [contenteditable] ul { list-style: disc outside; padding-left: 1.25rem; margin: 0.5rem 0; }
+        [contenteditable] ol { list-style: decimal outside; padding-left: 1.75rem; margin: 0.5rem 0; }
+        [contenteditable] li { margin: 0.25rem 0; }
+        [contenteditable] p { margin: 0.75rem 0; }
+        [contenteditable] p:first-child { margin-top: 0; }
+        [contenteditable] p:last-child { margin-bottom: 0; }
         [contenteditable]:focus { outline: none; }
-        
+
         /* Enhanced welcome section styling */
         .welcome-content p { margin-bottom: 1rem; line-height: 1.7; }
         .welcome-content p:last-child { margin-bottom: 0; }
-        
+        .welcome-content ul, .welcome-content ol { margin: 1rem 0; }
+        .welcome-content li { margin: 0.25rem 0; }
+
         /* Font system improvements */
         .font-sans { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+
+        /* Force white text for anything we mark as force-dark */
+        .dark .force-dark * { color: white !important; }
+
+        /* Also force any slate backgrounds to white text in dark */
+        .dark .bg-slate-800 *, .dark .bg-slate-800\\/50 *, .dark .bg-slate-800\\/60 * {
+          color: white !important;
+        }
+
+        /* Keep gradient text transparent in dark so gradient shows through */
+        .dark .bg-clip-text.text-transparent {
+          color: transparent !important;
+          background-clip: text;
+          -webkit-background-clip: text;
+        }
       `}</style>
 
       <ControlPanel isDark={isDark} toggleTheme={toggleTheme} viewMode={viewMode} toggleViewMode={toggleViewMode} />
@@ -1173,16 +1175,16 @@ export default function Home() {
           </h3>
           {hiRow.hasOverflow && (
             <div className="flex items-center gap-2">
-              <button 
-                onClick={() => hiRow.scrollBy(-1)} 
-                className={`h-9 w-9 grid place-items-center rounded-full transition-colors ${isDark ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-700"}`} 
+              <button
+                onClick={() => hiRow.scrollBy(-1)}
+                className={`h-9 w-9 grid place-items-center rounded-full transition-colors ${isDark ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-700"}`}
                 aria-label="Scroll left"
               >
                 ◀
               </button>
-              <button 
-                onClick={() => hiRow.scrollBy(1)}  
-                className={`h-9 w-9 grid place-items-center rounded-full transition-colors ${isDark ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-700"}`} 
+              <button
+                onClick={() => hiRow.scrollBy(1)}
+                className={`h-9 w-9 grid place-items-center rounded-full transition-colors ${isDark ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-700"}`}
                 aria-label="Scroll right"
               >
                 ▶
@@ -1191,51 +1193,42 @@ export default function Home() {
           )}
         </div>
 
-        {highlights.length > 0 ? (
-          <>
-            <div
-              ref={hiRow.rowRef}
-              className="flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory"
-              style={{ scrollBehavior: "smooth" }}
-              onMouseDown={hiRow.onMouseDown} 
-              onMouseMove={hiRow.onMouseMove} 
-              onMouseUp={hiRow.onMouseUp} 
-              onMouseLeave={hiRow.onMouseLeave}
-              onTouchStart={hiRow.onTouchStart} 
-              onTouchMove={hiRow.onTouchMove} 
-              onTouchEnd={hiRow.onTouchEnd}
-              onKeyDown={hiRow.onKey} 
-              onScroll={hiRow.onScroll} 
-              tabIndex={0}
-              aria-label="Highlights carousel"
-            >
-              {highlights.map((h) => (
-                <div key={h.id} className="snap-center min-w-[320px]">
-                  <EnhancedHighlightCard
-                    item={h}
-                    onChange={updateHighlightOnServer}
-                    onDelete={deleteHighlightOnServer}
-                    ownerMode={!!ownerMode}
-                    isDark={isDark}
-                  />
-                </div>
-              ))}
-              <EnhancedAddHighlightCard onAdd={addHighlight} ownerMode={!!ownerMode} isDark={isDark} />
-            </div>
-
-            <div className={`mt-3 h-1 w-full rounded ${isDark ? "bg-slate-700" : "bg-slate-200"}`}>
-              <div 
-                className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded transition-all duration-300" 
-                style={{ width: `${hiRow.progress}%` }} 
+        <div
+          ref={hiRow.rowRef}
+          className="flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory"
+          style={{ scrollBehavior: "smooth" }}
+          onMouseDown={hiRow.onMouseDown}
+          onMouseMove={hiRow.onMouseMove}
+          onMouseUp={hiRow.onMouseUp}
+          onMouseLeave={hiRow.onMouseLeave}
+          onTouchStart={hiRow.onTouchStart}
+          onTouchMove={hiRow.onTouchMove}
+          onTouchEnd={hiRow.onTouchEnd}
+          onKeyDown={hiRow.onKey}
+          onScroll={hiRow.onScroll}
+          tabIndex={0}
+          aria-label="Highlights carousel"
+        >
+          {highlights.map((h) => (
+            <div key={h.id} className="snap-center">
+              <EnhancedHighlightCard
+                item={h}
+                onChange={updateHighlightOnServer}
+                onDelete={deleteHighlightOnServer}
+                ownerMode={!!ownerMode}
+                isDark={isDark}
               />
             </div>
-          </>
-        ) : (
-          <div className="flex items-center justify-center py-12">
-            <p className={`text-sm ${isDark ? "text-white/60" : "text-slate-400"}`}>
-              No highlights yet. 
-              {ownerMode && <button onClick={addHighlight} className="ml-2 text-violet-500 hover:text-violet-600">Add your first highlight</button>}
-            </p>
+          ))}
+          {ownerMode && <EnhancedAddHighlightCard onAdd={addHighlight} ownerMode={!!ownerMode} isDark={isDark} />}
+        </div>
+
+        {hiRow.hasOverflow && (
+          <div className={`mt-3 h-1 w-full rounded ${isDark ? "bg-slate-700" : "bg-slate-200"}`}>
+            <div
+              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded transition-all duration-300"
+              style={{ width: `${hiRow.progress}%` }}
+            />
           </div>
         )}
       </section>
@@ -1305,9 +1298,9 @@ export default function Home() {
 
         {viewMode !== "grid" && (
           <div className={`mt-3 h-1 w-full rounded ${isDark ? "bg-slate-700" : "bg-slate-200"}`}>
-            <div 
-              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded transition-all duration-300" 
-              style={{ width: `${poRow.progress}%` }} 
+            <div
+              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded transition-all duration-300"
+              style={{ width: `${poRow.progress}%` }}
             />
           </div>
         )}
@@ -1364,11 +1357,15 @@ function ProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo, isProj
                 {isProject && <div className="flex gap-2 flex-wrap">{badges.map(([emo,label]) => <span key={emo+label} title={label} className="text-lg">{emo}</span>)}</div>}
               </div>
               {isProject && it.summary && (
-                <p className={`text-sm leading-6 clamp-3 ${isDark ? "text-white/90" : "text-slate-600"}`} dangerouslySetInnerHTML={{ __html: sanitizePreview(it.summary) }} />
+                <p
+                  className={`text-sm leading-6 clamp-3 ${isDark ? "text-white force-dark" : "text-slate-600"}`}
+                  dangerouslySetInnerHTML={{ __html: sanitizePreview(it.summary, { forceDark: isDark }) }}
+                />
               )}
               {isProject && (
-                <div className={`text-xs font-medium ${isDark ? "text-white/70" : "text-slate-500"}`}>
-                  Updated {it.updatedAt ? new Date(it.updatedAt).toLocaleDateString() : (it.createdAt ? new Date(it.createdAt).toLocaleDateString() : "—")}
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex gap-2">{badges.map(([emo,label])=> <span key={emo+label} title={label} className="text-lg">{emo}</span>)}</div>
+                  <span className={`text-xs px-3 py-1.5 rounded-md font-medium ${isDark ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-700"}`}>Read more →</span>
                 </div>
               )}
             </div>
@@ -1397,7 +1394,7 @@ function PostsRow({ isDark, poRow, posts, navigate, viewMode }) {
     >
       {(posts || []).map((post) => {
         const badges = postBadges(post);
-        const html = sanitizePreview(post.bodyHtml || post.content || "");
+        const html = sanitizePreview(post.bodyHtml || post.content || "", { forceDark: isDark });
         const snippet = snippetHtml(html, 320);
 
         const goBlog = () => { if (viewMode !== "grid" && !poRow.canClick()) return; navigate("/blog", { state: { focusId: post.id || post.slug || null } }); };
@@ -1418,7 +1415,7 @@ function PostsRow({ isDark, poRow, posts, navigate, viewMode }) {
               <div className={`text-xs font-medium ${isDark ? "text-white/70" : "text-slate-500"}`}>
                 {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : (post.updatedAt ? new Date(post.updatedAt).toLocaleDateString() : "")}
               </div>
-              <div className={`text-sm leading-6 clamp-5 ${isDark ? "text-white/90" : "text-slate-600"}`} dangerouslySetInnerHTML={{ __html: snippet }} />
+              <div className={`text-sm leading-6 clamp-5 ${isDark ? "text-white force-dark" : "text-slate-600"}`} dangerouslySetInnerHTML={{ __html: snippet }} />
               <div className="flex items-center justify-between pt-2">
                 <div className="flex gap-2">{badges.map(([emo,label])=> <span key={emo+label} title={label} className="text-lg">{emo}</span>)}</div>
                 <span className={`text-xs px-3 py-1.5 rounded-md font-medium ${isDark ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-700"}`}>Read more →</span>
