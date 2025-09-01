@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, UploadFile, File, Form, Depends, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse  # ← added PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from typing import Optional
 import os
@@ -10,13 +10,11 @@ import orjson
 
 from .config import settings
 from .db import init_pool, pool
-from .routes import home
 from .auth import create_owner_token, get_current_user, require_owner
 
 from .routes import (
     posts, projects, profile, experience, education, skills, languages,
-    certificates_gallery, contact, proxy, health, upload,
-    home,  # ← already added here
+    certificates_gallery, contact, proxy, health, upload, home
 )
 
 def orjson_dumps(v, *, default):
@@ -39,7 +37,7 @@ _allowed = {
     if isinstance(o, str) and o.strip()
 }
 
-# Optional regex (e.g., to allow all Vercel previews: https://.*\.vercel\.app)
+# Optional regex (e.g., allow all Vercel previews: https://.*\.vercel\.app)
 _allowed_regex = getattr(settings, "allowed_origin_regex", None)
 
 cors_common = dict(
@@ -62,14 +60,14 @@ else:
     )
 # --------------------------------------------------------------------
 
-# web root for uploads
+# Web root for uploads
 webroot = settings.web_root or os.path.join(os.path.dirname(__file__), "..", "uploads")
 webroot = os.path.abspath(webroot)
 os.makedirs(webroot, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=webroot), name="uploads")
 
 # ----------------------------- Root route ---------------------------
-# Avoid 404s on "/" and on HEAD probes
+# Fast, DB-free route so Render's health check doesn't block on DB
 @app.api_route("/", methods=["GET", "HEAD"])
 async def _root():
     return PlainTextResponse("ok")
@@ -78,7 +76,6 @@ async def _root():
 # Exception handler: dev-friendly JSON
 @app.exception_handler(Exception)
 async def all_exception_handler(request: Request, exc: Exception):
-    # In production you might hide details; here we show minimal details
     return JSONResponse(
         status_code=500,
         content={"error": "Internal Server Error", "path": str(request.url.path), "detail": str(exc)},
@@ -97,12 +94,29 @@ app.include_router(certificates_gallery.router)
 app.include_router(contact.router)
 app.include_router(proxy.router)
 app.include_router(upload.router)
-app.include_router(home.router)  # keep this one
-# (Removed duplicate include at the very end)
+app.include_router(home.router)
 
 def _mask_dsn(dsn: str) -> str:
     # postgresql://user:pass@host:port/db -> mask pass
     return re.sub(r"://([^:@/]+):([^@]+)@", r"://\1:***@", dsn or "")
+
+# ===== Non-blocking DB initialization =====
+DB_INIT_TASK = None
+
+async def _init_pool_background():
+    """Initialize DB pool without blocking server port binding."""
+    attempts = 20
+    delay_sec = 3
+    for i in range(1, attempts + 1):
+        try:
+            await init_pool(settings.database_url)
+            print("[API] DB pool initialized ✅")
+            return
+        except Exception as e:
+            print("[API] DB connect attempt {}/{} failed: {}: {}".format(
+                i, attempts, e.__class__.__name__, e))
+            await asyncio.sleep(delay_sec)
+    print("[API] DB init gave up after {} attempts".format(attempts))
 
 @app.on_event("startup")
 async def _startup():
@@ -115,21 +129,23 @@ async def _startup():
         print(f"[API] Allowed Origin Regex: {_allowed_regex}")
     print(f"[API] Token lifetime (minutes): {settings.token_minutes}")
 
-    # Robust DB init with small retry/backoff (helps when pooler/DB is waking up)
-    attempts = 5
-    for i in range(1, attempts + 1):
-        try:
-            await init_pool(settings.database_url)
-            print("[API] DB pool initialized ✅")
-            break
-        except Exception as e:
-            print(f"[API] DB connect attempt {i}/{attempts} failed: {e.__class__.__name__}: {e}")
-            if i == attempts:
-                # Re-raise so startup fails loudly after final attempt
-                raise
-            await asyncio.sleep(2 * i)  # backoff: 2s, 4s, 6s, ...
+    # Kick off DB init in the background so the app can bind $PORT immediately
+    global DB_INIT_TASK
+    DB_INIT_TASK = asyncio.create_task(_init_pool_background())
 
-# Auth endpoints (owner)
+# Optional: readiness that reflects DB status (still cheap)
+@app.get("/api/health/ready", response_class=PlainTextResponse)
+async def _ready():
+    # If your pool object exposes a ping, use that; otherwise just report presence
+    try:
+        if pool is None:
+            return PlainTextResponse("starting", status_code=503)
+        # You can add a lightweight ping here if your pool supports it
+        return PlainTextResponse("ok")
+    except Exception as e:
+        return PlainTextResponse("error: {}".format(e), status_code=503)
+
+# -------- Auth endpoints (owner) --------
 auth_router = APIRouter()
 
 @auth_router.post("/api/auth/owner")
@@ -147,4 +163,4 @@ async def auth_me(user = Depends(get_current_user)):
     return {"ok": True, "claims": claims}
 
 app.include_router(auth_router)
-# (Duplicate app.include_router(home.router) removed)
+app.include_router(home.router)
