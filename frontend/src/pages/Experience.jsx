@@ -124,40 +124,120 @@ function humanDuration(start, end) {
   return `${m} mo`;
 }
 
-/* Enhanced markdown conversion with better HTML structure */
+/* ---- NEW: remove pasted highlight/background + inline colors ---- */
+function stripHighlights(html) {
+  if (!html) return "";
+  let out = String(html);
+
+  // remove <mark>
+  out = out.replace(/<\/?mark[^>]*>/gi, "");
+
+  // drop inline color/background styles
+  out = out.replace(/style="([^"]*)"/gi, (_, styles) => {
+    const filtered = styles
+      .split(";")
+      .map((r) => r.trim())
+      .filter(Boolean)
+      .filter((r) => {
+        const prop = r.split(":")[0]?.trim().toLowerCase();
+        if (!prop) return false;
+        if (prop.startsWith("background")) return false;
+        if (prop === "color" || prop.endsWith("color")) return false;
+        return true;
+      })
+      .join("; ");
+    return filtered ? `style="${filtered}"` : "";
+  });
+
+  // remove obvious highlight-ish classes
+  out = out.replace(/class="([^"]*)"/gi, (_, cls) => {
+    const keep = cls
+      .split(/\s+/)
+      .filter((c) => !/^(?:bg-|highlight|ql-background|marker)/i.test(c))
+      .join(" ");
+    return keep ? `class="${keep}"` : "";
+  });
+
+  return out;
+}
+
+/* ---- NEW: convert bullet-like <p>… into true <ul><li>… for pasted HTML ---- */
+function fixBulletsInHtml(html) {
+  if (!html) return "";
+  let s = String(html);
+
+  // turn <p>• text</p>  or  <p>- text</p> / <p>* text</p>  into LI
+  s = s.replace(/<p[^>]*>\s*(?:•|·|-|\*)\s+([\s\S]*?)<\/p>/gi, '<li class="experience-list-item">$1</li>');
+
+  // if the HTML has no UL at all, wrap consecutive LIs into a UL
+  if (!/<ul[^>]*>/i.test(s)) {
+    s = s.replace(/(?:\s*<li class="experience-list-item">[\s\S]*?<\/li>)+/gi, (m) => `<ul class="experience-list">${m}</ul>`);
+  }
+
+  return s;
+}
+
+/* Enhanced markdown conversion with proper list handling */
 function mdLiteToHtml(text) {
   if (!text) return "";
   if (/<[^>]+>/.test(text)) return text;
-  
+
   const safe = String(text).trim();
   if (!safe) return "";
-  
-  const lines = safe.split(/\r?\n/).filter((l) => l.trim() !== "");
+
+  const lines = safe.split(/\r?\n/);
   if (!lines.length) return "";
-  
-  const isUL = lines.every((l) => /^(-|\*|•)\s+/.test(l.trim()));
-  const isOL = lines.every((l) => /^\d+[.)]\s+/.test(l.trim()));
-  
-  const inline = (s) => s
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/`(.+?)`/g, "<code>$1</code>");
-  
-  if (isUL) {
-    return `<ul class="experience-list">${lines.map((l) => 
-      `<li class="experience-list-item">${inline(l.trim().replace(/^(-|\*|•)\s+/, ""))}</li>`
-    ).join("")}</ul>`;
+
+  const inline = (s) =>
+    s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      .replace(/`(.+?)`/g, "<code>$1</code>");
+
+  let result = "";
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i].trim();
+
+    if (!line) {
+      i++;
+      continue;
+    }
+
+    // unordered list
+    if (/^(-|\*|•)\s+/.test(line)) {
+      let listItems = [];
+      while (i < lines.length && /^(-|\*|•)\s+/.test(lines[i].trim())) {
+        const listLine = lines[i].trim();
+        listItems.push(
+          `<li class="experience-list-item">${inline(listLine.replace(/^(-|\*|•)\s+/, ""))}</li>`
+        );
+        i++;
+      }
+      result += `<ul class="experience-list">${listItems.join("")}</ul>`;
+      continue;
+    }
+
+    // ordered list
+    if (/^\d+[.)]\s+/.test(line)) {
+      let listItems = [];
+      while (i < lines.length && /^\d+[.)]\s+/.test(lines[i].trim())) {
+        const listLine = lines[i].trim();
+        listItems.push(
+          `<li class="experience-list-item">${inline(listLine.replace(/^\d+[.)]\s+/, ""))}</li>`
+        );
+        i++;
+      }
+      result += `<ol class="experience-list">${listItems.join("")}</ol>`;
+      continue;
+    }
+
+    // paragraph
+    result += `<p class="experience-paragraph">${inline(line)}</p>`;
+    i++;
   }
-  
-  if (isOL) {
-    return `<ol class="experience-list">${lines.map((l) => 
-      `<li class="experience-list-item">${inline(l.trim().replace(/^\d+[.)]\s+/, ""))}</li>`
-    ).join("")}</ol>`;
-  }
-  
-  return `<div class="experience-text">${lines.map(line => 
-    `<p class="experience-paragraph">${inline(line)}</p>`
-  ).join("")}</div>`;
+
+  return result || `<p class="experience-paragraph">${inline(safe)}</p>`;
 }
 
 /* Get field value with fallbacks */
@@ -180,9 +260,9 @@ function toArray(value) {
   if (typeof value === "string") {
     const t = value.trim();
     if (t.startsWith("[") && t.endsWith("]")) {
-      try { 
-        const parsed = JSON.parse(t); 
-        if (Array.isArray(parsed)) return toArray(parsed); 
+      try {
+        const parsed = JSON.parse(t);
+        if (Array.isArray(parsed)) return toArray(parsed);
       } catch (e) {
         console.warn("Failed to parse array string:", t, e);
       }
@@ -196,8 +276,8 @@ function toArray(value) {
 const Card = ({ children, className = "", dark = false, ...props }) => (
   <article
     className={`experience-card rounded-xl border shadow-sm transition-all duration-300 hover:shadow-lg ${
-      dark 
-        ? "bg-gray-800/90 backdrop-blur-sm border-gray-700/50 hover:bg-gray-800" 
+      dark
+        ? "bg-gray-800/90 backdrop-blur-sm border-gray-700/50 hover:bg-gray-800"
         : "bg-white/90 backdrop-blur-sm border-gray-200/50 hover:bg-white"
     } ${className}`}
     {...props}
@@ -208,12 +288,12 @@ const Card = ({ children, className = "", dark = false, ...props }) => (
 
 const Reveal = ({ children, delay = 0 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  
-  useEffect(() => { 
-    const t = setTimeout(() => setIsVisible(true), delay); 
-    return () => clearTimeout(t); 
+
+  useEffect(() => {
+    const t = setTimeout(() => setIsVisible(true), delay);
+    return () => clearTimeout(t);
   }, [delay]);
-  
+
   return (
     <div className={`transition-all duration-700 transform ${
       isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
@@ -245,18 +325,21 @@ function normalize(row = {}) {
     const tools = toArray(row?.tools || row?.tags || row?.skills || row?.technologies || row?.tech || row?.skillTags || "");
     const htmlDesc = getField(row, ["descriptionHtml", "description_html", "html"]);
     const textDesc = getField(row, ["description", "body", "content", "details"]);
-    const descriptionHtml = htmlDesc || mdLiteToHtml(textDesc);
-    
-    return { 
-      id, 
-      company, 
-      role, 
-      project, 
-      location, 
-      startDate, 
-      endDate, 
-      descriptionHtml, 
-      tools: tools.slice(0, 20) // Limit tools to prevent UI overflow
+
+    // prefer provided HTML, otherwise build from text; then sanitize + fix bullets
+    const raw = htmlDesc || mdLiteToHtml(textDesc);
+    const descriptionHtml = fixBulletsInHtml(stripHighlights(raw));
+
+    return {
+      id,
+      company,
+      role,
+      project,
+      location,
+      startDate,
+      endDate,
+      descriptionHtml,
+      tools: tools.slice(0, 20) // UI guard
     };
   } catch (error) {
     console.error("Error normalizing experience item:", error, row);
@@ -287,21 +370,21 @@ export default function Experience() {
 
   // Theme and view preferences with better error handling
   const [darkMode, setDarkMode] = useState(() => {
-    try { 
+    try {
       const saved = localStorage.getItem("experience_theme");
       return saved === "dark" || (saved === null && window.matchMedia?.('(prefers-color-scheme: dark)')?.matches);
-    } catch (e) { 
+    } catch (e) {
       console.warn("Failed to read theme preference:", e);
-      return false; 
+      return false;
     }
   });
-  
+
   const [viewMode, setViewMode] = useState(() => {
-    try { 
-      return localStorage.getItem("experience_view") || "grid"; 
+    try {
+      return localStorage.getItem("experience_view") || "grid";
     } catch (e) {
       console.warn("Failed to read view mode preference:", e);
-      return "grid"; 
+      return "grid";
     }
   });
 
@@ -313,24 +396,24 @@ export default function Experience() {
   const [selectedTags, setSelectedTags] = useState([]);
 
   // Persist preferences with error handling
-  useEffect(() => { 
-    try { 
-      localStorage.setItem("experience_theme", darkMode ? "dark" : "light"); 
+  useEffect(() => {
+    try {
+      localStorage.setItem("experience_theme", darkMode ? "dark" : "light");
     } catch (e) {
       console.warn("Failed to save theme preference:", e);
-    } 
+    }
   }, [darkMode]);
-  
-  useEffect(() => { 
-    try { 
-      localStorage.setItem("experience_view", viewMode); 
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("experience_view", viewMode);
     } catch (e) {
       console.warn("Failed to save view mode preference:", e);
-    } 
+    }
   }, [viewMode]);
-  
-  useEffect(() => { 
-    document.documentElement.classList.toggle("dark", darkMode); 
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
 
   // Enhanced data loading with retry logic
@@ -339,40 +422,40 @@ export default function Experience() {
       setLoading(true);
       setErrorMsg("");
     }
-    
+
     try {
       const data = await getExperience();
       let list = [];
-      
+
       if (Array.isArray(data)) {
         list = data;
       } else if (data && typeof data === 'object') {
-        list = Array.isArray(data.items) ? data.items : 
-               Array.isArray(data.data) ? data.data : 
+        list = Array.isArray(data.items) ? data.items :
+               Array.isArray(data.data) ? data.data :
                Array.isArray(data.experiences) ? data.experiences : [];
       }
-      
+
       const normalizedItems = list.map(normalize).filter(item => item && item.id);
       setItems(normalizedItems);
       setRetryCount(0);
-      
+
       if (normalizedItems.length === 0 && list.length > 0) {
         console.warn("All items failed normalization. Raw data:", list);
         setErrorMsg("Some experience data could not be loaded properly. Please check the data format.");
       }
     } catch (e) {
       console.error("Failed to load experience (attempt", retries + 1, "):", e);
-      
+
       if (retries < 2) {
-        // Retry up to 2 times with exponential backoff
+        // Retry with simple backoff
         setTimeout(() => load(retries + 1), (retries + 1) * 1000);
         setRetryCount(retries + 1);
         return;
       }
-      
+
       setErrorMsg(e?.message || "Failed to load experience data. Please check your connection and try again.");
-      setItems([]); // Clear items on persistent failure
-    } finally { 
+      setItems([]); // Clear on persistent failure
+    } finally {
       if (retries === 0) {
         setLoading(false);
       }
@@ -382,12 +465,12 @@ export default function Experience() {
   // Initial load and event listeners
   useEffect(() => {
     load();
-    
+
     const onSaved = () => {
       console.log("Experience saved event received");
       load();
     };
-    
+
     const onStorageChange = (e) => {
       if (e.key === 'experience_theme') {
         setDarkMode(e.newValue === 'dark');
@@ -395,10 +478,10 @@ export default function Experience() {
         setViewMode(e.newValue || 'grid');
       }
     };
-    
+
     window.addEventListener("experience:saved", onSaved);
     window.addEventListener("storage", onStorageChange);
-    
+
     return () => {
       window.removeEventListener("experience:saved", onSaved);
       window.removeEventListener("storage", onStorageChange);
@@ -424,10 +507,10 @@ export default function Experience() {
       const months = monthDiff(item?.startDate, item?.endDate);
       return acc + (isNaN(months) ? 0 : months);
     }, 0);
-    
+
     const y = Math.floor(totalMonths / 12);
     const m = totalMonths % 12;
-    
+
     let totalExperience = "0 mo";
     if (totalMonths) {
       if (y && m) totalExperience = `${y} yr ${m} mo`;
@@ -460,18 +543,18 @@ export default function Experience() {
           item.project?.toLowerCase().includes(q) ||
           item.location?.toLowerCase().includes(q) ||
           item.descriptionHtml?.toLowerCase().includes(q) ||
-          (Array.isArray(item.tools) && item.tools.some((t) => 
+          (Array.isArray(item.tools) && item.tools.some((t) =>
             String(t).toLowerCase().includes(q)
           ));
 
         const matchesFilter =
-          filterBy === "all" || 
-          (filterBy === "current" && !item.endDate) || 
+          filterBy === "all" ||
+          (filterBy === "current" && !item.endDate) ||
           (filterBy === "past" && !!item.endDate);
 
         const matchesTags =
-          selectedTags.length === 0 || 
-          (Array.isArray(item.tools) && selectedTags.every((tag) => 
+          selectedTags.length === 0 ||
+          (Array.isArray(item.tools) && selectedTags.every((tag) =>
             item.tools.some(tool => String(tool).toLowerCase() === tag.toLowerCase())
           ));
 
@@ -511,18 +594,18 @@ export default function Experience() {
   // Enhanced actions with better UX and error handling
   const onDelete = useCallback(async (id, itemTitle) => {
     if (!owner) return;
-    
-    const confirmMsg = itemTitle 
+
+    const confirmMsg = itemTitle
       ? `Delete "${itemTitle}"?\n\nThis action cannot be undone.`
       : "Delete this experience?\n\nThis action cannot be undone.";
-    
+
     if (!window.confirm(confirmMsg)) return;
-    
-    try { 
+
+    try {
       setLoading(true);
-      await deleteExperience(id); 
-      await load(); 
-    } catch (e) { 
+      await deleteExperience(id);
+      await load();
+    } catch (e) {
       console.error("Failed to delete experience:", e);
       setErrorMsg(e?.message || "Failed to delete experience. Please try again.");
       setLoading(false);
@@ -531,7 +614,7 @@ export default function Experience() {
 
   const exportData = useCallback(() => {
     if (!owner || items.length === 0) return;
-    
+
     try {
       const exportData = {
         exportDate: new Date().toISOString(),
@@ -542,7 +625,7 @@ export default function Experience() {
           exportedAt: new Date().toISOString()
         }))
       };
-      
+
       const dataStr = JSON.stringify(exportData, null, 2);
       const blob = new Blob([dataStr], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -659,7 +742,7 @@ export default function Experience() {
             </div>
 
             {/* Enhanced Controls */}
-            <div className="flex flex-wrap gap-3">
+            <div className="experience-controls flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => setDarkMode((v) => !v)}
@@ -793,8 +876,8 @@ export default function Experience() {
                         key={tag}
                         type="button"
                         onClick={() => {
-                          setSelectedTags(prev => 
-                            prev.includes(tag) 
+                          setSelectedTags(prev =>
+                            prev.includes(tag)
                               ? prev.filter(t => t !== tag)
                               : [...prev, tag]
                           );
@@ -845,7 +928,7 @@ export default function Experience() {
                 No experiences found
               </h3>
               <p className="mb-8 max-w-md mx-auto text-gray-600 dark:text-gray-400">
-                {items.length === 0 
+                {items.length === 0
                   ? "Get started by adding your first professional experience."
                   : "Try adjusting your search criteria or filters."
                 }
@@ -870,12 +953,12 @@ export default function Experience() {
                   /* Grid Card View */
                   <Card dark={darkMode} className="group relative p-6 h-full flex flex-col">
                     {owner && (
-                      <div className="absolute top-4 right-4 flex gap-2 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
+                      <div className="owner-actions absolute top-4 right-4 flex gap-2 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
                         <button
                           type="button"
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            navigate(`/experience/edit/${item.id}`); 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/experience/edit/${item.id}`);
                           }}
                           className="p-2 rounded-lg border transition-all duration-200 bg-white/95 dark:bg-gray-700/95 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                           title="Edit experience"
@@ -885,9 +968,9 @@ export default function Experience() {
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            onDelete(item.id, `${item.role} at ${item.company}`); 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(item.id, `${item.role} at ${item.company}`);
                           }}
                           className="p-2 rounded-lg border transition-all duration-200 bg-white/95 dark:bg-gray-700/95 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/50"
                           title="Delete experience"
@@ -900,8 +983,8 @@ export default function Experience() {
 
                     <div className="flex flex-wrap items-start justify-between gap-2 mb-4 pr-20">
                       <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        item.endDate 
-                          ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300" 
+                        item.endDate
+                          ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                           : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
                       }`}>
                         {item.endDate ? "Completed" : "Current"}
@@ -949,8 +1032,8 @@ export default function Experience() {
                     {Array.isArray(item.tools) && item.tools.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {item.tools.map((tool, i) => (
-                          <span 
-                            key={`${item.id}-tool-${i}`} 
+                          <span
+                            key={`${item.id}-tool-${i}`}
                             className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                           >
                             {String(tool)}
@@ -969,8 +1052,8 @@ export default function Experience() {
                             {item.role}
                           </h3>
                           <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            item.endDate 
-                              ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300" 
+                            item.endDate
+                              ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                               : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
                           }`}>
                             {item.endDate ? "Completed" : "Current"}
@@ -991,7 +1074,7 @@ export default function Experience() {
                           <div className="flex items-center gap-1">
                             <Icon.Calendar className="w-4 h-4" />
                             <span>
-                              {fmtYM(item.startDate)} – {fmtYM(item.endDate)} 
+                              {fmtYM(item.startDate)} – {fmtYM(item.endDate)}
                               <span className="ml-1 font-medium text-blue-600 dark:text-blue-400">
                                 ({humanDuration(item.startDate, item.endDate)})
                               </span>
@@ -1012,8 +1095,8 @@ export default function Experience() {
                         {Array.isArray(item.tools) && item.tools.length > 0 && (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {item.tools.map((tool, i) => (
-                              <span 
-                                key={`${item.id}-tool-${i}`} 
+                              <span
+                                key={`${item.id}-tool-${i}`}
                                 className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                               >
                                 {String(tool)}
@@ -1024,7 +1107,7 @@ export default function Experience() {
                       </div>
 
                       {owner && (
-                        <div className="flex gap-2 lg:flex-col lg:items-end shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
+                        <div className="owner-actions flex gap-2 lg:flex-col lg:items-end shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
                           <button
                             type="button"
                             onClick={() => navigate(`/experience/edit/${item.id}`)}
@@ -1085,448 +1168,95 @@ export default function Experience() {
         )}
       </div>
 
-      {/* Fixed Dark Mode Text Visibility - ALL TEXT ELEMENTS */}
+      {/* Fixed Dark Mode Text Visibility + Bullets + Icon color */}
       <style>{`
         /* Base experience content styling */
         .experience-content {
           line-height: 1.6;
         }
 
-        /* Light mode: Dark text for content */
+        /* Light mode default text */
         .experience-content,
-        .experience-content *,
-        .experience-content p,
-        .experience-content div,
-        .experience-content span,
-        .experience-content li,
-        .experience-content strong,
-        .experience-content em,
-        .experience-content .experience-paragraph,
-        .experience-content .experience-text,
-        .experience-content .experience-list-item {
-          color: rgb(55 65 81) !important; /* gray-700 for light mode */
+        .experience-content * {
+          color: rgb(55 65 81) !important; /* gray-700 */
         }
 
-        /* Dark mode: White text for ALL elements in experience cards */
+        /* Dark mode: force readable text across the card */
         html.dark .experience-card,
-        html.dark .experience-card *,
-        html.dark .experience-card h1,
-        html.dark .experience-card h2, 
-        html.dark .experience-card h3,
-        html.dark .experience-card h4,
-        html.dark .experience-card h5,
-        html.dark .experience-card h6,
-        html.dark .experience-card p,
-        html.dark .experience-card div,
-        html.dark .experience-card span,
-        html.dark .experience-card li,
-        html.dark .experience-card strong,
-        html.dark .experience-card em,
-        html.dark .experience-card .text-lg,
-        html.dark .experience-card .text-sm,
-        html.dark .experience-card .text-xs,
-        html.dark .experience-card .font-bold,
-        html.dark .experience-card .font-medium,
-        html.dark .experience-card .text-gray-900,
-        html.dark .experience-card .text-gray-700,
-        html.dark .experience-card .text-gray-600,
-        html.dark .experience-card .text-gray-500,
-        html.dark .experience-card .text-gray-400,
-        html.dark .experience-card .text-gray-300,
-        body.dark .experience-card,
-        body.dark .experience-card *,
-        body.dark .experience-card h1,
-        body.dark .experience-card h2,
-        body.dark .experience-card h3,
-        body.dark .experience-card h4,
-        body.dark .experience-card h5,
-        body.dark .experience-card h6,
-        body.dark .experience-card p,
-        body.dark .experience-card div,
-        body.dark .experience-card span,
-        body.dark .experience-card li,
-        body.dark .experience-card strong,
-        body.dark .experience-card em,
-        body.dark .experience-card .text-lg,
-        body.dark .experience-card .text-sm,
-        body.dark .experience-card .text-xs,
-        body.dark .experience-card .font-bold,
-        body.dark .experience-card .font-medium,
-        body.dark .experience-card .text-gray-900,
-        body.dark .experience-card .text-gray-700,
-        body.dark .experience-card .text-gray-600,
-        body.dark .experience-card .text-gray-500,
-        body.dark .experience-card .text-gray-400,
-        body.dark .experience-card .text-gray-300,
-        .dark .experience-card,
-        .dark .experience-card *,
-        .dark .experience-card h1,
-        .dark .experience-card h2,
-        .dark .experience-card h3,
-        .dark .experience-card h4,
-        .dark .experience-card h5,
-        .dark .experience-card h6,
-        .dark .experience-card p,
-        .dark .experience-card div,
-        .dark .experience-card span,
-        .dark .experience-card li,
-        .dark .experience-card strong,
-        .dark .experience-card em,
-        .dark .experience-card .text-lg,
-        .dark .experience-card .text-sm,
-        .dark .experience-card .text-xs,
-        .dark .experience-card .font-bold,
-        .dark .experience-card .font-medium,
-        .dark .experience-card .text-gray-900,
-        .dark .experience-card .text-gray-700,
-        .dark .experience-card .text-gray-600,
-        .dark .experience-card .text-gray-500,
-        .dark .experience-card .text-gray-400,
-        .dark .experience-card .text-gray-300 {
-          color: rgb(255 255 255) !important; /* white for dark mode */
+        html.dark .experience-card * {
+          color: rgb(255 255 255) !important;
         }
 
-        /* Keep blue colors for duration and links in dark mode */
+        /* Keep blue accents readable in dark mode */
         html.dark .experience-card .text-blue-600,
-        html.dark .experience-card .text-blue-400,
-        body.dark .experience-card .text-blue-600,
-        body.dark .experience-card .text-blue-400,
-        .dark .experience-card .text-blue-600,
-        .dark .experience-card .text-blue-400 {
-          color: rgb(96 165 250) !important; /* keep blue-400 in dark mode */
+        html.dark .experience-card .text-blue-400 {
+          color: rgb(96 165 250) !important;
         }
 
-        /* Fix tool/skill tags in dark mode - make them visible */
-        html.dark .experience-card .bg-gray-100,
-        body.dark .experience-card .bg-gray-100,
-        .dark .experience-card .bg-gray-100 {
-          background-color: rgb(55 65 81) !important; /* gray-700 background */
-          color: rgb(255 255 255) !important; /* white text */
-        }
-
-        html.dark .experience-card .text-gray-700,
-        body.dark .experience-card .text-gray-700,
-        .dark .experience-card .text-gray-700 {
-          color: rgb(255 255 255) !important; /* white text */
-        }
-
-        /* Fix edit/delete buttons in dark mode */
-        html.dark .owner-actions button,
-        html.dark .owner-actions button *,
-        body.dark .owner-actions button,
-        body.dark .owner-actions button *,
-        .dark .owner-actions button,
-        .dark .owner-actions button * {
-          color: rgb(255 255 255) !important;
-        }
-
-        html.dark .owner-actions .bg-white\/95,
-        html.dark .owner-actions .bg-white,
-        body.dark .owner-actions .bg-white\/95, 
-        body.dark .owner-actions .bg-white,
-        .dark .owner-actions .bg-white\/95,
-        .dark .owner-actions .bg-white {
-          background-color: rgb(55 65 81) !important; /* gray-700 */
-          color: rgb(255 255 255) !important;
-        }
-
-        /* Status badges in dark mode */
-        html.dark .bg-green-100,
-        body.dark .bg-green-100,
-        .dark .bg-green-100 {
-          background-color: rgb(6 78 59) !important; /* green-900 */
-          color: rgb(167 243 208) !important; /* green-200 */
-        }
-
-        html.dark .text-green-700,
-        body.dark .text-green-700,
-        .dark .text-green-700 {
-          color: rgb(167 243 208) !important; /* green-200 */
-        }
-
-        /* Project badges in dark mode */
-        html.dark .bg-indigo-50,
-        body.dark .bg-indigo-50,
-        .dark .bg-indigo-50 {
-          background-color: rgb(49 46 129) !important; /* indigo-900 */
-          color: rgb(196 181 253) !important; /* indigo-200 */
-        }
-
-        html.dark .text-indigo-700,
-        body.dark .text-indigo-700,
-        .dark .text-indigo-700 {
-          color: rgb(196 181 253) !important; /* indigo-200 */
-        }
-
-        /* Completed status badges */
-        html.dark .bg-gray-100.text-gray-700,
-        body.dark .bg-gray-100.text-gray-700,
-        .dark .bg-gray-100.text-gray-700 {
-          background-color: rgb(55 65 81) !important; /* gray-700 */
-          color: rgb(229 231 235) !important; /* gray-200 */
-        }
-
-        /* Additional color fixes for various text colors in dark mode */
-        html.dark .text-gray-300,
-        html.dark .text-gray-600,
-        html.dark .text-gray-500,
-        body.dark .text-gray-300,
-        body.dark .text-gray-600, 
-        body.dark .text-gray-500,
-        .dark .text-gray-300,
-        .dark .text-gray-600,
-        .dark .text-gray-500 {
-          color: rgb(255 255 255) !important; /* white for better visibility */
-        }
-
-        /* Links in dark mode */
-        html.dark .experience-content a,
-        body.dark .experience-content a,
-        .dark .experience-content a {
-          color: rgb(147 197 253) !important; /* blue-300 */
-        }
-
-        /* Emergency override for any remaining invisible text in dark mode */
-        html.dark .experience-card .text-gray-900:not(.text-blue-600):not(.text-blue-400):not(.text-green-700):not(.text-indigo-700),
-        body.dark .experience-card .text-gray-900:not(.text-blue-600):not(.text-blue-400):not(.text-green-700):not(.text-indigo-700),
-        .dark .experience-card .text-gray-900:not(.text-blue-600):not(.text-blue-400):not(.text-green-700):not(.text-indigo-700) {
-          color: rgb(255 255 255) !important;
-        }
-
-        /* Fix Light/Dark mode button text in dark mode */
-        html.dark button .text-gray-700,
-        body.dark button .text-gray-700,
-        .dark button .text-gray-700,
-        html.dark .text-gray-700,
-        body.dark .text-gray-700,
-        .dark .text-gray-700 {
-          color: rgb(255 255 255) !important;
-        }
-
-        /* Fix all button icons and text in header controls */
-        html.dark .flex.flex-wrap.gap-3 button,
-        html.dark .flex.flex-wrap.gap-3 button *,
-        body.dark .flex.flex-wrap.gap-3 button,
-        body.dark .flex.flex-wrap.gap-3 button *,
-        .dark .flex.flex-wrap.gap-3 button,
-        .dark .flex.flex-wrap.gap-3 button * {
-          color: rgb(255 255 255) !important;
-        }
-
-        /* Fix download button icon */
-        html.dark button[title="Export experience data"] svg,
-        html.dark button[aria-label="Export data"] svg,
-        body.dark button[title="Export experience data"] svg,
-        body.dark button[aria-label="Export data"] svg,
-        .dark button[title="Export experience data"] svg,
-        .dark button[aria-label="Export data"] svg {
-          color: rgb(255 255 255) !important;
-          stroke: rgb(255 255 255) !important;
-        }
-
-        /* Fix filter button icon */
-        html.dark button[aria-expanded] svg,
-        html.dark button[title="Toggle filters (Ctrl + /)"] svg,
-        body.dark button[aria-expanded] svg,
-        body.dark button[title="Toggle filters (Ctrl + /)"] svg,
-        .dark button[aria-expanded] svg,
-        .dark button[title="Toggle filters (Ctrl + /)"] svg {
-          color: rgb(255 255 255) !important;
-          stroke: rgb(255 255 255) !important;
-        }
-
-        /* Fix edit and delete button icons */
-        html.dark .owner-actions button svg,
-        body.dark .owner-actions button svg,
-        .dark .owner-actions button svg {
-          color: rgb(255 255 255) !important;
-          stroke: rgb(255 255 255) !important;
-        }
-
-        /* Fix all SVG icons in dark mode */
-        html.dark svg,
-        body.dark svg,
-        .dark svg {
-          stroke: currentColor !important;
-        }
-
-        /* Ensure search input is functional and visible */
-        html.dark input[type="text"],
-        html.dark input[type="search"],
-        html.dark select,
-        body.dark input[type="text"],
-        body.dark input[type="search"],
-        body.dark select,
-        .dark input[type="text"],
-        .dark input[type="search"],
-        .dark select {
+        /* Tags in dark mode */
+        html.dark .experience-card .bg-gray-100 {
           background-color: rgb(55 65 81) !important;
           color: rgb(255 255 255) !important;
-          border-color: rgb(75 85 99) !important;
         }
 
-        html.dark input[type="text"]::placeholder,
-        html.dark input[type="search"]::placeholder,
-        body.dark input[type="text"]::placeholder,
-        body.dark input[type="search"]::placeholder,
-        .dark input[type="text"]::placeholder,
-        .dark input[type="search"]::placeholder {
-          color: rgb(156 163 175) !important;
+        /* ===== BULLET LISTS (works for any list, with or without our classes) ===== */
+        .experience-content ul,
+        .experience-content ol {
+          margin: 0.5rem 0 0.75rem 0;
+          padding-left: 1.25rem;
+          list-style-position: outside;
         }
+        .experience-content ul { list-style-type: disc; }
+        .experience-content ol { list-style-type: decimal; }
+        .experience-content li { margin: 0.25rem 0; }
+        .experience-content p.experience-paragraph { margin: 0.5rem 0; }
 
-        /* Fix search input focus and interaction */
-        html.dark input:focus,
-        body.dark input:focus,
-        .dark input:focus {
-          outline: none !important;
-          ring: 2px solid rgb(59 130 246) !important;
-          border-color: rgb(59 130 246) !important;
-          background-color: rgb(55 65 81) !important;
-          color: rgb(255 255 255) !important;
-          z-index: 10 !important;
-          position: relative !important;
-        }
-
-        /* Fix any remaining button text colors */
-        html.dark button:not(.bg-blue-500):not(.bg-blue-600) *,
-        body.dark button:not(.bg-blue-500):not(.bg-blue-600) *,
-        .dark button:not(.bg-blue-500):not(.bg-blue-600) * {
-          color: rgb(255 255 255) !important;
-        }
-
-        /* Fix theme toggle button specifically */
-        html.dark button[aria-label*="mode"],
-        body.dark button[aria-label*="mode"],
-        .dark button[aria-label*="mode"] {
-          color: rgb(255 255 255) !important;
-        }
-
-        /* Fix all text in buttons and controls */
-        html.dark .container button,
-        html.dark .container button *,
-        body.dark .container button,
-        body.dark .container button *,
-        .dark .container button,
-        .dark .container button * {
-          color: rgb(255 255 255) !important;
-        }
-
-        /* Override any conflicting Tailwind classes */
-        html.dark .text-gray-600,
-        html.dark .text-gray-500,
-        html.dark .text-gray-400,
-        body.dark .text-gray-600,
-        body.dark .text-gray-500,
-        body.dark .text-gray-400,
-        .dark .text-gray-600,
-        .dark .text-gray-500,
-        .dark .text-gray-400 {
-          color: rgb(255 255 255) !important;
-        }
-
-        /* Ensure input elements are above other content */
-        input[type="text"],
-        input[type="search"],
-        select {
-          position: relative;
-          z-index: 1;
-        }
-
-        /* List styling */
-        .experience-content .experience-list {
-          list-style-position: inside;
-          margin: 1rem 0;
-          padding-left: 1rem;
-        }
-
-        .experience-content .experience-list ul {
-          list-style-type: disc;
-        }
-
-        .experience-content .experience-list ol {
-          list-style-type: decimal;
-        }
-
-        .experience-content .experience-list-item {
-          display: list-item;
-          margin: 0.25rem 0;
-          line-height: 1.5;
-        }
-
-        .experience-content .experience-paragraph {
-          margin: 0.5rem 0;
-        }
-
-        /* Code blocks */
+        /* Inline code */
         .experience-content code {
           background: rgb(243 244 246);
           padding: 0.125rem 0.25rem;
           border-radius: 0.25rem;
-          font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, Consolas, monospace;
+          font-family: ui-monospace, Menlo, Consolas, monospace;
           font-size: 0.875em;
           color: rgb(55 65 81) !important;
         }
-
-        html.dark .experience-content code,
-        body.dark .experience-content code,
-        .dark .experience-content code {
+        html.dark .experience-content code {
           background: rgb(55 65 81) !important;
           color: rgb(255 255 255) !important;
         }
 
         /* Links */
-        .experience-content a {
-          text-decoration: underline;
-          text-underline-offset: 2px;
-          transition: opacity 0.2s ease;
-          color: rgb(37 99 235) !important; /* blue-600 */
+        .experience-content a { color: rgb(37 99 235) !important; text-decoration: underline; text-underline-offset: 2px; }
+        html.dark .experience-content a { color: rgb(147 197 253) !important; }
+
+        /* Controls icons must be visible in dark mode */
+        html.dark .experience-controls button:not(.bg-blue-500):not(.bg-blue-600) svg {
+          color: #fff !important;
+          stroke: currentColor !important;
+        }
+        html.dark .owner-actions button svg {
+          color: #fff !important;
+          stroke: currentColor !important;
         }
 
-        html.dark .experience-content a,
-        body.dark .experience-content a,
-        .dark .experience-content a {
-          color: rgb(147 197 253) !important; /* blue-300 */
+        /* Inputs in dark mode */
+        html.dark input[type="text"],
+        html.dark input[type="search"],
+        html.dark select {
+          background-color: rgb(55 65 81);
+          color: #fff;
+          border-color: rgb(75 85 99);
         }
+        html.dark input::placeholder { color: rgb(156 163 175); }
 
-        .experience-content a:hover {
-          opacity: 0.8;
-        }
+        /* Focus ring hint */
+        .experience-card:focus-within { outline: 2px solid rgb(59 130 246); outline-offset: 2px; }
 
-        /* Focus states */
-        .experience-card:focus-within {
-          outline: 2px solid rgb(59 130 246);
-          outline-offset: 2px;
-        }
-
-        /* Transitions */
-        .experience-content * {
-          transition: color 0.2s ease;
-        }
-
-        /* Reduced motion */
-        @media (prefers-reduced-motion: reduce) {
-          .experience-content * {
-            transition: none !important;
-          }
-        }
-
-        /* Print styles */
+        /* Print */
         @media print {
-          .experience-card {
-            break-inside: avoid;
-            box-shadow: none !important;
-            border: 1px solid #ccc !important;
-          }
-          
-          .owner-actions {
-            display: none !important;
-          }
-          
-          .experience-content,
-          .experience-content * {
-            color: black !important;
-            background: transparent !important;
-          }
+          .owner-actions, .experience-controls { display: none !important; }
+          .experience-card { box-shadow: none !important; border: 1px solid #ccc !important; }
+          .experience-content, .experience-content * { color: #000 !important; background: transparent !important; }
         }
       `}</style>
     </section>

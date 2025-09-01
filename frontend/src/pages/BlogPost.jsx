@@ -318,7 +318,7 @@ function normalizeAlignmentTokens(html) {
   return out;
 }
 
-/** NEW: strip pasted highlight backgrounds but keep everything else intact */
+/** UPDATED: strip pasted highlights AND inline text colors that might interfere with theming */
 function stripCopyHighlights(html) {
   try {
     const doc = new DOMParser().parseFromString(html || "", "text/html");
@@ -331,20 +331,22 @@ function stripCopyHighlights(html) {
       el.remove();
     });
 
-    // remove inline background styles
+    // remove inline background AND color styles that might interfere with theming
     doc.querySelectorAll("[style]").forEach((el) => {
       const style = el.getAttribute("style") || "";
       const cleaned = style
         .replace(/background(?:-color)?\s*:\s*[^;]+;?/gi, "")
+        .replace(/color\s*:\s*[^;]+;?/gi, "") // ADDED: remove inline text colors
         .replace(/\s*;\s*$/g, "");
       if (cleaned.trim()) el.setAttribute("style", cleaned);
       else el.removeAttribute("style");
     });
 
     // legacy attributes
-    doc.querySelectorAll("[bgcolor],[background]").forEach((el) => {
+    doc.querySelectorAll("[bgcolor],[background],[color]").forEach((el) => {
       el.removeAttribute("bgcolor");
       el.removeAttribute("background");
+      el.removeAttribute("color"); // ADDED: remove color attribute
     });
 
     return doc.body.innerHTML;
@@ -626,7 +628,7 @@ export default function BlogPost() {
     return null;
   }, []);
 
-  // Build HTML from raw (Markdown or HTML) + IDs, and strip highlights
+  // Build HTML from raw (Markdown or HTML) + IDs, and strip highlights + colors
   const normalizedHtml = useMemo(() => {
     if (!post?.rawBody && !post?.bodyHtml) return "";
     let htmlCandidate = post?.bodyHtml || post?.rawBody || "";
@@ -634,7 +636,7 @@ export default function BlogPost() {
       htmlCandidate = mdToHtml(htmlCandidate);
     }
     const withAlign = normalizeAlignmentTokens(htmlCandidate);
-    const withoutHighlights = stripCopyHighlights(withAlign); // <- remove pasted highlighting only
+    const withoutHighlights = stripCopyHighlights(withAlign); // <- UPDATED: now removes both highlights and text colors
     return addHeadingIds(withoutHighlights);
   }, [post?.rawBody, post?.bodyHtml]);
 
@@ -908,9 +910,6 @@ export default function BlogPost() {
   const basePx = post.theme?.basePx || 16;
   const headingScale = post.theme?.headingScale || 1.15;
   const readingTime = estimateReadingTime(normalizedHtml);
-
-  // Body color (explicit so UI text never disappears; does NOT touch post body)
-  const bodyColor = darkMode ? "#e5e7eb" : "#374151";
 
   return (
     <div
@@ -1276,9 +1275,11 @@ export default function BlogPost() {
               </div>
             </header>
 
-            {/* Body (UNSKINNED: render exactly what was authored; only highlight backgrounds removed) */}
+            {/* Body - UPDATED: ensure text is always visible in both modes */}
             <div
-              className="article-content"
+              className={`article-content ${
+                darkMode ? 'dark-mode-article' : 'light-mode-article'
+              }`}
               style={{
                 fontFamily: serifFont ? "Georgia, serif" : fontFamily,
                 fontSize: basePx,
@@ -1286,17 +1287,69 @@ export default function BlogPost() {
                 borderRadius: readingMode ? "1rem" : "0",
                 padding: readingMode ? "2rem" : "0",
                 boxShadow: readingMode ? "0 4px 16px rgba(0,0,0,0.08)" : "none",
-                color: bodyColor, // inherits, does not override inline colors inside the HTML
+                // UPDATED: Force text color inheritance for all child elements
+                color: darkMode ? "#ffffff" : "#1f2937",
               }}
-              // IMPORTANT: no "prose" classes and no color variables -> exact authored look
               dangerouslySetInnerHTML={{ __html: normalizedHtml || "<p><em>No content available</em></p>" }}
             />
 
-            {/* Small safety styles that DON'T change authored formatting */}
+            {/* UPDATED CSS - Force text colors to be visible in both modes */}
             <style jsx>{`
               .article-content img { max-width: 100%; height: auto; }
               .article-content table { width: 100%; border-collapse: collapse; }
               .article-content pre { overflow: auto; }
+              
+              /* ADDED: Force all text to be visible in dark mode */
+              .dark-mode-article,
+              .dark-mode-article * {
+                color: #ffffff !important;
+              }
+              
+              .dark-mode-article h1,
+              .dark-mode-article h2,
+              .dark-mode-article h3,
+              .dark-mode-article h4,
+              .dark-mode-article h5,
+              .dark-mode-article h6 {
+                color: #ffffff !important;
+              }
+              
+              .dark-mode-article p,
+              .dark-mode-article div,
+              .dark-mode-article span,
+              .dark-mode-article li,
+              .dark-mode-article td,
+              .dark-mode-article th {
+                color: #ffffff !important;
+              }
+              
+              /* Ensure light mode text remains visible */
+              .light-mode-article,
+              .light-mode-article * {
+                color: #1f2937 !important;
+              }
+              
+              .light-mode-article h1,
+              .light-mode-article h2,
+              .light-mode-article h3,
+              .light-mode-article h4,
+              .light-mode-article h5,
+              .light-mode-article h6 {
+                color: #1f2937 !important;
+              }
+              
+              /* Special handling for code blocks and pre tags */
+              .dark-mode-article pre,
+              .dark-mode-article code {
+                background-color: #374151 !important;
+                color: #e5e7eb !important;
+              }
+              
+              .light-mode-article pre,
+              .light-mode-article code {
+                background-color: #f3f4f6 !important;
+                color: #374151 !important;
+              }
             `}</style>
 
             {/* Floating progress donut */}
