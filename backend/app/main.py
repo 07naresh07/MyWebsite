@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, UploadFile, File, Form, Depends, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse  # ← added PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from typing import Optional
 import os
@@ -16,7 +16,7 @@ from .auth import create_owner_token, get_current_user, require_owner
 from .routes import (
     posts, projects, profile, experience, education, skills, languages,
     certificates_gallery, contact, proxy, health, upload,
-    home,  # ← added
+    home,  # ← already added here
 )
 
 def orjson_dumps(v, *, default):
@@ -68,6 +68,13 @@ webroot = os.path.abspath(webroot)
 os.makedirs(webroot, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=webroot), name="uploads")
 
+# ----------------------------- Root route ---------------------------
+# Avoid 404s on "/" and on HEAD probes
+@app.api_route("/", methods=["GET", "HEAD"])
+async def _root():
+    return PlainTextResponse("ok")
+# --------------------------------------------------------------------
+
 # Exception handler: dev-friendly JSON
 @app.exception_handler(Exception)
 async def all_exception_handler(request: Request, exc: Exception):
@@ -90,7 +97,8 @@ app.include_router(certificates_gallery.router)
 app.include_router(contact.router)
 app.include_router(proxy.router)
 app.include_router(upload.router)
-app.include_router(home.router)  # ← added
+app.include_router(home.router)  # keep this one
+# (Removed duplicate include at the very end)
 
 def _mask_dsn(dsn: str) -> str:
     # postgresql://user:pass@host:port/db -> mask pass
@@ -139,4 +147,4 @@ async def auth_me(user = Depends(get_current_user)):
     return {"ok": True, "claims": claims}
 
 app.include_router(auth_router)
-app.include_router(home.router)
+# (Duplicate app.include_router(home.router) removed)
