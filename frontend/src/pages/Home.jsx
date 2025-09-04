@@ -20,7 +20,6 @@ function normalizeHighlight(h = {}) {
     titleHtml: h.titleHtml ?? h.title_html ?? h.title ?? "",
     bodyHtml:  h.bodyHtml  ?? h.body_html  ?? h.description ?? "",
     sortOrder: h.sortOrder ?? h.sort_order ?? h.position ?? 0,
-    // keep legacy fields around (optional)
     title: h.title ?? null,
     description: h.description ?? null,
     url: h.url ?? null,
@@ -34,20 +33,22 @@ function normalizeHomePayload(home = {}) {
   };
 }
 
-/* ------------------------------ Lightweight UI primitives ------------------------------ */
+/* ------------------------------ Enhanced UI primitives ------------------------------ */
 const Card = ({ children, className = "", isDark = false, ...props }) => (
   <div
-    className={`relative shadow-sm border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"} ${className}`}
+    className={`relative shadow-lg border backdrop-blur-sm transform-gpu transition-all duration-500 hover:shadow-2xl hover:shadow-violet-500/10 ${isDark ? "bg-slate-800/80 border-slate-700/50 hover:border-slate-600/70" : "bg-white/90 border-slate-200/60 hover:border-slate-300/70"} ${className}`}
     {...props}
   >
     {children}
   </div>
 );
-const Reveal = ({ children }) => <div className="animate-fade-in">{children}</div>;
+const Reveal = ({ children }) => <div className="animate-fade-in-enhanced">{children}</div>;
 
-/* ------------------------------ Theme & UI ------------------------------ */
+/* ------------------------------ Enhanced Theme & UI ------------------------------ */
 const UI_GRADIENT = "from-indigo-600 via-violet-600 to-fuchsia-600";
 const DARK_UI_GRADIENT = "from-indigo-400 via-violet-400 to-fuchsia-400";
+const ENHANCED_GRADIENT = "from-indigo-500 via-purple-500 via-violet-500 to-fuchsia-500";
+const DARK_ENHANCED_GRADIENT = "from-indigo-300 via-purple-300 via-violet-300 to-fuchsia-300";
 
 const MODERN_ICONS = {
   projects: "🚀",
@@ -62,25 +63,45 @@ const MODERN_ICONS = {
   inProgress: "🔧",
 };
 
-const TAG_COLORS = [
-  { light: "bg-amber-100 text-amber-900 ring-amber-200", dark: "bg-amber-900/30 text-amber-200 ring-amber-700" },
-  { light: "bg-emerald-100 text-emerald-900 ring-emerald-200", dark: "bg-emerald-900/30 text-emerald-200 ring-emerald-700" },
-  { light: "bg-sky-100 text-sky-900 ring-sky-200", dark: "bg-sky-900/30 text-sky-200 ring-sky-700" },
-  { light: "bg-fuchsia-100 text-fuchsia-900 ring-fuchsia-200", dark: "bg-fuchsia-900/30 text-fuchsia-200 ring-fuchsia-700" },
-  { light: "bg-rose-100 text-rose-900 ring-rose-200", dark: "bg-rose-900/30 text-rose-200 ring-rose-700" },
-  { light: "bg-indigo-100 text-indigo-900 ring-indigo-200", dark: "bg-indigo-900/30 text-indigo-200 ring-indigo-700" },
-  { light: "bg-teal-100 text-teal-900 ring-teal-200", dark: "bg-teal-900/30 text-teal-200 ring-teal-700" },
+const ENHANCED_TAG_COLORS = [
+  { 
+    light: "bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-900 ring-amber-300 hover:from-amber-200 hover:to-yellow-200", 
+    dark: "bg-gradient-to-r from-amber-900/40 to-yellow-900/40 text-amber-200 ring-amber-600 hover:from-amber-800/50 hover:to-yellow-800/50" 
+  },
+  { 
+    light: "bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-900 ring-emerald-300 hover:from-emerald-200 hover:to-green-200", 
+    dark: "bg-gradient-to-r from-emerald-900/40 to-green-900/40 text-emerald-200 ring-emerald-600 hover:from-emerald-800/50 hover:to-green-800/50" 
+  },
+  { 
+    light: "bg-gradient-to-r from-sky-100 to-blue-100 text-sky-900 ring-sky-300 hover:from-sky-200 hover:to-blue-200", 
+    dark: "bg-gradient-to-r from-sky-900/40 to-blue-900/40 text-sky-200 ring-sky-600 hover:from-sky-800/50 hover:to-blue-800/50" 
+  },
+  { 
+    light: "bg-gradient-to-r from-fuchsia-100 to-pink-100 text-fuchsia-900 ring-fuchsia-300 hover:from-fuchsia-200 hover:to-pink-200", 
+    dark: "bg-gradient-to-r from-fuchsia-900/40 to-pink-900/40 text-fuchsia-200 ring-fuchsia-600 hover:from-fuchsia-800/50 hover:to-pink-800/50" 
+  },
+  { 
+    light: "bg-gradient-to-r from-rose-100 to-red-100 text-rose-900 ring-rose-300 hover:from-rose-200 hover:to-red-200", 
+    dark: "bg-gradient-to-r from-rose-900/40 to-red-900/40 text-rose-200 ring-rose-600 hover:from-rose-800/50 hover:to-red-800/50" 
+  },
+  { 
+    light: "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-900 ring-indigo-300 hover:from-indigo-200 hover:to-purple-200", 
+    dark: "bg-gradient-to-r from-indigo-900/40 to-purple-900/40 text-indigo-200 ring-indigo-600 hover:from-indigo-800/50 hover:to-purple-800/50" 
+  },
+  { 
+    light: "bg-gradient-to-r from-teal-100 to-cyan-100 text-teal-900 ring-teal-300 hover:from-teal-200 hover:to-cyan-200", 
+    dark: "bg-gradient-to-r from-teal-900/40 to-cyan-900/40 text-teal-200 ring-teal-600 hover:from-teal-800/50 hover:to-cyan-800/50" 
+  },
 ];
 
-function hashIdx(str = "", mod = TAG_COLORS.length) {
+function hashIdx(str = "", mod = ENHANCED_TAG_COLORS.length) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
   return h % mod;
 }
-
 function chipClassFor(tag = "", isDark = false) {
-  const c = TAG_COLORS[hashIdx(tag)];
-  return `${isDark ? c.dark : c.light} ring-1 rounded-md px-2 py-0.5 text-xs font-medium`;
+  const c = ENHANCED_TAG_COLORS[hashIdx(tag)];
+  return `${isDark ? c.dark : c.light} ring-2 rounded-full px-3 py-1 text-xs font-semibold transform transition-all duration-300 hover:scale-105 cursor-default`;
 }
 
 /* ------------------------------ Helpers ------------------------------ */
@@ -93,7 +114,6 @@ function projectBadges(pj) {
   if (pj.status && /in\s*progress|wip|ongoing/i.test(pj.status)) out.push([MODERN_ICONS.inProgress, "In Progress"]);
   return out;
 }
-
 function postBadges(po) {
   const out = [];
   const tags = (po.tags || []).map((t) => String(t));
@@ -102,23 +122,19 @@ function postBadges(po) {
   if (tags.some((t) => /ai|ml/i.test(t))) out.push([MODERN_ICONS.ai, "AI"]);
   return out;
 }
-
 function isRecent(dateStr) {
   const d = dateStr ? new Date(dateStr) : null;
   if (!d || isNaN(+d)) return false;
   const days = (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24);
   return days <= 30;
 }
-
 function isTrendingByTags(tags = []) {
   const t = (tags || []).join(" ").toLowerCase();
   return /ai|bim|mobility|transport|automation/.test(t);
 }
 
 /**
- * Sanitize HTML for preview.
- * NEW: when forceDark is true, strip inline 'color' and 'background-color'
- * so dark mode can control text colors.
+ * Enhanced HTML sanitization with better dark mode support
  */
 function sanitizePreview(html, { forceDark = false } = {}) {
   try {
@@ -139,7 +155,7 @@ function sanitizePreview(html, { forceDark = false } = {}) {
       if (!m) return "";
       const prop = m[1].toLowerCase();
       const val  = m[2].trim();
-      if (forceDark && (prop === "color" || prop === "background-color")) return ""; // strip for dark mode
+      if (forceDark && (prop === "color" || prop === "background-color")) return "";
       return `${prop}: ${val}`;
     }).filter(Boolean).join("; ");
     const walk=(node)=>{
@@ -159,7 +175,6 @@ function sanitizePreview(html, { forceDark = false } = {}) {
     return doc.body.innerHTML;
   } catch { return html || ""; }
 }
-
 function snippetHtml(html, maxChars = 420) {
   try {
     const parser = new DOMParser();
@@ -189,7 +204,7 @@ function snippetHtml(html, maxChars = 420) {
   }
 }
 
-/* ------------------------------ Horizontal Row Hook ------------------------------ */
+/* ------------------------------ Enhanced Horizontal Row Hook ------------------------------ */
 function useHRow() {
   const rowRef = useRef(null);
   const drag = useRef({ down: false, x: 0, left: 0, moved: false });
@@ -201,7 +216,7 @@ function useHRow() {
     const el = rowRef.current;
     if (!el) return;
     drag.current = { down: true, x: clientX, left: el.scrollLeft, moved: false };
-    el.classList.add("cursor-grabbing");
+    el.classList.add("cursor-grabbing", "select-none");
   };
   const move = (clientX) => {
     const el = rowRef.current;
@@ -212,9 +227,9 @@ function useHRow() {
   };
   const end = () => {
     const el = rowRef.current;
-    if (el) el.classList.remove("cursor-grabbing");
+    if (el) el.classList.remove("cursor-grabbing", "select-none");
     drag.current.down = false;
-    setTimeout(() => { drag.current.moved = false; }, 50);
+    setTimeout(() => { drag.current.moved = false; }, 100);
   };
 
   const onMouseDown = (e) => { if (e.button !== 0) return; start(e.pageX); };
@@ -241,7 +256,7 @@ function useHRow() {
     const el = rowRef.current;
     if (!el) return;
     const max = el.scrollWidth - el.clientWidth;
-    setHasOverflow(max > 0);
+    setHasOverflow(max > 10);
     setProgress(max > 0 ? Math.min(100, Math.max(0, (el.scrollLeft / max) * 100)) : 0);
   };
 
@@ -250,7 +265,7 @@ function useHRow() {
     if (!el) return;
     const ro = new ResizeObserver(() => {
       const max = el.scrollWidth - el.clientWidth;
-      setHasOverflow(max > 0);
+      setHasOverflow(max > 10);
       setProgress(0);
     });
     ro.observe(el);
@@ -266,7 +281,7 @@ function useHRow() {
   };
 }
 
-/* ------------------------------ Local Theme (scoped to Home) ------------------------------ */
+/* ------------------------------ Enhanced Local Theme ------------------------------ */
 const HOME_THEME_KEY = "homeTheme";
 function useTheme() {
   const [isDark, setIsDark] = useState(() => {
@@ -281,12 +296,21 @@ function useTheme() {
 
   useEffect(() => {
     try {
+      const root = document.documentElement;
       if (isDark) {
-        document.documentElement.classList.add("dark");
-        document.body.className = "bg-slate-900 text-white font-sans";
+        root.classList.add("dark");
+        root.style.setProperty('--bg-primary', '#0f172a');
+        root.style.setProperty('--bg-secondary', '#1e293b');
+        root.style.setProperty('--text-primary', '#ffffff');
+        root.style.setProperty('--text-secondary', '#cbd5e1');
+        document.body.className = "bg-slate-900 text-white font-sans transition-all duration-700";
       } else {
-        document.documentElement.classList.remove("dark");
-        document.body.className = "bg-gray-50 text-slate-900 font-sans";
+        root.classList.remove("dark");
+        root.style.setProperty('--bg-primary', '#f8fafc');
+        root.style.setProperty('--bg-secondary', '#ffffff');
+        root.style.setProperty('--text-primary', '#0f172a');
+        root.style.setProperty('--text-secondary', '#475569');
+        document.body.className = "bg-gray-50 text-slate-900 font-sans transition-all duration-700";
       }
     } catch {}
   }, [isDark]);
@@ -306,38 +330,13 @@ function useViewMode() {
   return { viewMode, toggleViewMode };
 }
 
-/* ------------------------------ Color Palettes ------------------------------ */
-const COLOR_PALETTE = [
-  { name: "Black", value: "#000000", bg: "bg-black" },
-  { name: "Gray", value: "#6b7280", bg: "bg-gray-500" },
-  { name: "Red", value: "#dc2626", bg: "bg-red-600" },
-  { name: "Orange", value: "#ea580c", bg: "bg-orange-600" },
-  { name: "Yellow", value: "#ca8a04", bg: "bg-yellow-600" },
-  { name: "Green", value: "#16a34a", bg: "bg-green-600" },
-  { name: "Blue", value: "#2563eb", bg: "bg-blue-600" },
-  { name: "Purple", value: "#9333ea", bg: "bg-purple-600" },
-  { name: "Pink", value: "#db2777", bg: "bg-pink-600" },
-  { name: "Indigo", value: "#4f46e5", bg: "bg-indigo-600" },
-];
-
-const HIGHLIGHT_COLORS = [
-  { name: "Yellow", value: "#fef08a", bg: "bg-yellow-200" },
-  { name: "Green", value: "#bbf7d0", bg: "bg-green-200" },
-  { name: "Blue", value: "#bfdbfe", bg: "bg-blue-200" },
-  { name: "Purple", value: "#e9d5ff", bg: "bg-purple-200" },
-  { name: "Pink", value: "#fbcfe8", bg: "bg-pink-200" },
-  { name: "Orange", value: "#fed7aa", bg: "bg-orange-200" },
-];
-
-/* ------------------------------ Welcome Editor ------------------------------ */
+/* ------------------------------ Enhanced Welcome Editor ------------------------------ */
 const LS_WELCOME = "welcomeContentV1";
 
 function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [showColorPalette, setShowColorPalette] = useState(false);
   const editorRef = useRef(null);
-  const savedRangeRef = useRef(null);
 
   const [welcomeContent, setWelcomeContent] = useState(() => {
     try {
@@ -360,69 +359,6 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
       document.execCommand("defaultParagraphSeparator", false, "p");
     } catch {}
   }, [isEditing]);
-
-  useEffect(() => {
-    if (!isEditing) return;
-    const onSel = () => {
-      const sel = window.getSelection?.();
-      if (!sel || sel.rangeCount === 0) return;
-      const range = sel.getRangeAt(0);
-      if (editorRef.current && editorRef.current.contains(range.commonAncestorContainer)) {
-        savedRangeRef.current = range.cloneRange();
-      }
-    };
-    document.addEventListener("selectionchange", onSel);
-    return () => document.removeEventListener("selectionchange", onSel);
-  }, [isEditing]);
-
-  const restoreSelection = () => {
-    const range = savedRangeRef.current;
-    if (!range) return false;
-    const sel = window.getSelection?.();
-    if (!sel) return false;
-    try {
-      sel.removeAllRanges();
-      sel.addRange(range.cloneRange());
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const applyInlineStyle = (prop, color) => {
-    const range = savedRangeRef.current;
-    if (!range || !editorRef.current) return;
-    const sel = window.getSelection?.();
-    if (!sel) return;
-    try {
-      sel.removeAllRanges();
-      sel.addRange(range.cloneRange());
-      if (sel.rangeCount === 0 || range.collapsed) return;
-      if (prop === "backgroundColor") {
-        document.execCommand("hiliteColor", false, color);
-      } else {
-        document.execCommand("foreColor", false, color);
-      }
-      if (sel.rangeCount > 0) {
-        savedRangeRef.current = sel.getRangeAt(0).cloneRange();
-      }
-    } catch (e) {
-      console.error("Error applying color:", e);
-    }
-  };
-
-  const applyColor = (color, isHighlight = false) => {
-    if (savedRangeRef.current && !savedRangeRef.current.collapsed) {
-      applyInlineStyle(isHighlight ? "backgroundColor" : "color", color);
-    }
-    setShowColorPalette(false);
-  };
-
-  const removeFormatting = () => {
-    restoreSelection();
-    try { document.execCommand("removeFormat"); } catch {}
-    setShowColorPalette(false);
-  };
 
   const handlePaste = (e) => {
     if (!isEditing) return;
@@ -454,9 +390,18 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
 
   const handleKeyDown = (e) => {
     if (!isEditing) return;
+    // Shift+Enter => soft break
     if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
       document.execCommand("insertLineBreak", false);
+      return;
+    }
+    // Undo / Redo keyboard (ensure works on all browsers)
+    const isMeta = e.ctrlKey || e.metaKey;
+    if (isMeta && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) document.execCommand('redo');
+      else document.execCommand('undo');
     }
   };
 
@@ -494,7 +439,7 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
           sel.addRange(range);
         }
       }
-    }, 60);
+    }, 100);
   };
 
   const handleSave = async () => {
@@ -512,28 +457,30 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
     try { window.localStorage.setItem(LS_WELCOME, html); } catch {}
     try { await onSaveHtml?.(html); } catch (e) { console.error("Failed to save welcome:", e); }
     setIsEditing(false);
-    setShowColorPalette(false);
   };
 
   const handleCancel = () => {
     if (editorRef.current) editorRef.current.innerHTML = welcomeContent;
     setIsEditing(false);
-    setShowColorPalette(false);
   };
 
-  const panelBg = isDark ? "bg-slate-700 border-slate-600" : "bg-gray-50 border-gray-200";
-  const btnHover = isDark ? "hover:bg-slate-600 text-white" : "hover:bg-gray-200 text-slate-700";
+  const removeFormatting = () => {
+    try { document.execCommand("removeFormat"); } catch {}
+  };
+
+  const panelBg = isDark ? "bg-slate-800/95 border-slate-600/50" : "bg-white/95 border-gray-200/50";
+  const btnHover = isDark ? "hover:bg-slate-600/80 text-white transition-all duration-300" : "hover:bg-gray-200/80 text-slate-700 transition-all duration-300";
 
   return (
     <section
-      className={`container mx-auto px-4 py-10 relative group ${isDark ? "text-white" : "text-slate-800"}`}
+      className={`container mx-auto px-4 py-12 relative group ${isDark ? "text-white" : "text-slate-800"}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {ownerMode && !isEditing && isHovered && (
         <button
           onClick={handleEdit}
-          className={`absolute top-4 right-4 z-10 px-3 py-1.5 text-sm font-medium ${isDark ? "bg-slate-800 border-slate-600 text-white hover:bg-slate-700" : "bg-white border-gray-300 text-slate-700 hover:bg-gray-50"} border rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2`}
+          className={`absolute top-6 right-6 z-20 px-4 py-2 text-sm font-semibold backdrop-blur-md border rounded-xl shadow-xl transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-800/90 border-slate-600/70 text-white hover:bg-slate-700/90" : "bg-white/90 border-gray-300/70 text-slate-700 hover:bg-gray-50/90"} flex items-center gap-2`}
           aria-label="Edit welcome"
         >
           ✏️ Edit Welcome
@@ -541,35 +488,45 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
       )}
 
       <Reveal>
-        <h3 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-          <span className={`bg-clip-text text-transparent bg-gradient-to-r ${UI_GRADIENT}`}>Welcome</span>
-          <span aria-hidden="true">👋</span>
+        <h3 className="text-3xl md:text-4xl font-bold flex items-center gap-3 mb-2">
+          <span className={`bg-clip-text text-transparent bg-gradient-to-r ${ENHANCED_GRADIENT} animate-gradient-shift`}>Welcome</span>
+          <span aria-hidden="true" className="animate-wave">👋</span>
         </h3>
       </Reveal>
-      <span className={`block h-1 bg-gradient-to-r ${UI_GRADIENT} rounded mt-2 mb-6 w-full opacity-70`} />
+      <div className={`h-1.5 bg-gradient-to-r ${ENHANCED_GRADIENT} rounded-full mb-8 w-full opacity-80 animate-pulse-subtle`} />
 
       {isEditing && (
-        <div className={`mb-4 p-3 rounded-xl border shadow-lg ${panelBg} relative`}>
-          <div className="flex flex-wrap items-center gap-1">
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("bold")} className={`px-2 py-1.5 rounded-md ${btnHover} font-bold text-sm`}>B</button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("italic")} className={`px-2 py-1.5 rounded-md ${btnHover} italic text-sm`}>I</button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("underline")} className={`px-2 py-1.5 rounded-md ${btnHover} underline text-sm`}>U</button>
+        <div className={`mb-6 p-4 rounded-2xl border shadow-2xl backdrop-blur-md ${panelBg} relative animate-fade-in-enhanced`}>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            {/* Basic formatting */}
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("bold")} className={`px-3 py-2 rounded-xl font-bold text-sm ${btnHover}`}>B</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("italic")} className={`px-3 py-2 rounded-xl italic text-sm ${btnHover}`}>I</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("underline")} className={`px-3 py-2 rounded-xl underline text-sm ${btnHover}`}>U</button>
+
             <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("insertUnorderedList")} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>•</button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("insertOrderedList")} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>1</button>
+
+            {/* Lists */}
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("insertUnorderedList")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>• List</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("insertOrderedList")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>1. List</button>
+
             <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
-            <button
-              onMouseDown={(e)=>{ e.preventDefault(); restoreSelection(); }}
-              onClick={() => setShowColorPalette((v)=>!v)}
-              className={`px-2 py-1.5 rounded-md ${btnHover} text-sm ${showColorPalette ? (isDark ? "bg-slate-600" : "bg-gray-200") : ""}`}
-            >
-              🎨
-            </button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={removeFormatting} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>⚪</button>
+
+            {/* Alignment incl. Justify */}
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyLeft")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>← Left</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyCenter")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>↔ Center</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyRight")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>→ Right</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyFull")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>≋ Justify</button>
+
             <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyLeft")} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>←</button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyCenter")} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>↔</button>
-            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyRight")} className={`px-2 py-1.5 rounded-md ${btnHover} text-sm`}>→</button>
+
+            {/* Undo / Redo */}
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("undo")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>↶ Undo</button>
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("redo")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>↷ Redo</button>
+
+            <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
+
+            {/* Clear formatting */}
+            <button onMouseDown={(e)=>e.preventDefault()} onClick={removeFormatting} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>🗑️ Clear</button>
           </div>
         </div>
       )}
@@ -582,28 +539,28 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
           onPaste={handlePaste}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
-          className={`text-lg leading-8 outline-none welcome-content ${
+          className={`text-lg leading-8 outline-none welcome-content transition-all duration-300 ${
             isEditing
-              ? `${isDark ? "text-white bg-slate-800 border-slate-600" : "text-slate-800 bg-white border-gray-300"} ring-2 ring-violet-500/50 rounded-lg p-4 border`
+              ? `${isDark ? "text-white bg-slate-800/90 border-slate-600/70" : "text-slate-800 bg-white/90 border-gray-300/70"} ring-2 ring-violet-500/60 rounded-2xl p-6 border backdrop-blur-md shadow-2xl`
               : `${isDark ? "text-white" : "text-slate-800"}`
           }`}
-          style={{ textAlign: "justify", minHeight: isEditing ? "200px" : "auto" }}
+          style={{ minHeight: isEditing ? "250px" : "auto" }}
           dangerouslySetInnerHTML={{ __html: welcomeContent }}
         />
 
         {isEditing && (
-          <div className="mt-4 flex gap-3">
+          <div className="mt-6 flex gap-4">
             <button
               onClick={handleSave}
-              className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl text-sm"
+              className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 text-sm"
             >
-              Save Changes
+              💾 Save Changes
             </button>
             <button
               onClick={handleCancel}
-              className={`px-6 py-2 font-medium rounded-lg border text-sm ${isDark ? "bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600" : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"}`}
+              className={`px-8 py-3 font-semibold rounded-xl border text-sm transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-700/80 text-slate-300 border-slate-600/70 hover:bg-slate-600/80" : "bg-gray-100/80 text-gray-700 border-gray-300/70 hover:bg-gray-200/80"}`}
             >
-              Cancel
+              ❌ Cancel
             </button>
           </div>
         )}
@@ -612,18 +569,19 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
   );
 }
 
-/* ------------------------------ Highlights ------------------------------ */
+/* ------------------------------ Enhanced Highlights ------------------------------ */
 const LS_HIGHLIGHTS = "homeHighlightsV1";
 
-const EMOJI_CATEGORIES = {
-  Tech: ["🌐", "🧩", "🤖", "⚙️", "🧠", "💡", "🛠️", "💾", "🧰", "💻", "🖥️", "📱"],
-  Infrastructure: ["🚦", "🏗️", "🛰️", "🗺️", "📐", "🏙️", "🌉", "🚇", "🚉", "🚆", "🚀"],
-  Science: ["🧪", "📊", "🧮", "🔬", "🧭", "⚡", "🔋", "🔌", "📈", "📉"],
-  Nature: ["🌍", "🌏", "🌎", "⛰️", "🏔️", "🌱", "🌤️", "🌧️", "⭐", "🌙"],
-  Objects: ["🔧", "🗜️", "🔩", "📦", "🧱", "📎", "🖇️", "✏️", "🖊️", "📝", "📚", "📄"],
+const ENHANCED_EMOJI_CATEGORIES = {
+  Tech: ["🌐", "🧩", "🤖", "⚙️", "🧠", "💡", "🛠️", "💾", "🧰", "💻", "🖥️", "📱", "🔬", "⚡", "🚀"],
+  Infrastructure: ["🚦", "🏗️", "🛰️", "🗺️", "📐", "🏙️", "🌉", "🚇", "🚉", "🚆", "🛤️", "🌍", "🏗️"],
+  Science: ["🧪", "📊", "🧮", "🔬", "🧭", "⚡", "🔋", "🔌", "📈", "📉", "🔭", "🧬", "⚗️"],
+  Nature: ["🌍", "🌏", "🌎", "⛰️", "🏔️", "🌱", "🌤️", "🌧️", "⭐", "🌙", "🌊", "🍃", "🌺"],
+  Objects: ["🔧", "🗜️", "🔩", "📦", "🧱", "📎", "🖇️", "✏️", "🖊️", "📝", "📚", "📄", "💎", "🎯"],
+  Creative: ["🎨", "🖼️", "🎭", "🎪", "🎵", "🎶", "📸", "🎬", "✨", "🌟", "💫", "🎆", "🎇"],
 };
 
-/* ------------------------------ Fixed Highlight Card ------------------------------ */
+/* ------------------------------ Enhanced Highlight Card ------------------------------ */
 function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) {
   const [editing, setEditing] = useState(false);
   const [iconOpen, setIconOpen] = useState(false);
@@ -644,7 +602,7 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
     } catch {}
   }, [editing]);
 
-  const startEdit = () => { if (!ownerMode) return; setEditing(true); setTimeout(() => bodyRef.current?.focus(), 80); };
+  const startEdit = () => { if (!ownerMode) return; setEditing(true); setTimeout(() => bodyRef.current?.focus(), 120); };
 
   const saveEdit = () => {
     const titleContent = titleRef.current?.innerHTML || "";
@@ -678,7 +636,7 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
   };
 
   const stopBubble = (e) => e.stopPropagation();
-  const gradient = isDark ? DARK_UI_GRADIENT : UI_GRADIENT;
+  const gradient = isDark ? DARK_ENHANCED_GRADIENT : ENHANCED_GRADIENT;
 
   const displayTitle = item.titleHtml || "Untitled";
   const displayBody = item.bodyHtml || "No description available";
@@ -687,17 +645,17 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
     <>
       <div className="relative group h-full">
         {ownerMode && !editing && (
-          <div className="absolute right-3 top-3 z-20 opacity-0 group-hover:opacity-100 transition-all">
-            <div className="flex gap-2">
+          <div className="absolute right-4 top-4 z-20 opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-2 group-hover:translate-y-0">
+            <div className="flex gap-3">
               <button
                 onClick={startEdit}
-                className={`text-xs px-3 py-1.5 rounded-lg backdrop-blur border font-medium ${isDark ? "bg-slate-800/80 border-white/10 text-white" : "bg-white/80 border-white/20 text-slate-700"}`}
+                className={`text-xs px-4 py-2 rounded-xl backdrop-blur-md border font-semibold shadow-lg transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-800/90 border-white/20 text-white hover:bg-slate-700/90" : "bg-white/90 border-white/40 text-slate-700 hover:bg-gray-50/90"}`}
               >
                 ✏️ Edit
               </button>
               <button
                 onClick={() => onDelete(item.id)}
-                className={`text-xs px-3 py-1.5 rounded-lg backdrop-blur border font-medium ${isDark ? "bg-slate-800/80 border-white/10 text-white hover:bg-red-900/30" : "bg-white/80 border-white/20 text-slate-700 hover:bg-red-50"}`}
+                className={`text-xs px-4 py-2 rounded-xl backdrop-blur-md border font-semibold shadow-lg transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-800/90 border-white/20 text-white hover:bg-red-900/50" : "bg-white/90 border-white/40 text-slate-700 hover:bg-red-50/90"}`}
               >
                 🗑️ Delete
               </button>
@@ -707,14 +665,14 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
 
         <Card
           isDark={isDark}
-          className={`relative p-6 h-[300px] w-[340px] transition-all duration-300 hover:shadow-lg hover:-translate-y-1 rounded-2xl border-0 shadow-md ${isDark ? "bg-slate-800/50" : "bg-white/70"} backdrop-blur-sm flex flex-col flex-shrink-0`}
+          className={`relative p-8 h-[320px] w-[360px] transition-all duration-500 hover:shadow-2xl hover:shadow-violet-500/20 hover:-translate-y-2 rounded-3xl border-0 ${isDark ? "bg-slate-800/70 hover:bg-slate-800/80" : "bg-white/80 hover:bg-white/90"} backdrop-blur-md flex flex-col flex-shrink-0 transform-gpu`}
         >
           <div className="relative z-10 flex-1 flex flex-col min-h-0">
-            <div className="flex items-start gap-4 mb-3">
+            <div className="flex items-start gap-5 mb-4">
               <div className="relative flex-shrink-0">
                 <button
                   type="button"
-                  className={`text-3xl transition-all p-2 rounded-xl ${ownerMode ? "hover:scale-110" : ""} ${isDark ? "hover:bg-slate-700" : "hover:bg-slate-100"}`}
+                  className={`text-4xl transition-all duration-300 p-3 rounded-2xl ${ownerMode ? "hover:scale-110 transform" : ""} ${isDark ? "hover:bg-slate-700/60" : "hover:bg-slate-100/60"} backdrop-blur-sm`}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={(e) => { e.stopPropagation(); ownerMode && setIconOpen((v) => !v); }}
                   aria-label="Choose icon"
@@ -724,19 +682,19 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
 
                 {ownerMode && iconOpen && (
                   <div
-                    className={`absolute left-0 top-full mt-2 z-50 w-80 max-h-96 overflow-hidden rounded-2xl shadow-2xl backdrop-blur-md ${
-                      isDark ? "bg-slate-800/95 border-slate-700" : "bg-white/95 border-slate-200"
-                    } border`}
+                    className={`absolute left-0 top-full mt-3 z-50 w-96 max-h-96 overflow-hidden rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-300 animate-fade-in-enhanced ${
+                      isDark ? "bg-slate-800/95 border-slate-700/50" : "bg-white/95 border-slate-200/50"
+                    }`}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className={`flex overflow-x-auto p-2 border-b ${isDark ? "border-slate-700" : "border-slate-200"}`}>
-                      {Object.keys(EMOJI_CATEGORIES).map((cat) => (
+                    <div className={`flex overflow-x-auto p-3 border-b ${isDark ? "border-slate-700/50" : "border-slate-200/50"} gap-2`}>
+                      {Object.keys(ENHANCED_EMOJI_CATEGORIES).map((cat) => (
                         <button
                           key={cat}
-                          className={`px-3 py-1.5 text-sm font-medium rounded-lg whitespace-nowrap ${
+                          className={`px-4 py-2 text-sm font-semibold rounded-xl whitespace-nowrap transition-all duration-300 ${
                             selectedCategory === cat
-                              ? `bg-gradient-to-r ${gradient} text-white`
-                              : `${isDark ? "text-white/80 hover:bg-slate-700" : "text-slate-600 hover:bg-slate-100"}`
+                              ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
+                              : `${isDark ? "text-white/80 hover:bg-slate-700/60" : "text-slate-600 hover:bg-slate-100/60"} hover:scale-105 transform`
                           }`}
                           onClick={() => setSelectedCategory(cat)}
                         >
@@ -744,11 +702,11 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                         </button>
                       ))}
                     </div>
-                    <div className="p-3 grid grid-cols-8 gap-2 max-h-64 overflow-y-auto">
-                      {EMOJI_CATEGORIES[selectedCategory].map((emo) => (
+                    <div className="p-4 grid grid-cols-8 gap-3 max-h-64 overflow-y-auto">
+                      {ENHANCED_EMOJI_CATEGORIES[selectedCategory].map((emo) => (
                         <button
                           key={emo}
-                          className={`h-12 w-12 grid place-items-center text-2xl rounded-xl ${isDark ? "hover:bg-slate-700" : "hover:bg-slate-100"}`}
+                          className={`h-14 w-14 grid place-items-center text-2xl rounded-2xl transition-all duration-300 transform hover:scale-110 ${isDark ? "hover:bg-slate-700/60" : "hover:bg-slate-100/60"} backdrop-blur-sm`}
                           onClick={() => {
                             const newItem = { ...item, icon: emo };
                             onChange(newItem);
@@ -770,16 +728,16 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                     contentEditable={true}
                     suppressContentEditableWarning
                     onPaste={handlePasteTitle}
-                    className={`text-lg font-bold leading-tight outline-none ring-2 ring-violet-500/50 rounded-lg px-2 py-1 ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-800"}`}
+                    className={`text-xl font-bold leading-tight outline-none ring-2 ring-violet-500/60 rounded-xl px-3 py-2 transition-all duration-300 ${isDark ? "bg-slate-700/80 text-white" : "bg-white/80 text-slate-800"} backdrop-blur-sm`}
                     dangerouslySetInnerHTML={{ __html: item.titleHtml || "" }}
                   />
                 ) : (
                   <h3
-                    className={`text-lg font-bold leading-tight bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}
+                    className={`text-xl font-bold leading-tight bg-clip-text text-transparent bg-gradient-to-r ${gradient} animate-gradient-shift`}
                     dangerouslySetInnerHTML={{ __html: displayTitle }}
                   />
                 )}
-                <div className={`mt-2 h-1 w-16 rounded-full bg-gradient-to-r ${gradient} opacity-60`} />
+                <div className={`mt-3 h-1.5 w-20 rounded-full bg-gradient-to-r ${gradient} opacity-70 animate-pulse-subtle`} />
               </div>
             </div>
 
@@ -793,59 +751,59 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
                   onWheel={stopBubble}
                   onMouseDown={stopBubble}
                   onTouchStart={stopBubble}
-                  className={`relative z-10 text-sm leading-6 outline-none flex-1 min-h-0 overflow-y-auto pr-1 ring-2 ring-violet-500/50 rounded-lg p-3 ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-700"}`}
+                  className={`relative z-10 text-sm leading-7 outline-none flex-1 min-h-0 overflow-y-auto pr-2 ring-2 ring-violet-500/60 rounded-xl p-4 transition-all duration-300 ${isDark ? "bg-slate-700/80 text-white" : "bg-white/80 text-slate-700"} backdrop-blur-sm`}
                   style={{ textAlign: "justify" }}
                   dangerouslySetInnerHTML={{ __html: item.bodyHtml || "" }}
                 />
               ) : (
                 <div
-                  className={`relative z-10 text-sm leading-6 flex-1 min-h-0 overflow-y-auto pr-1 ${isDark ? "text-white" : "text-slate-600"}`}
+                  className={`relative z-10 text-sm leading-7 flex-1 min-h-0 overflow-y-auto pr-2 transition-all duration-300 ${isDark ? "text-white/90" : "text-slate-600"}`}
                   style={{ textAlign: "justify" }}
                   dangerouslySetInnerHTML={{ __html: displayBody }}
                 />
               )}
 
-              <div className="pt-3 flex justify-end">
+              <div className="pt-4 flex justify-end">
                 {!editing ? (
                   <button
                     type="button"
                     onClick={() => setShowModal(true)}
-                    className={`text-xs font-medium flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors ${isDark ? "text-white/80 hover:text-violet-300 hover:bg-slate-700/50" : "text-slate-500 hover:text-violet-600 hover:bg-slate-100/50"}`}
+                    className={`text-sm font-semibold flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 transform hover:scale-105 ${isDark ? "text-white/80 hover:text-violet-300 hover:bg-slate-700/50" : "text-slate-500 hover:text-violet-600 hover:bg-slate-100/50"} backdrop-blur-sm`}
                     aria-label="Read more highlight"
                     onMouseDown={stopBubble}
                     onWheel={stopBubble}
                     onTouchStart={stopBubble}
                   >
                     <span>Read more</span>
-                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <svg className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                     </svg>
                   </button>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <button
                       onClick={() => document.execCommand("bold")}
-                      className={`p-2 rounded text-sm font-bold ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200 text-slate-700"}`}
+                      className={`p-3 rounded-xl text-sm font-bold transition-all duration-300 ${isDark ? "hover:bg-slate-600/60 text-white" : "hover:bg-slate-200/60 text-slate-700"} backdrop-blur-sm`}
                     >
                       B
                     </button>
                     <button
                       onClick={() => document.execCommand("italic")}
-                      className={`p-2 rounded text-sm italic ${isDark ? "hover:bg-slate-600 text-white" : "hover:bg-slate-200 text-slate-700"}`}
+                      className={`p-3 rounded-xl text-sm italic transition-all duration-300 ${isDark ? "hover:bg-slate-600/60 text-white" : "hover:bg-slate-200/60 text-slate-700"} backdrop-blur-sm`}
                     >
                       I
                     </button>
                     <button
                       onClick={saveEdit}
-                      className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-sm font-medium"
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
                     >
-                      Save
+                      💾 Save
                     </button>
                     <button
                       onClick={cancelEdit}
-                      className={`px-3 py-1.5 rounded-md text-sm font-medium ${isDark ? "bg-slate-600 text-white" : "bg-slate-100 text-slate-700"}`}
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-600/80 text-white" : "bg-slate-100/80 text-slate-700"} backdrop-blur-sm`}
                     >
-                      Cancel
+                      ❌ Cancel
                     </button>
                   </div>
                 )}
@@ -856,29 +814,29 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in-enhanced" onClick={() => setShowModal(false)}>
           <div
-            className={`w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden backdrop-blur-md ${isDark ? "bg-slate-800/95" : "bg-white/95"} border ${isDark ? "border-slate-700" : "border-slate-200"}`}
+            className={`w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden backdrop-blur-xl transition-all duration-500 transform ${isDark ? "bg-slate-800/95" : "bg-white/95"} border ${isDark ? "border-slate-700/50" : "border-slate-200/50"}`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className={`p-6 flex items-start justify-between border-b ${isDark ? "border-slate-700" : "border-slate-200"}`}>
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">{item.icon || "💡"}</span>
+            <div className={`p-8 flex items-start justify-between border-b ${isDark ? "border-slate-700/50" : "border-slate-200/50"}`}>
+              <div className="flex items-center gap-4">
+                <span className="text-4xl">{item.icon || "💡"}</span>
                 <div
-                  className={`text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${isDark ? DARK_UI_GRADIENT : UI_GRADIENT}`}
+                  className={`text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}
                   dangerouslySetInnerHTML={{ __html: displayTitle }}
                 />
               </div>
               <button
-                className={`h-10 w-10 grid place-items-center rounded-full ${isDark ? "hover:bg-slate-700 text-white" : "hover:bg-slate-100 text-slate-700"}`}
+                className={`h-12 w-12 grid place-items-center rounded-2xl transition-all duration-300 transform hover:scale-110 ${isDark ? "hover:bg-slate-700/60 text-white" : "hover:bg-slate-100/60 text-slate-700"} backdrop-blur-sm`}
                 onClick={() => setShowModal(false)}
               >
                 ✕
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-8">
               <div
-                className={`prose prose-lg max-w-none leading-8 ${isDark ? "text-white [&_*]:text-white" : "text-slate-700"}`}
+                className={`prose prose-xl max-w-none leading-8 transition-all duration-300 ${isDark ? "text-white [&_*]:text-white" : "text-slate-700"}`}
                 style={{ textAlign: "justify" }}
                 dangerouslySetInnerHTML={{ __html: displayBody }}
               />
@@ -890,7 +848,7 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
   );
 }
 
-/* Add Highlight Card (owner-only) */
+/* Enhanced Add Highlight Card */
 function EnhancedAddHighlightCard({ onAdd, ownerMode, isDark }) {
   if (!ownerMode) return null;
   return (
@@ -902,28 +860,28 @@ function EnhancedAddHighlightCard({ onAdd, ownerMode, isDark }) {
     >
       <Card
         isDark={isDark}
-        className={`p-6 h-[300px] w-[340px] border-2 border-dashed rounded-2xl grid place-items-center transition-all hover:scale-[1.02] ${isDark ? "border-slate-600 hover:border-slate-500 bg-slate-800/30" : "border-slate-300 hover:border-slate-400 bg-slate-50/50"}`}
+        className={`p-8 h-[320px] w-[360px] border-2 border-dashed rounded-3xl grid place-items-center transition-all duration-500 hover:scale-105 transform-gpu ${isDark ? "border-slate-600/60 hover:border-slate-500/80 bg-slate-800/40 hover:bg-slate-800/60" : "border-slate-300/60 hover:border-slate-400/80 bg-slate-50/60 hover:bg-slate-50/80"} backdrop-blur-sm`}
       >
-        <div className="flex flex-col items-center gap-3">
-          <div className={`text-4xl p-3 rounded-full ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-600"}`}>
-            <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <div className="flex flex-col items-center gap-4">
+          <div className={`text-5xl p-4 rounded-2xl transition-all duration-300 transform group-hover:scale-110 ${isDark ? "bg-slate-700/80 text-white" : "bg-white/80 text-slate-600"} backdrop-blur-sm shadow-lg`}>
+            <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/>
             </svg>
           </div>
-          <div className={`text-sm font-medium ${isDark ? "text-white" : "text-slate-600"}`}>Add New Section</div>
+          <div className={`text-base font-semibold ${isDark ? "text-white/90" : "text-slate-600"}`}>Add New Section</div>
         </div>
       </Card>
     </button>
   );
 }
 
-/* ------------------------------ Floating Controls ------------------------------ */
+/* ------------------------------ Enhanced Floating Controls ------------------------------ */
 function ControlPanel({ isDark, toggleTheme, viewMode, toggleViewMode }) {
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2">
+    <div className="fixed bottom-6 right-6 z-40 flex items-center gap-3">
       <button
         onClick={toggleTheme}
-        className={`px-4 py-2 text-sm font-medium rounded-full backdrop-blur-md border shadow-lg transition-all ${isDark ? "bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700/60" : "bg-white/80 border-slate-200 text-slate-700 hover:bg-white/70"}`}
+        className={`px-5 py-3 text-sm font-semibold rounded-2xl backdrop-blur-xl border shadow-xl transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-800/90 border-slate-700/50 text-white hover:bg-slate-700/80" : "bg-white/90 border-slate-200/50 text-slate-700 hover:bg-white/80"}`}
         aria-label="Toggle theme"
         title="Toggle light/dark"
       >
@@ -932,16 +890,16 @@ function ControlPanel({ isDark, toggleTheme, viewMode, toggleViewMode }) {
 
       <button
         onClick={toggleViewMode}
-        className={`p-3 rounded-full backdrop-blur-md border shadow-lg transition-all ${isDark ? "bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700/60" : "bg-white/80 border-slate-200 text-slate-700 hover:bg-white/70"}`}
+        className={`p-4 rounded-2xl backdrop-blur-xl border shadow-xl transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-800/90 border-slate-700/50 text-white hover:bg-slate-700/80" : "bg-white/90 border-slate-200/50 text-slate-700 hover:bg-white/80"}`}
         aria-label="Toggle view mode"
         title="Toggle grid/list"
       >
         {viewMode === "grid" ? (
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" strokeWidth="2"/>
           </svg>
         ) : (
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M4 6h16M4 12h16M4 18h16" strokeWidth="2" strokeLinecap="round"/>
           </svg>
         )}
@@ -950,7 +908,7 @@ function ControlPanel({ isDark, toggleTheme, viewMode, toggleViewMode }) {
   );
 }
 
-/* ------------------------------ Main Page ------------------------------ */
+/* ------------------------------ Main Enhanced Page ------------------------------ */
 export default function Home() {
   const navigate = useNavigate();
   const { owner } = useOwnerMode?.() || {};
@@ -977,7 +935,6 @@ export default function Home() {
         setWelcomeHtml(home.welcomeHtml);
         setHighlights(home.highlights);
       } catch (e) {
-        // Fallback to local
         if (!mounted) return;
         try {
           const localWelcome = localStorage.getItem(LS_WELCOME);
@@ -1053,7 +1010,7 @@ export default function Home() {
     return () => { mounted = false; };
   }, []);
 
-  // Persist normalized highlights locally
+  // Persist highlights locally
   useEffect(() => {
     try { window.localStorage.setItem(LS_HIGHLIGHTS, JSON.stringify(highlights.map(normalizeHighlight))); } catch {}
   }, [highlights]);
@@ -1099,29 +1056,73 @@ export default function Home() {
   const pjRow = useHRow();
   const poRow = useHRow();
 
-  const gradient = isDark ? DARK_UI_GRADIENT : UI_GRADIENT;
+  const gradient = isDark ? DARK_ENHANCED_GRADIENT : ENHANCED_GRADIENT;
 
   if (loading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${isDark ? "bg-slate-900 text-white" : "bg-gray-50 text-slate-900"}`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500 mx-auto mb-4"></div>
-          <p className="text-sm font-medium">Loading...</p>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-6 bg-gradient-to-r ${gradient} p-1`}>
+            <div className={`rounded-full w-full h-full ${isDark ? "bg-slate-900" : "bg-gray-50"}`}></div>
+          </div>
+          <p className="text-lg font-semibold">Loading your workspace...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen font-sans ${isDark ? "dark bg-slate-900 text-white" : "bg-gray-50 text-slate-900"}`}>
+    <div className={`min-h-screen font-sans transition-all duration-700 ${isDark ? "dark bg-slate-900 text-white" : "bg-gray-50 text-slate-900"}`}>
       <style>{`
         .clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         .clamp-4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
         .clamp-5 { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
         .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .animate-fade-in { animation: fadeIn 0.6s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .animate-fade-in-enhanced { 
+          animation: fadeInEnhanced 0.8s ease-out; 
+        }
+        .animate-gradient-shift {
+          background-size: 200% 200%;
+          animation: gradientShift 3s ease-in-out infinite;
+        }
+        .animate-pulse-subtle {
+          animation: pulseSubtle 2s ease-in-out infinite;
+        }
+        .animate-wave {
+          animation: wave 2s ease-in-out infinite;
+          transform-origin: 70% 70%;
+        }
+        
+        @keyframes fadeInEnhanced { 
+          from { 
+            opacity: 0; 
+            transform: translateY(30px) scale(0.95); 
+            filter: blur(10px);
+          } 
+          to { 
+            opacity: 1; 
+            transform: translateY(0) scale(1); 
+            filter: blur(0px);
+          } 
+        }
+        
+        @keyframes gradientShift {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        
+        @keyframes pulseSubtle {
+          0%, 100% { opacity: 0.7; }
+          50% { opacity: 0.9; }
+        }
+        
+        @keyframes wave {
+          0%, 100% { transform: rotate(0deg); }
+          10%, 30%, 50%, 70% { transform: rotate(14deg); }
+          20%, 40%, 60%, 80% { transform: rotate(-8deg); }
+        }
 
         [contenteditable] ul { list-style: disc outside; padding-left: 1.25rem; margin: 0.5rem 0; }
         [contenteditable] ol { list-style: decimal outside; padding-left: 1.75rem; margin: 0.5rem 0; }
@@ -1131,29 +1132,27 @@ export default function Home() {
         [contenteditable] p:last-child { margin-bottom: 0; }
         [contenteditable]:focus { outline: none; }
 
-        /* Enhanced welcome section styling */
-        .welcome-content p { margin-bottom: 1rem; line-height: 1.7; }
+        .welcome-content p { margin-bottom: 1.2rem; line-height: 1.8; }
         .welcome-content p:last-child { margin-bottom: 0; }
-        .welcome-content ul, .welcome-content ol { margin: 1rem 0; }
-        .welcome-content li { margin: 0.25rem 0; }
+        .welcome-content ul, .welcome-content ol { margin: 1.2rem 0; }
+        .welcome-content li { margin: 0.3rem 0; }
 
-        /* Font system improvements */
         .font-sans { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
 
-        /* Force white text for anything we mark as force-dark */
         .dark .force-dark * { color: white !important; }
-
-        /* Also force any slate backgrounds to white text in dark */
-        .dark .bg-slate-800 *, .dark .bg-slate-800\\/50 *, .dark .bg-slate-800\\/60 * {
+        .dark .bg-slate-800 *, .dark .bg-slate-800\\/50 *, .dark .bg-slate-800\\/60 *, .dark .bg-slate-800\\/70 *, .dark .bg-slate-800\\/80 * {
           color: white !important;
         }
-
-        /* Keep gradient text transparent in dark so gradient shows through */
         .dark .bg-clip-text.text-transparent {
           color: transparent !important;
           background-clip: text;
           -webkit-background-clip: text;
         }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(45deg, #6366f1, #8b5cf6); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: linear-gradient(45deg, #4f46e5, #7c3aed); }
       `}</style>
 
       <ControlPanel isDark={isDark} toggleTheme={toggleTheme} viewMode={viewMode} toggleViewMode={toggleViewMode} />
@@ -1165,26 +1164,26 @@ export default function Home() {
         onSaveHtml={saveWelcome}
       />
 
-      {/* Highlights */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl md:text-2xl font-semibold flex items-center gap-2">
-            <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}>
+      {/* Enhanced Highlights */}
+      <section className="container mx-auto px-4 py-10">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl md:text-3xl font-bold flex items-center gap-3">
+            <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient} animate-gradient-shift`}>
               {MODERN_ICONS.highlights} Highlights
             </span>
           </h3>
           {hiRow.hasOverflow && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => hiRow.scrollBy(-1)}
-                className={`h-9 w-9 grid place-items-center rounded-full transition-colors ${isDark ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-700"}`}
+                className={`h-11 w-11 grid place-items-center rounded-2xl transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-700/80 hover:bg-slate-600/80 text-white" : "bg-slate-100/80 hover:bg-slate-200/80 text-slate-700"} backdrop-blur-sm shadow-lg`}
                 aria-label="Scroll left"
               >
                 ◀
               </button>
               <button
                 onClick={() => hiRow.scrollBy(1)}
-                className={`h-9 w-9 grid place-items-center rounded-full transition-colors ${isDark ? "bg-slate-700 hover:bg-slate-600 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-700"}`}
+                className={`h-11 w-11 grid place-items-center rounded-2xl transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-700/80 hover:bg-slate-600/80 text-white" : "bg-slate-100/80 hover:bg-slate-200/80 text-slate-700"} backdrop-blur-sm shadow-lg`}
                 aria-label="Scroll right"
               >
                 ▶
@@ -1195,7 +1194,7 @@ export default function Home() {
 
         <div
           ref={hiRow.rowRef}
-          className="flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory"
+          className="flex gap-6 overflow-x-auto hide-scrollbar custom-scrollbar snap-x snap-mandatory"
           style={{ scrollBehavior: "smooth" }}
           onMouseDown={hiRow.onMouseDown}
           onMouseMove={hiRow.onMouseMove}
@@ -1224,21 +1223,21 @@ export default function Home() {
         </div>
 
         {hiRow.hasOverflow && (
-          <div className={`mt-3 h-1 w-full rounded ${isDark ? "bg-slate-700" : "bg-slate-200"}`}>
+          <div className={`mt-4 h-2 w-full rounded-full ${isDark ? "bg-slate-700/60" : "bg-slate-200/60"}`}>
             <div
-              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded transition-all duration-300"
+              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full transition-all duration-500"
               style={{ width: `${hiRow.progress}%` }}
             />
           </div>
         )}
       </section>
 
-      {/* Projects */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-4">
-          <button type="button" onClick={() => navigate("/projects")} className="text-left" aria-label="Go to all projects" title="Go to Projects">
-            <h3 className="text-xl md:text-2xl font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity">
-              <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}>
+      {/* Enhanced Projects */}
+      <section className="container mx-auto px-4 py-10">
+        <div className="flex items-center justify-between mb-6">
+          <button type="button" onClick={() => navigate("/projects")} className="text-left group" aria-label="Go to all projects" title="Go to Projects">
+            <h3 className="text-2xl md:text-3xl font-bold flex items-center gap-3 transition-all duration-300 group-hover:scale-105">
+              <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient} animate-gradient-shift`}>
                 {MODERN_ICONS.projects} Projects
               </span>
             </h3>
@@ -1247,23 +1246,23 @@ export default function Home() {
           <button
             type="button"
             onClick={() => navigate("/projects")}
-            className={`text-sm font-medium px-3 py-1.5 rounded-lg border transition-colors ${isDark ? "border-slate-600 text-white hover:bg-slate-700" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
+            className={`text-sm font-semibold px-5 py-2.5 rounded-xl border transition-all duration-300 transform hover:scale-105 ${isDark ? "border-slate-600/60 text-white hover:bg-slate-700/60" : "border-slate-300/60 text-slate-700 hover:bg-slate-100/60"} backdrop-blur-sm shadow-lg`}
             aria-label="View all projects"
           >
             View all →
           </button>
         </div>
 
-        <div className={`mb-4 text-sm flex items-center gap-3 ${isDark ? "text-white/70" : "text-slate-500"}`}>
-          <span className="inline-flex items-center gap-1 font-medium">
+        <div className={`mb-5 text-sm flex items-center gap-4 ${isDark ? "text-white/80" : "text-slate-600"}`}>
+          <span className="inline-flex items-center gap-2 font-medium">
             <span>🔥</span> Trending tags are labeled
           </span>
-          <span className="inline-flex items-center gap-1 font-medium">
+          <span className="inline-flex items-center gap-2 font-medium">
             <span>🕒</span> Recent updates in last 30 days
           </span>
         </div>
 
-        <ProjectsAndPosts
+        <EnhancedProjectsAndPosts
           isDark={isDark}
           viewMode={viewMode}
           rowHook={pjRow}
@@ -1273,12 +1272,12 @@ export default function Home() {
         />
       </section>
 
-      {/* Posts */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-4">
-          <button type="button" onClick={() => navigate("/blog")} className="text-left" aria-label="Go to all blog posts" title="Go to Blog">
-            <h3 className="text-xl md:text-2xl font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity">
-              <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}>
+      {/* Enhanced Posts */}
+      <section className="container mx-auto px-4 py-10">
+        <div className="flex items-center justify-between mb-6">
+          <button type="button" onClick={() => navigate("/blog")} className="text-left group" aria-label="Go to all blog posts" title="Go to Blog">
+            <h3 className="text-2xl md:text-3xl font-bold flex items-center gap-3 transition-all duration-300 group-hover:scale-105">
+              <span className={`bg-clip-text text-transparent bg-gradient-to-r ${gradient} animate-gradient-shift`}>
                 {MODERN_ICONS.posts} Latest Posts
               </span>
             </h3>
@@ -1287,85 +1286,181 @@ export default function Home() {
           <button
             type="button"
             onClick={() => navigate("/blog")}
-            className={`text-sm font-medium px-3 py-1.5 rounded-lg border transition-colors ${isDark ? "border-slate-600 text-white hover:bg-slate-700" : "border-slate-300 text-slate-700 hover:bg-slate-100"}`}
+            className={`text-sm font-semibold px-5 py-2.5 rounded-xl border transition-all duration-300 transform hover:scale-105 ${isDark ? "border-slate-600/60 text-white hover:bg-slate-700/60" : "border-slate-300/60 text-slate-700 hover:bg-slate-100/60"} backdrop-blur-sm shadow-lg`}
             aria-label="View all blog posts"
           >
             View all →
           </button>
         </div>
 
-        <PostsRow isDark={isDark} poRow={poRow} posts={posts} navigate={navigate} viewMode={viewMode} />
+        {/* LIST MODE NOW FULL-WIDTH STACK */}
+        <EnhancedPostsRow isDark={isDark} poRow={poRow} posts={posts} navigate={navigate} viewMode={viewMode} />
 
-        {viewMode !== "grid" && (
-          <div className={`mt-3 h-1 w-full rounded ${isDark ? "bg-slate-700" : "bg-slate-200"}`}>
+        {viewMode !== "grid" && poRow.hasOverflow && (
+          <div className={`mt-4 h-2 w-full rounded-full ${isDark ? "bg-slate-700/60" : "bg-slate-200/60"}`}>
             <div
-              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded transition-all duration-300"
+              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full transition-all duration-500"
               style={{ width: `${poRow.progress}%` }}
             />
           </div>
         )}
       </section>
 
-      <div className="h-12" />
+      <div className="h-16" />
     </div>
   );
 }
 
-/* ------------- Helper components for Projects/Posts rows ------------- */
-function ProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo, isProject=false }) {
+/* ------------- Enhanced Helper components for Projects/Posts rows ------------- */
+/* ------------- Enhanced Helper components for Projects/Posts rows ------------- */
+function EnhancedProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo, isProject=false }) {
+  const containerCommon =
+    viewMode === "grid"
+      ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+      : "flex gap-6 overflow-x-auto hide-scrollbar custom-scrollbar snap-x snap-mandatory";
+
+  const containerProps =
+    viewMode === "grid"
+      ? {}
+      : {
+          ref: rowHook.rowRef,
+          style: { scrollBehavior: "smooth" },
+          onMouseDown: rowHook.onMouseDown,
+          onMouseMove: rowHook.onMouseMove,
+          onMouseUp: rowHook.onMouseUp,
+          onMouseLeave: rowHook.onMouseLeave,
+          onTouchStart: rowHook.onTouchStart,
+          onTouchMove: rowHook.onTouchMove,
+          onTouchEnd: rowHook.onTouchEnd,
+          onKeyDown: rowHook.onKey,
+          onScroll: rowHook.onScroll,
+          tabIndex: 0,
+          "aria-label": isProject ? "Projects carousel" : "Posts carousel",
+        };
+
   return (
-    <div
-      ref={rowHook.rowRef}
-      className={`${viewMode==="grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" : "flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory"}`}
-      style={viewMode !== "grid" ? { scrollBehavior: "smooth" } : {}}
-      {...(viewMode==="grid" ? {} : {
-        onMouseDown: rowHook.onMouseDown, onMouseMove: rowHook.onMouseMove, onMouseUp: rowHook.onMouseUp, onMouseLeave: rowHook.onMouseLeave,
-        onTouchStart: rowHook.onTouchStart, onTouchMove: rowHook.onTouchMove, onTouchEnd: rowHook.onTouchEnd,
-        onKeyDown: rowHook.onKey, onScroll: rowHook.onScroll, tabIndex: 0, "aria-label": isProject ? "Projects carousel" : "Posts carousel"
-      })}
-    >
+    <div className={containerCommon} {...containerProps}>
       {(items || []).map((it) => {
         const trending = isProject ? isTrendingByTags(it.tags || it.techStack || []) : false;
         const recent = isProject ? isRecent(it.updatedAt || it.createdAt) : false;
         const badges = isProject ? projectBadges(it) : [];
 
-        const go = () => { if (viewMode !== "grid" && !rowHook.canClick()) return; navigateTo(it); };
-        const onKey = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+        const go = () => {
+          if (viewMode !== "grid" && rowHook && !rowHook.canClick()) return;
+          navigateTo(it);
+        };
+        const onKey = (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            go();
+          }
+        };
 
         return (
           <Card
             isDark={isDark}
             key={it.id || it.slug || it.name || Math.random()}
-            className={`${viewMode !== "grid" ? "min-w-[320px] snap-center" : ""} p-5 rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${isDark ? "bg-slate-800/60" : "bg-white/70"}`}
+            className={`${
+              viewMode !== "grid" ? "min-w-[340px] snap-center" : ""
+            } p-6 rounded-3xl transition-all duration-500 hover:shadow-2xl hover:shadow-violet-500/20 hover:-translate-y-2 transform-gpu ${
+              isDark ? "bg-slate-800/70 hover:bg-slate-800/80" : "bg-white/80 hover:bg-white/90"
+            } group`}
           >
-            <button type="button" className="absolute inset-0" onClick={go} onKeyDown={onKey} aria-label={it.name || it.title || "Open"} />
-            <div className="relative pointer-events-none flex flex-col gap-3">
+            <button
+              type="button"
+              className="absolute inset-0"
+              onClick={go}
+              onKeyDown={onKey}
+              aria-label={it.name || it.title || "Open"}
+            />
+            <div className="relative pointer-events-none flex flex-col gap-4">
               {isProject && Array.isArray(it.images) && it.images[0] && (
-                <div className={`aspect-[16/9] overflow-hidden rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-100"}`}>
-                  <img src={it.images[0]} alt={it.name || it.title || "Project"} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                <div className={`${isDark ? "bg-slate-700" : "bg-slate-100"} aspect-[16/9] overflow-hidden rounded-2xl`}>
+                  <img
+                    src={it.images[0]}
+                    alt={it.name || it.title || "Project"}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    loading="lazy"
+                  />
                 </div>
               )}
+
               {isProject && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  {trending && <span className={`text-xs px-2 py-1 rounded font-medium ${isDark ? "bg-pink-900/30 text-pink-200" : "bg-pink-100 text-pink-800"}`}>{MODERN_ICONS.trending} Trending</span>}
-                  {recent && <span className={`text-xs px-2 py-1 rounded font-medium ${isDark ? "bg-emerald-900/30 text-emerald-200" : "bg-emerald-100 text-emerald-900"}`}>{MODERN_ICONS.recent} Recent</span>}
-                  {(it.tags || []).slice(0, 4).map((t) => <span key={t} className={chipClassFor(t, isDark)}>{t}</span>)}
+                <div className="flex items-center gap-3 flex-wrap">
+                  {trending && (
+                    <span
+                      className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all duration-300 ${
+                        isDark
+                          ? "bg-gradient-to-r from-pink-900/40 to-rose-900/40 text-pink-200 ring-2 ring-pink-600"
+                          : "bg-gradient-to-r from-pink-100 to-rose-100 text-pink-800 ring-2 ring-pink-300"
+                      } hover:scale-105 transform`}
+                    >
+                      {MODERN_ICONS.trending} Trending
+                    </span>
+                  )}
+                  {recent && (
+                    <span
+                      className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all duration-300 ${
+                        isDark
+                          ? "bg-gradient-to-r from-emerald-900/40 to-green-900/40 text-emerald-200 ring-2 ring-emerald-600"
+                          : "bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-900 ring-2 ring-emerald-300"
+                      } hover:scale-105 transform`}
+                    >
+                      {MODERN_ICONS.recent} Recent
+                    </span>
+                  )}
+                  {(it.tags || []).slice(0, 4).map((t) => (
+                    <span key={t} className={chipClassFor(t, isDark)}>
+                      {t}
+                    </span>
+                  ))}
                 </div>
               )}
-              <div className="flex items-start justify-between gap-2">
-                <h4 className={`text-lg font-semibold leading-tight ${isDark ? "text-white" : "text-slate-900"}`}>{it.name || it.title}</h4>
-                {isProject && <div className="flex gap-2 flex-wrap">{badges.map(([emo,label]) => <span key={emo+label} title={label} className="text-lg">{emo}</span>)}</div>}
+
+              <div className="flex items-start justify-between gap-3">
+                <h4
+                  className={`text-xl font-bold leading-tight transition-all duration-300 ${
+                    isDark ? "text-white group-hover:text-violet-300" : "text-slate-900 group-hover:text-violet-700"
+                  }`}
+                >
+                  {it.name || it.title}
+                </h4>
+                {isProject && (
+                  <div className="flex gap-2 flex-wrap">
+                    {badges.map(([emo, label]) => (
+                      <span key={emo + label} title={label} className="text-xl transition-all duration-300 hover:scale-110">
+                        {emo}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
+
               {isProject && it.summary && (
                 <p
-                  className={`text-sm leading-6 clamp-3 ${isDark ? "text-white force-dark" : "text-slate-600"}`}
+                  className={`text-sm leading-7 clamp-3 transition-all duration-300 ${
+                    isDark ? "text-white/90 force-dark" : "text-slate-600"
+                  }`}
                   dangerouslySetInnerHTML={{ __html: sanitizePreview(it.summary, { forceDark: isDark }) }}
                 />
               )}
+
               {isProject && (
                 <div className="flex items-center justify-between pt-2">
-                  <div className="flex gap-2">{badges.map(([emo,label])=> <span key={emo+label} title={label} className="text-lg">{emo}</span>)}</div>
-                  <span className={`text-xs px-3 py-1.5 rounded-md font-medium ${isDark ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-700"}`}>Read more →</span>
+                  <div className="flex gap-2">
+                    {badges.map(([emo, label]) => (
+                      <span key={emo + label} title={label} className="text-xl transition-all duration-300 hover:scale-110">
+                        {emo}
+                      </span>
+                    ))}
+                  </div>
+                  <span
+                    className={`text-sm px-4 py-2 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 ${
+                      isDark ? "bg-slate-700/80 text-white hover:bg-slate-600/80" : "bg-slate-100/80 text-slate-700 hover:bg-slate-200/80"
+                    } backdrop-blur-sm`}
+                  >
+                    Read more →
+                  </span>
                 </div>
               )}
             </div>
@@ -1376,54 +1471,99 @@ function ProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo, isProj
   );
 }
 
-function PostsRow({ isDark, poRow, posts, navigate, viewMode }) {
-  const containerProps = (viewMode === "grid")
-    ? {}
-    : {
-        onMouseDown: poRow.onMouseDown, onMouseMove: poRow.onMouseMove, onMouseUp: poRow.onMouseUp, onMouseLeave: poRow.onMouseLeave,
-        onTouchStart: poRow.onTouchStart, onTouchMove: poRow.onTouchMove, onTouchEnd: poRow.onTouchEnd,
-        onKeyDown: poRow.onKey, onScroll: poRow.onScroll, tabIndex: 0, "aria-label": "Blog posts carousel"
-      };
+function EnhancedPostsRow({ isDark, poRow, posts, navigate, viewMode }) {
+  // GRID: same 3-column grid as before
+  if (viewMode === "grid") {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {posts.map((post) => (
+          <PostCard key={post.id || post.slug || post.title} post={post} isDark={isDark} navigate={navigate} compact={false} />
+        ))}
+      </div>
+    );
+  }
+
+  // LIST: full-width vertical stack (no horizontal scroll)
+  return (
+    <div className="grid grid-cols-1 gap-6 w-full">
+      {posts.map((post) => (
+        <PostCard key={post.id || post.slug || post.title} post={post} isDark={isDark} navigate={navigate} compact={true} />
+      ))}
+    </div>
+  );
+}
+
+/* Reusable PostCard used by EnhancedPostsRow (handles both grid and list) */
+function PostCard({ post, isDark, navigate, compact }) {
+  const badges = postBadges(post);
+  const html = sanitizePreview(post.bodyHtml || post.content || "", { forceDark: isDark });
+  const snippet = snippetHtml(html, compact ? 520 : 320);
+
+  const goBlog = () => navigate("/blog", { state: { focusId: post.id || post.slug || null } });
+  const onKey = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      goBlog();
+    }
+  };
 
   return (
-    <div
-      ref={poRow.rowRef}
-      className={`${viewMode==="grid" ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5" : "flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory"}`}
-      style={viewMode !== "grid" ? { scrollBehavior: "smooth" } : {}}
-      {...containerProps}
+    <Card
+      isDark={isDark}
+      className={`w-full p-6 rounded-3xl transition-all duration-500 hover:shadow-2xl hover:shadow-violet-500/20 hover:-translate-y-2 transform-gpu ${
+        isDark ? "bg-slate-800/70 hover:bg-slate-800/80" : "bg-white/80 hover:bg-white/90"
+      } group`}
     >
-      {(posts || []).map((post) => {
-        const badges = postBadges(post);
-        const html = sanitizePreview(post.bodyHtml || post.content || "", { forceDark: isDark });
-        const snippet = snippetHtml(html, 320);
+      {/* Click overlay */}
+      <button type="button" className="absolute inset-0" onClick={goBlog} onKeyDown={onKey} aria-label={post.title || "Open post"} />
 
-        const goBlog = () => { if (viewMode !== "grid" && !poRow.canClick()) return; navigate("/blog", { state: { focusId: post.id || post.slug || null } }); };
-        const onKey = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goBlog(); } };
+      <div className="relative pointer-events-none flex flex-col gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          {(post.tags || []).slice(0, 6).map((t) => (
+            <span key={t} className={chipClassFor(t, isDark)}>
+              {t}
+            </span>
+          ))}
+        </div>
 
-        return (
-          <Card
-            isDark={isDark}
-            key={post.id || post.slug || post.title}
-            className={`${viewMode !== "grid" ? "snap-center min-w-[320px]" : ""} p-5 rounded-2xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1 ${isDark ? "bg-slate-800/60" : "bg-white/70"}`}
+        <h4
+          className={`text-xl font-bold leading-tight transition-all duration-300 ${
+            isDark ? "text-white group-hover:text-violet-300" : "text-slate-900 group-hover:text-violet-700"
+          }`}
+        >
+          {post.title}
+        </h4>
+
+        <div className={`${isDark ? "text-white/80" : "text-slate-500"} text-sm font-medium`}>
+          {post.publishedAt
+            ? new Date(post.publishedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+            : post.updatedAt
+            ? new Date(post.updatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+            : ""}
+        </div>
+
+        <div
+          className={`text-sm leading-7 transition-all duration-300 ${isDark ? "text-white/90 force-dark" : "text-slate-600"}`}
+          dangerouslySetInnerHTML={{ __html: snippet }}
+        />
+
+        <div className="flex items-center justify-between pt-2">
+          <div className="flex gap-2">
+            {badges.map(([emo, label]) => (
+              <span key={emo + label} title={label} className="text-xl transition-all duration-300 hover:scale-110">
+                {emo}
+              </span>
+            ))}
+          </div>
+          <span
+            className={`text-sm px-4 py-2 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 ${
+              isDark ? "bg-slate-700/80 text-white hover:bg-slate-600/80" : "bg-slate-100/80 text-slate-700 hover:bg-slate-200/80"
+            } backdrop-blur-sm`}
           >
-            <button type="button" className="absolute inset-0" onClick={goBlog} onKeyDown={onKey} aria-label={post.title || "Open post"} />
-            <div className="relative pointer-events-none flex flex-col gap-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                {(post.tags || []).slice(0, 4).map((t) => <span key={t} className={chipClassFor(t, isDark)}>{t}</span>)}
-              </div>
-              <h4 className={`text-lg font-semibold leading-tight ${isDark ? "text-white" : "text-slate-900"}`}>{post.title}</h4>
-              <div className={`text-xs font-medium ${isDark ? "text-white/70" : "text-slate-500"}`}>
-                {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : (post.updatedAt ? new Date(post.updatedAt).toLocaleDateString() : "")}
-              </div>
-              <div className={`text-sm leading-6 clamp-5 ${isDark ? "text-white force-dark" : "text-slate-600"}`} dangerouslySetInnerHTML={{ __html: snippet }} />
-              <div className="flex items-center justify-between pt-2">
-                <div className="flex gap-2">{badges.map(([emo,label])=> <span key={emo+label} title={label} className="text-lg">{emo}</span>)}</div>
-                <span className={`text-xs px-3 py-1.5 rounded-md font-medium ${isDark ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-700"}`}>Read more →</span>
-              </div>
-            </div>
-          </Card>
-        );
-      })}
-    </div>
+            Read more →
+          </span>
+        </div>
+      </div>
+    </Card>
   );
 }
