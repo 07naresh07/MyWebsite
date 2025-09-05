@@ -1065,7 +1065,7 @@ export default function Home() {
           <div className={`animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-6 bg-gradient-to-r ${gradient} p-1`}>
             <div className={`rounded-full w-full h-full ${isDark ? "bg-slate-900" : "bg-gray-50"}`}></div>
           </div>
-          <p className="text-lg font-semibold">Loading your workspace...</p>
+          <p className="text-lg font-semibold">Getting ready...</p>
         </div>
       </div>
     );

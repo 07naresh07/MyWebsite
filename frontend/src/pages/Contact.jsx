@@ -1,17 +1,73 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Simple icons using emoji
+// Official SVG Icons
 const Icon = {
-  mail: "📧",
-  phone: "📞",
-  location: "📍",
-  send: "🚀",
-  sun: "☀️",
-  moon: "🌙",
-  check: "✅",
-  error: "❌",
-  online: "🟢",
+  mail: (
+    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
+      <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+    </svg>
+  ),
+  phone: (
+    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
+      <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+    </svg>
+  ),
+  location: (
+    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+    </svg>
+  ),
+  send: (
+    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
+      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+    </svg>
+  ),
+  sun: (
+    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
+      <path d="M12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18M20,15.31L23.31,12L20,8.69V4H15.31L12,0.69L8.69,4H4V8.69L0.69,12L4,15.31V20H8.69L12,23.31L15.31,20H20V15.31Z"/>
+    </svg>
+  ),
+  moon: (
+    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
+      <path d="M17.75,4.09L15.22,6.03L16.13,9.09L13.5,7.28L10.87,9.09L11.78,6.03L9.25,4.09L12.44,4L13.5,1L14.56,4L17.75,4.09M21.25,11L19.61,12.25L20.2,14.23L18.5,13.06L16.8,14.23L17.39,12.25L15.75,11L17.81,10.95L18.5,9L19.19,10.95L21.25,11M18.97,15.95C19.8,15.87 20.69,17.05 20.16,17.8C19.84,18.25 19.5,18.67 19.08,19.07C15.17,23 8.84,23 4.94,19.07C1.03,15.17 1.03,8.83 4.94,4.93C5.34,4.53 5.76,4.17 6.21,3.85C6.96,3.32 8.14,4.21 8.06,5.04C7.79,7.9 8.75,10.87 10.95,13.06C13.14,15.26 16.1,16.22 18.97,15.95M17.33,17.97C14.5,17.81 11.7,16.64 9.53,14.5C7.36,12.31 6.2,9.5 6.04,6.68C3.23,9.82 3.34,14.4 6.35,17.41C9.37,20.43 14,20.54 17.33,17.97Z"/>
+    </svg>
+  ),
+  check: (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
+      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+    </svg>
+  ),
+  error: (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+    </svg>
+  ),
+  online: (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
+      <circle cx="12" cy="12" r="10" fill="currentColor"/>
+    </svg>
+  ),
+  copy: (
+    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+    </svg>
+  ),
+  clock: (
+    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+      <path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16.2,16.2L11,13V7H12.5V12.2L17,14.7L16.2,16.2Z"/>
+    </svg>
+  ),
+  save: (
+    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+      <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+    </svg>
+  ),
+  template: (
+    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+      <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+    </svg>
+  ),
 };
 
 // Real social media icons as SVG components
@@ -32,6 +88,13 @@ const SocialIcon = {
     </svg>
   ),
 };
+
+// Better checkmark icon as SVG
+const CheckmarkIcon = ({ className = "w-4 h-4" }) => (
+  <svg viewBox="0 0 20 20" className={className} fill="currentColor">
+    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+  </svg>
+);
 
 // Validation helpers
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
@@ -67,6 +130,13 @@ export default function EnhancedContact() {
     facebook: "https://www.facebook.com/naresh.kshettri",
   };
 
+  // Message templates
+  const messageTemplates = [
+    "Hi! I'd like to discuss a project opportunity with you.",
+    "Hi Naresh! I have a question about your work.",
+    "Hello! I'd like to schedule a consultation call.",
+  ];
+
   // Form state
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -74,8 +144,13 @@ export default function EnhancedContact() {
   const [sending, setSending] = useState(false);
   const [formError, setFormError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [showPlatformModal, setShowPlatformModal] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [copySuccess, setCopySuccess] = useState("");
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [autoSaved, setAutoSaved] = useState(false);
 
-  // Dark mode with persistence - fixed implementation
+  // Dark mode with persistence
   const [darkMode, setDarkMode] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -92,6 +167,74 @@ export default function EnhancedContact() {
       localStorage.setItem('darkMode', JSON.stringify(darkMode));
     }
   }, [darkMode, isLoaded]);
+
+  // Auto-save form data
+  useEffect(() => {
+    const savedForm = localStorage.getItem('contactFormDraft');
+    if (savedForm) {
+      const { name: savedName, contact: savedContact, message: savedMessage } = JSON.parse(savedForm);
+      if (savedName || savedContact || savedMessage) {
+        setName(savedName || "");
+        setContact(savedContact || "");
+        setMessage(savedMessage || "");
+        setAutoSaved(true);
+        setTimeout(() => setAutoSaved(false), 3000);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (name || contact || message) {
+      localStorage.setItem('contactFormDraft', JSON.stringify({ name, contact, message }));
+    }
+  }, [name, contact, message]);
+
+  // Real-time clock for availability
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+    return () => clearInterval(timer);
+  }, []);
+
+  // Get current time in JST
+  const getJSTTime = () => {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Tokyo',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).format(currentTime);
+  };
+
+  // Check availability status
+  const getAvailabilityStatus = () => {
+    const jstTime = new Date().toLocaleString("en-US", {timeZone: "Asia/Tokyo"});
+    const hour = new Date(jstTime).getHours();
+    
+    if (hour >= 9 && hour < 18) {
+      return { status: "working", message: "Working Hours - Usually available", color: "green" };
+    } else if (hour >= 19 && hour < 22) {
+      return { status: "available", message: "Personal Time - Available for calls", color: "blue" };
+    } else {
+      return { status: "offline", message: "Offline - Will respond within 2-3 hours", color: "gray" };
+    }
+  };
+
+  // Copy to clipboard functionality
+  const copyToClipboard = async (text, label) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopySuccess(label);
+      setTimeout(() => setCopySuccess(""), 2000);
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+    }
+  };
+
+  // Message character counter
+  const messageLength = message.length;
+  const maxLength = 1000;
 
   // Smart email opening - Gmail app on mobile, Gmail web on desktop
   const handleEmailClick = () => {
@@ -123,7 +266,7 @@ export default function EnhancedContact() {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  // Form submission
+  // Form submission - now shows platform selection
   const handleSubmit = (e) => {
     e.preventDefault();
     setFormError("");
@@ -135,29 +278,76 @@ export default function EnhancedContact() {
       return;
     }
 
+    // Show platform selection modal
+    setShowPlatformModal(true);
+  };
+
+  // Handle platform-specific messaging
+  const handlePlatformSelect = (platform) => {
+    setShowPlatformModal(false);
     setSending(true);
 
+    const messageContent = `Hi! I'm ${name}.\n\nContact: ${contact}\n\nMessage: ${message}\n\n---\nSent from your website contact form`;
+
     try {
-      // Simulate sending (replace with your actual API call)
-      // For now, we'll just open the email client with the form data
-      const subject = encodeURIComponent(`Website Contact from ${name}`);
-      const body = encodeURIComponent(
-        `Name: ${name}\nContact: ${contact}\n\nMessage:\n${message}\n\n---\nSent from contact form`
-      );
-      
-      // Try to send via email client
-      window.open(`mailto:${primaryEmail}?subject=${subject}&body=${body}`, '_blank');
-      
-      setSuccessMessage("Message prepared! Your email client should open shortly.");
-      
-      // Clear form after success
+      switch (platform) {
+        case 'facebook':
+          // Open Facebook Messenger
+          const fbMessage = encodeURIComponent(messageContent);
+          window.open(`https://m.me/naresh.kshettri?text=${fbMessage}`, '_blank');
+          setSuccessMessage("Opening Facebook Messenger...");
+          break;
+
+        case 'linkedin':
+          // Open LinkedIn messaging (will go to profile, user needs to click message)
+          const linkedinMessage = encodeURIComponent(messageContent);
+          window.open(`https://www.linkedin.com/messaging/compose/?recipient=naresh-singh-dhami-461bb8132&subject=Website Contact from ${encodeURIComponent(name)}&body=${linkedinMessage}`, '_blank');
+          setSuccessMessage("Opening LinkedIn Messenger...");
+          break;
+
+        case 'email':
+          // Always open Gmail - never traditional mail clients
+          const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          const subject = encodeURIComponent(`Website Contact from ${name}`);
+          const body = encodeURIComponent(messageContent);
+          
+          if (isMobile) {
+            // Try Gmail app first
+            const gmailAppUrl = `googlegmail://co?to=${primaryEmail}&subject=${subject}&body=${body}`;
+            
+            // Create a test to see if Gmail app opens
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = gmailAppUrl;
+            document.body.appendChild(iframe);
+            
+            // If Gmail app doesn't open, use Gmail web
+            setTimeout(() => {
+              if (document.visibilityState === 'visible') {
+                window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${primaryEmail}&subject=${subject}&body=${body}`, '_blank');
+              }
+              if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+              }
+            }, 1000);
+          } else {
+            // Desktop - always Gmail web
+            window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${primaryEmail}&subject=${subject}&body=${body}`, '_blank');
+          }
+          
+          setSuccessMessage("Opening Gmail...");
+          break;
+
+        default:
+          setFormError("Please select a messaging platform.");
+          return;
+      }
+
+      // Clear success message after delay, but keep form data
       setTimeout(() => {
-        setName("");
-        setContact("");
-        setMessage("");
         setSuccessMessage("");
       }, 3000);
-      
+
     } catch (error) {
       setFormError("Something went wrong. Please try again or contact me directly.");
     } finally {
@@ -171,6 +361,7 @@ export default function EnhancedContact() {
     setMessage("");
     setFormError("");
     setSuccessMessage("");
+    localStorage.removeItem('contactFormDraft');
   };
 
   const themeClasses = darkMode 
@@ -181,9 +372,20 @@ export default function EnhancedContact() {
     ? 'bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-gray-600' 
     : 'bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300';
 
-  const inputClasses = darkMode 
-    ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-white' 
-    : 'bg-white border-gray-300 focus:border-blue-500';
+  // Fixed input classes to maintain background in all states
+  const getInputClasses = (hasError = false, isValid = false) => {
+    const baseClasses = darkMode 
+      ? 'bg-gray-700 text-white focus:ring-blue-200' 
+      : 'bg-white focus:ring-blue-200';
+    
+    if (hasError) {
+      return `${baseClasses} border-red-400 focus:border-red-500`;
+    } else if (isValid) {
+      return `${baseClasses} border-green-400 focus:border-green-500`;
+    } else {
+      return `${baseClasses} ${darkMode ? 'border-gray-600 focus:border-blue-500' : 'border-gray-300 focus:border-blue-500'}`;
+    }
+  };
 
   return (
     <div className={`min-h-screen transition-all duration-500 ${themeClasses}`}>
@@ -236,24 +438,43 @@ export default function EnhancedContact() {
 
               {/* Email Card */}
               <motion.div
-                onClick={handleEmailClick}
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                className={`p-6 rounded-2xl cursor-pointer transition-all duration-300 ${cardClasses} shadow-lg hover:shadow-xl`}
+                className={`p-6 rounded-2xl transition-all duration-300 ${cardClasses} shadow-lg hover:shadow-xl group`}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white text-xl">
+                  <motion.div
+                    onClick={handleEmailClick}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white text-xl cursor-pointer"
+                  >
                     {Icon.mail}
-                  </div>
+                  </motion.div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-lg">Email</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-lg">Email</h3>
+                      <motion.button
+                        onClick={() => copyToClipboard(primaryEmail, "Email")}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
+                          darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
+                        }`}
+                      >
+                        {Icon.copy}
+                      </motion.button>
+                    </div>
                     <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2`}>
                       {primaryEmail}
                     </p>
                     <div className="flex gap-2">
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                        Click to compose
-                      </span>
+                      <motion.button
+                        onClick={handleEmailClick}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full hover:bg-green-200 transition-colors"
+                      >
+                        Compose Email
+                      </motion.button>
                       <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
                         Response within 2-3 hours
                       </span>
@@ -264,24 +485,43 @@ export default function EnhancedContact() {
 
               {/* Phone Card */}
               <motion.div
-                onClick={handlePhoneClick}
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                className={`p-6 rounded-2xl cursor-pointer transition-all duration-300 ${cardClasses} shadow-lg hover:shadow-xl`}
+                className={`p-6 rounded-2xl transition-all duration-300 ${cardClasses} shadow-lg hover:shadow-xl group`}
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center text-white text-xl">
+                  <motion.div
+                    onClick={handlePhoneClick}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center text-white text-xl cursor-pointer"
+                  >
                     {Icon.phone}
-                  </div>
+                  </motion.div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-lg">Phone</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-bold text-lg">Phone</h3>
+                      <motion.button
+                        onClick={() => copyToClipboard(phoneClean, "Phone")}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
+                          darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
+                        }`}
+                      >
+                        {Icon.copy}
+                      </motion.button>
+                    </div>
                     <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2`}>
                       {phoneDisplay}
                     </p>
                     <div className="flex gap-2">
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                        Click to call
-                      </span>
+                      <motion.button
+                        onClick={handlePhoneClick}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full hover:bg-green-200 transition-colors"
+                      >
+                        Call Now
+                      </motion.button>
                       <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
                         Best: 7-10 PM JST
                       </span>
@@ -297,24 +537,37 @@ export default function EnhancedContact() {
                 darkMode 
                   ? 'bg-gray-800 border border-gray-700' 
                   : 'bg-white border border-gray-200'
-              } shadow-lg`}
+              } shadow-lg group`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-xl">
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center text-white">
                   {Icon.location}
                 </div>
-                <div>
-                  <h3 className="font-bold text-lg">Location</h3>
-                  <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{location}</p>
-                  <div className="flex gap-2 mt-2">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-bold text-lg">Location</h3>
+                    <motion.button
+                      onClick={() => copyToClipboard(location, "Location")}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
+                        darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
+                      }`}
+                    >
+                      {Icon.copy}
+                    </motion.button>
+                  </div>
+                  <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2`}>{location}</p>
+                  <div className="flex gap-2">
                     <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
                       Remote friendly
                     </span>
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                      JST Timezone
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center gap-1">
+                      {Icon.clock}
+                      JST: {getJSTTime()}
                     </span>
                   </div>
                 </div>
@@ -347,33 +600,60 @@ export default function EnhancedContact() {
               </div>
             </motion.div>
 
-            {/* Availability Status */}
+            {/* Enhanced Availability Status */}
             <motion.div
-              className={`p-4 rounded-xl ${
-                darkMode 
-                  ? 'bg-green-900/30 border border-green-700/50' 
-                  : 'bg-green-50 border border-green-200'
-              }`}
+              className={`p-4 rounded-xl ${(() => {
+                const status = getAvailabilityStatus();
+                const baseColor = status.color === 'green' ? 'green' : status.color === 'blue' ? 'blue' : 'gray';
+                return darkMode 
+                  ? `bg-${baseColor}-900/30 border border-${baseColor}-700/50` 
+                  : `bg-${baseColor}-50 border border-${baseColor}-200`;
+              })()}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
             >
-              <div className="flex items-center gap-2">
-                <motion.span
+              <div className="flex items-center gap-3">
+                <motion.div
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{ duration: 2, repeat: Infinity }}
-                  className="text-lg"
-                >
-                  {Icon.online}
-                </motion.span>
-                <div>
-                  <span className="font-semibold text-green-600">Usually Available</span>
+                  className={`w-3 h-3 rounded-full ${(() => {
+                    const status = getAvailabilityStatus();
+                    return status.color === 'green' ? 'bg-green-500' : 
+                           status.color === 'blue' ? 'bg-blue-500' : 'bg-gray-500';
+                  })()}`}
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-semibold ${(() => {
+                      const status = getAvailabilityStatus();
+                      return status.color === 'green' ? 'text-green-600' : 
+                             status.color === 'blue' ? 'text-blue-600' : 'text-gray-600';
+                    })()}`}>
+                      {getAvailabilityStatus().message}
+                    </span>
+                  </div>
                   <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    7-10 PM JST • Working hours: 9 AM - 6 PM JST
+                    Current JST: {getJSTTime()} • Working hours: 9 AM - 6 PM JST
                   </p>
                 </div>
               </div>
             </motion.div>
+
+            {/* Copy Success Notification */}
+            <AnimatePresence>
+              {copySuccess && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2"
+                >
+                  {Icon.check}
+                  {copySuccess} copied to clipboard!
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
 
           {/* Contact Form - Right Side */}
@@ -390,7 +670,20 @@ export default function EnhancedContact() {
             } shadow-2xl`}>
               
               <div className="mb-8">
-                <h2 className="text-3xl font-bold mb-2">Send a Message</h2>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-3xl font-bold">Send a Message</h2>
+                  {autoSaved && (
+                    <motion.div
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="flex items-center gap-2 text-sm text-green-600"
+                    >
+                      {Icon.save}
+                      Draft restored
+                    </motion.div>
+                  )}
+                </div>
                 <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                   I'll get back to you as soon as possible!
                 </p>
@@ -407,7 +700,7 @@ export default function EnhancedContact() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="John Doe"
-                      className={`w-full px-4 py-3 rounded-xl border ${inputClasses} focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all`}
+                      className={`w-full px-4 py-3 rounded-xl border ${getInputClasses()} focus:outline-none focus:ring-2 transition-all`}
                       required
                     />
                   </div>
@@ -419,34 +712,95 @@ export default function EnhancedContact() {
                       value={contact}
                       onChange={(e) => setContact(e.target.value)}
                       placeholder="email@domain.com or +1-555-123-4567"
-                      className={`w-full px-4 py-3 rounded-xl border ${
-                        contact && validateContact(contact) 
-                          ? 'border-red-300 focus:border-red-500' 
-                          : inputClasses
-                      } focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all`}
+                      className={`w-full px-4 py-3 rounded-xl border ${getInputClasses(
+                        contact && validateContact(contact),
+                        contact && !validateContact(contact)
+                      )} focus:outline-none focus:ring-2 transition-all`}
                       required
                     />
                     {contact && (
-                      <p className={`mt-1 text-xs ${
+                      <p className={`mt-1 text-xs flex items-center gap-1 ${
                         validateContact(contact) ? 'text-red-600' : 'text-green-600'
                       }`}>
-                        {validateContact(contact) || "Looks good!"}
+                        {validateContact(contact) ? (
+                          validateContact(contact)
+                        ) : (
+                          <CheckmarkIcon className="w-4 h-4" />
+                        )}
                       </p>
                     )}
                   </div>
                 </div>
 
-                {/* Message */}
+                {/* Message Templates */}
                 <div>
-                  <label className="block text-sm font-semibold mb-2">Your Message</label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-semibold">Your Message</label>
+                    <motion.button
+                      onClick={() => setShowTemplates(!showTemplates)}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`text-xs px-3 py-1 rounded-full border transition-colors flex items-center gap-1 ${
+                        darkMode 
+                          ? 'border-gray-600 hover:bg-gray-700' 
+                          : 'border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {Icon.template}
+                      Quick Templates
+                    </motion.button>
+                  </div>
+
+                  {/* Template Selection */}
+                  <AnimatePresence>
+                    {showTemplates && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mb-3 space-y-2"
+                      >
+                        {messageTemplates.map((template, index) => (
+                          <motion.button
+                            key={index}
+                            onClick={() => {
+                              setMessage(template);
+                              setShowTemplates(false);
+                            }}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            className={`w-full text-left p-3 rounded-lg border text-sm transition-colors ${
+                              darkMode 
+                                ? 'border-gray-600 hover:bg-gray-700 hover:border-gray-500' 
+                                : 'border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                            }`}
+                          >
+                            {template}
+                          </motion.button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Tell me about your project, question, or just say hello! I'm here to help..."
                     rows={6}
-                    className={`w-full px-4 py-3 rounded-xl border ${inputClasses} focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all resize-none`}
+                    maxLength={maxLength}
+                    className={`w-full px-4 py-3 rounded-xl border ${getInputClasses()} focus:outline-none focus:ring-2 transition-all resize-none`}
                     required
                   />
+                  
+                  {/* Character Counter */}
+                  <div className="flex justify-between items-center mt-2">
+                    <div className={`text-xs ${
+                      messageLength > maxLength * 0.9 ? 'text-orange-600' : 
+                      messageLength > maxLength * 0.8 ? 'text-yellow-600' : 'text-gray-500'
+                    }`}>
+                      {messageLength}/{maxLength} characters
+                    </div>
+                  </div>
                 </div>
 
                 {/* Error/Success Messages */}
@@ -482,11 +836,11 @@ export default function EnhancedContact() {
                 <div className="flex gap-4">
                   <motion.button
                     onClick={handleSubmit}
-                    disabled={sending || !name.trim() || !contact.trim() || !message.trim() || validateContact(contact)}
+                    disabled={sending || !name.trim() || !contact.trim() || !message.trim() || validateContact(contact) || messageLength > maxLength}
                     whileHover={{ scale: sending ? 1 : 1.02 }}
                     whileTap={{ scale: sending ? 1 : 0.98 }}
-                    className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-semibold text-white transition-all duration-300 ${
-                      sending || !name.trim() || !contact.trim() || !message.trim() || validateContact(contact)
+                    className={`flex items-center gap-2 px-8 py-4 rounded-2xl font-semibold text-white transition-all duration-300 flex-1 justify-center ${
+                      sending || !name.trim() || !contact.trim() || !message.trim() || validateContact(contact) || messageLength > maxLength
                         ? 'bg-gray-400 cursor-not-allowed' 
                         : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl'
                     }`}
@@ -502,7 +856,7 @@ export default function EnhancedContact() {
                       </>
                     ) : (
                       <>
-                        <span className="text-lg">{Icon.send}</span>
+                        {Icon.send}
                         Send Message
                       </>
                     )}
@@ -522,41 +876,120 @@ export default function EnhancedContact() {
                   </motion.button>
                 </div>
               </div>
-
-              {/* Tips */}
-              <motion.div
-                className={`mt-8 p-6 rounded-2xl ${
-                  darkMode ? 'bg-gray-700 border border-gray-600' : 'bg-gray-50 border border-gray-200'
-                }`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.6 }}
-              >
-                <h4 className="font-semibold mb-4 flex items-center gap-2">
-                  💡 Tips for Better Communication
-                </h4>
-                <div className="grid md:grid-cols-2 gap-3 text-sm">
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Be specific about your project requirements</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Include your budget range for projects</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Mention your preferred meeting times (JST)</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Share relevant links or documents</span>
-                  </div>
-                </div>
-              </motion.div>
             </div>
           </motion.div>
         </div>
+
+        {/* Platform Selection Modal */}
+        <AnimatePresence>
+          {showPlatformModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowPlatformModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className={`${
+                  darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                } border rounded-3xl p-8 max-w-md w-full shadow-2xl`}
+              >
+                <div className="text-center mb-6">
+                  <h3 className="text-2xl font-bold mb-2">Choose Messaging Platform</h3>
+                  <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    How would you like to send your message?
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Facebook Messenger */}
+                  <motion.button
+                    onClick={() => handlePlatformSelect('facebook')}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`w-full p-4 rounded-2xl border-2 transition-all duration-200 ${
+                      darkMode 
+                        ? 'border-gray-600 hover:border-blue-500 bg-gray-700 hover:bg-gray-600' 
+                        : 'border-gray-200 hover:border-blue-500 bg-gray-50 hover:bg-blue-50'
+                    } flex items-center gap-4`}
+                  >
+                    <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white">
+                      {SocialIcon.facebook}
+                    </div>
+                    <div className="text-left">
+                      <h4 className="font-semibold">Facebook Messenger</h4>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Instant messaging • Fast response
+                      </p>
+                    </div>
+                  </motion.button>
+
+                  {/* LinkedIn Messenger */}
+                  <motion.button
+                    onClick={() => handlePlatformSelect('linkedin')}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`w-full p-4 rounded-2xl border-2 transition-all duration-200 ${
+                      darkMode 
+                        ? 'border-gray-600 hover:border-blue-500 bg-gray-700 hover:bg-gray-600' 
+                        : 'border-gray-200 hover:border-blue-500 bg-gray-50 hover:bg-blue-50'
+                    } flex items-center gap-4`}
+                  >
+                    <div className="w-12 h-12 bg-blue-700 rounded-xl flex items-center justify-center text-white">
+                      {SocialIcon.linkedin}
+                    </div>
+                    <div className="text-left">
+                      <h4 className="font-semibold">LinkedIn Messenger</h4>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Professional networking • Business inquiries
+                      </p>
+                    </div>
+                  </motion.button>
+
+                  {/* Email */}
+                  <motion.button
+                    onClick={() => handlePlatformSelect('email')}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`w-full p-4 rounded-2xl border-2 transition-all duration-200 ${
+                      darkMode 
+                        ? 'border-gray-600 hover:border-blue-500 bg-gray-700 hover:bg-gray-600' 
+                        : 'border-gray-200 hover:border-blue-500 bg-gray-50 hover:bg-blue-50'
+                    } flex items-center gap-4`}
+                  >
+                    <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center text-white">
+                      {Icon.mail}
+                    </div>
+                    <div className="text-left">
+                      <h4 className="font-semibold">Email</h4>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Traditional email • Detailed conversations
+                      </p>
+                    </div>
+                  </motion.button>
+                </div>
+
+                <motion.button
+                  onClick={() => setShowPlatformModal(false)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`w-full mt-6 py-3 rounded-2xl border font-semibold ${
+                    darkMode 
+                      ? 'border-gray-600 hover:bg-gray-700' 
+                      : 'border-gray-300 hover:bg-gray-100'
+                  } transition-colors`}
+                >
+                  Cancel
+                </motion.button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Footer Response Info */}
         <motion.div

@@ -54,11 +54,6 @@ const Icon = {
       <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
     </svg>
   ),
-  Filter: (p) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={p.className ?? "w-5 h-5"}>
-      <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46" />
-    </svg>
-  ),
   Search: (p) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={p.className ?? "w-5 h-5"}>
       <circle cx="11" cy="11" r="8" />
@@ -124,15 +119,11 @@ function humanDuration(start, end) {
   return `${m} mo`;
 }
 
-/* ---- NEW: remove pasted highlight/background + inline colors ---- */
+/* ---- Sanitize pasted HTML ---- */
 function stripHighlights(html) {
   if (!html) return "";
   let out = String(html);
-
-  // remove <mark>
   out = out.replace(/<\/?mark[^>]*>/gi, "");
-
-  // drop inline color/background styles
   out = out.replace(/style="([^"]*)"/gi, (_, styles) => {
     const filtered = styles
       .split(";")
@@ -148,8 +139,6 @@ function stripHighlights(html) {
       .join("; ");
     return filtered ? `style="${filtered}"` : "";
   });
-
-  // remove obvious highlight-ish classes
   out = out.replace(/class="([^"]*)"/gi, (_, cls) => {
     const keep = cls
       .split(/\s+/)
@@ -157,86 +146,59 @@ function stripHighlights(html) {
       .join(" ");
     return keep ? `class="${keep}"` : "";
   });
-
   return out;
 }
 
-/* ---- NEW: convert bullet-like <p>… into true <ul><li>… for pasted HTML ---- */
+/* ---- Convert bullet-like <p>… into proper lists ---- */
 function fixBulletsInHtml(html) {
   if (!html) return "";
   let s = String(html);
-
-  // turn <p>• text</p>  or  <p>- text</p> / <p>* text</p>  into LI
   s = s.replace(/<p[^>]*>\s*(?:•|·|-|\*)\s+([\s\S]*?)<\/p>/gi, '<li class="experience-list-item">$1</li>');
-
-  // if the HTML has no UL at all, wrap consecutive LIs into a UL
   if (!/<ul[^>]*>/i.test(s)) {
     s = s.replace(/(?:\s*<li class="experience-list-item">[\s\S]*?<\/li>)+/gi, (m) => `<ul class="experience-list">${m}</ul>`);
   }
-
   return s;
 }
 
-/* Enhanced markdown conversion with proper list handling */
+/* Markdown-lite to HTML */
 function mdLiteToHtml(text) {
   if (!text) return "";
   if (/<[^>]+>/.test(text)) return text;
-
   const safe = String(text).trim();
   if (!safe) return "";
-
   const lines = safe.split(/\r?\n/);
-  if (!lines.length) return "";
-
   const inline = (s) =>
     s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.+?)\*/g, "<em>$1</em>")
       .replace(/`(.+?)`/g, "<code>$1</code>");
-
   let result = "";
   let i = 0;
-
   while (i < lines.length) {
     const line = lines[i].trim();
-
-    if (!line) {
-      i++;
-      continue;
-    }
-
-    // unordered list
+    if (!line) { i++; continue; }
     if (/^(-|\*|•)\s+/.test(line)) {
       let listItems = [];
       while (i < lines.length && /^(-|\*|•)\s+/.test(lines[i].trim())) {
         const listLine = lines[i].trim();
-        listItems.push(
-          `<li class="experience-list-item">${inline(listLine.replace(/^(-|\*|•)\s+/, ""))}</li>`
-        );
+        listItems.push(`<li class="experience-list-item">${inline(listLine.replace(/^(-|\*|•)\s+/, ""))}</li>`);
         i++;
       }
       result += `<ul class="experience-list">${listItems.join("")}</ul>`;
       continue;
     }
-
-    // ordered list
     if (/^\d+[.)]\s+/.test(line)) {
       let listItems = [];
       while (i < lines.length && /^\d+[.)]\s+/.test(lines[i].trim())) {
         const listLine = lines[i].trim();
-        listItems.push(
-          `<li class="experience-list-item">${inline(listLine.replace(/^\d+[.)]\s+/, ""))}</li>`
-        );
+        listItems.push(`<li class="experience-list-item">${inline(listLine.replace(/^\d+[.)]\s+/, ""))}</li>`);
         i++;
       }
       result += `<ol class="experience-list">${listItems.join("")}</ol>`;
       continue;
     }
-
-    // paragraph
     result += `<p class="experience-paragraph">${inline(line)}</p>`;
     i++;
   }
-
   return result || `<p class="experience-paragraph">${inline(safe)}</p>`;
 }
 
@@ -263,9 +225,7 @@ function toArray(value) {
       try {
         const parsed = JSON.parse(t);
         if (Array.isArray(parsed)) return toArray(parsed);
-      } catch (e) {
-        console.warn("Failed to parse array string:", t, e);
-      }
+      } catch {}
     }
     return t.split(/[,;|]/).map((v) => v.trim()).filter(Boolean);
   }
@@ -277,8 +237,8 @@ const Card = ({ children, className = "", dark = false, ...props }) => (
   <article
     className={`experience-card rounded-xl border shadow-sm transition-all duration-300 hover:shadow-lg ${
       dark
-        ? "bg-gray-800/90 backdrop-blur-sm border-gray-700/50 hover:bg-gray-800"
-        : "bg-white/90 backdrop-blur-sm border-gray-200/50 hover:bg-white"
+        ? "bg-gray-800/90 border-gray-700/50 hover:bg-gray-800"   /* removed backdrop-blur-sm to prevent flicker */
+        : "bg-white/90 border-gray-200/50 hover:bg-white"         /* removed backdrop-blur-sm to prevent flicker */
     } ${className}`}
     {...props}
   >
@@ -286,21 +246,9 @@ const Card = ({ children, className = "", dark = false, ...props }) => (
   </article>
 );
 
-const Reveal = ({ children, delay = 0 }) => {
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setIsVisible(true), delay);
-    return () => clearTimeout(t);
-  }, [delay]);
-
-  return (
-    <div className={`transition-all duration-700 transform ${
-      isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-    }`}>
-      {children}
-    </div>
-  );
+const Reveal = ({ children }) => {
+  // Keep always visible to avoid any scroll-related opacity glitches
+  return <div className="transition-all duration-300">{children}</div>;
 };
 
 const LoadingSpinner = ({ dark }) => (
@@ -326,21 +274,10 @@ function normalize(row = {}) {
     const htmlDesc = getField(row, ["descriptionHtml", "description_html", "html"]);
     const textDesc = getField(row, ["description", "body", "content", "details"]);
 
-    // prefer provided HTML, otherwise build from text; then sanitize + fix bullets
     const raw = htmlDesc || mdLiteToHtml(textDesc);
     const descriptionHtml = fixBulletsInHtml(stripHighlights(raw));
 
-    return {
-      id,
-      company,
-      role,
-      project,
-      location,
-      startDate,
-      endDate,
-      descriptionHtml,
-      tools: tools.slice(0, 20) // UI guard
-    };
+    return { id, company, role, project, location, startDate, endDate, descriptionHtml, tools: tools.slice(0, 20) };
   } catch (error) {
     console.error("Error normalizing experience item:", error, row);
     return {
@@ -368,13 +305,12 @@ export default function Experience() {
   const [errorMsg, setErrorMsg] = useState("");
   const [retryCount, setRetryCount] = useState(0);
 
-  // Theme and view preferences with better error handling
+  // Theme and view preferences
   const [darkMode, setDarkMode] = useState(() => {
     try {
       const saved = localStorage.getItem("experience_theme");
-      return saved === "dark" || (saved === null && window.matchMedia?.('(prefers-color-scheme: dark)')?.matches);
-    } catch (e) {
-      console.warn("Failed to read theme preference:", e);
+      return saved === "dark" || (saved === null && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches);
+    } catch {
       return false;
     }
   });
@@ -382,298 +318,171 @@ export default function Experience() {
   const [viewMode, setViewMode] = useState(() => {
     try {
       return localStorage.getItem("experience_view") || "grid";
-    } catch (e) {
-      console.warn("Failed to read view mode preference:", e);
+    } catch {
       return "grid";
     }
   });
 
-  // Filters and search
+  // Filters (panel remains; no button to open)
   const [sortBy, setSortBy] = useState("date");
   const [filterBy, setFilterBy] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [selectedTags, setSelectedTags] = useState([]);
 
-  // Persist preferences with error handling
+  // Persist preferences
   useEffect(() => {
-    try {
-      localStorage.setItem("experience_theme", darkMode ? "dark" : "light");
-    } catch (e) {
-      console.warn("Failed to save theme preference:", e);
-    }
+    try { localStorage.setItem("experience_theme", darkMode ? "dark" : "light"); } catch {}
   }, [darkMode]);
-
   useEffect(() => {
-    try {
-      localStorage.setItem("experience_view", viewMode);
-    } catch (e) {
-      console.warn("Failed to save view mode preference:", e);
-    }
+    try { localStorage.setItem("experience_view", viewMode); } catch {}
   }, [viewMode]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
 
-  // Enhanced data loading with retry logic
+  // Load data
   const load = useCallback(async (retries = 0) => {
-    if (retries === 0) {
-      setLoading(true);
-      setErrorMsg("");
-    }
-
+    if (retries === 0) { setLoading(true); setErrorMsg(""); }
     try {
       const data = await getExperience();
       let list = [];
-
-      if (Array.isArray(data)) {
-        list = data;
-      } else if (data && typeof data === 'object') {
+      if (Array.isArray(data)) list = data;
+      else if (data && typeof data === "object") {
         list = Array.isArray(data.items) ? data.items :
                Array.isArray(data.data) ? data.data :
                Array.isArray(data.experiences) ? data.experiences : [];
       }
-
-      const normalizedItems = list.map(normalize).filter(item => item && item.id);
+      const normalizedItems = list.map(normalize).filter((i) => i && i.id);
       setItems(normalizedItems);
       setRetryCount(0);
-
       if (normalizedItems.length === 0 && list.length > 0) {
-        console.warn("All items failed normalization. Raw data:", list);
         setErrorMsg("Some experience data could not be loaded properly. Please check the data format.");
       }
     } catch (e) {
       console.error("Failed to load experience (attempt", retries + 1, "):", e);
-
       if (retries < 2) {
-        // Retry with simple backoff
         setTimeout(() => load(retries + 1), (retries + 1) * 1000);
         setRetryCount(retries + 1);
         return;
       }
-
       setErrorMsg(e?.message || "Failed to load experience data. Please check your connection and try again.");
-      setItems([]); // Clear on persistent failure
+      setItems([]);
     } finally {
-      if (retries === 0) {
-        setLoading(false);
-      }
+      if (retries === 0) setLoading(false);
     }
   }, []);
 
-  // Initial load and event listeners
   useEffect(() => {
     load();
-
-    const onSaved = () => {
-      console.log("Experience saved event received");
-      load();
-    };
-
+    const onSaved = () => load();
     const onStorageChange = (e) => {
-      if (e.key === 'experience_theme') {
-        setDarkMode(e.newValue === 'dark');
-      } else if (e.key === 'experience_view') {
-        setViewMode(e.newValue || 'grid');
-      }
+      if (e.key === "experience_theme") setDarkMode(e.newValue === "dark");
+      else if (e.key === "experience_view") setViewMode(e.newValue || "grid");
     };
-
     window.addEventListener("experience:saved", onSaved);
     window.addEventListener("storage", onStorageChange);
-
     return () => {
       window.removeEventListener("experience:saved", onSaved);
       window.removeEventListener("storage", onStorageChange);
     };
   }, [load]);
 
-  // Enhanced computed values
+  // Derived
   const allTags = useMemo(() => {
     const tagSet = new Set();
-    items.forEach((item) => {
-      if (Array.isArray(item.tools)) {
-        item.tools.forEach((tool) => {
-          const cleanTool = String(tool).trim();
-          if (cleanTool) tagSet.add(cleanTool);
-        });
-      }
-    });
+    items.forEach((item) => Array.isArray(item.tools) && item.tools.forEach((t) => { const s = String(t).trim(); if (s) tagSet.add(s); }));
     return Array.from(tagSet).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
   }, [items]);
 
   const stats = useMemo(() => {
-    const totalMonths = items.reduce((acc, item) => {
-      const months = monthDiff(item?.startDate, item?.endDate);
-      return acc + (isNaN(months) ? 0 : months);
-    }, 0);
-
-    const y = Math.floor(totalMonths / 12);
-    const m = totalMonths % 12;
-
+    const totalMonths = items.reduce((acc, item) => acc + (isNaN(monthDiff(item?.startDate, item?.endDate)) ? 0 : monthDiff(item?.startDate, item?.endDate)), 0);
+    const y = Math.floor(totalMonths / 12), m = totalMonths % 12;
     let totalExperience = "0 mo";
-    if (totalMonths) {
-      if (y && m) totalExperience = `${y} yr ${m} mo`;
-      else if (y) totalExperience = `${y} yr${y > 1 ? "s" : ""}`;
-      else totalExperience = `${m} mo`;
-    }
-
+    if (totalMonths) totalExperience = y && m ? `${y} yr ${m} mo` : y ? `${y} yr${y > 1 ? "s" : ""}` : `${m} mo`;
     return {
       totalExperience,
       currentJobs: items.filter((i) => !i.endDate).length,
       completedJobs: items.filter((i) => i.endDate).length,
       totalPositions: items.length,
-      uniqueCompanies: new Set(items.map(i => i.company).filter(Boolean)).size,
-      mostRecentStart: items.reduce((latest, item) => {
-        if (!item.startDate) return latest;
-        return !latest || item.startDate > latest ? item.startDate : latest;
-      }, "")
+      uniqueCompanies: new Set(items.map((i) => i.company).filter(Boolean)).size,
+      mostRecentStart: items.reduce((latest, item) => (!item.startDate ? latest : (!latest || item.startDate > latest ? item.startDate : latest)), "")
     };
   }, [items]);
 
-  // Enhanced filtering with debounced search
   const filteredAndSortedItems = useMemo(() => {
     let arr = items.filter((item) => {
-      try {
-        const q = searchTerm.trim().toLowerCase();
-        const matchesSearch =
-          !q ||
-          item.role?.toLowerCase().includes(q) ||
-          item.company?.toLowerCase().includes(q) ||
-          item.project?.toLowerCase().includes(q) ||
-          item.location?.toLowerCase().includes(q) ||
-          item.descriptionHtml?.toLowerCase().includes(q) ||
-          (Array.isArray(item.tools) && item.tools.some((t) =>
-            String(t).toLowerCase().includes(q)
-          ));
-
-        const matchesFilter =
-          filterBy === "all" ||
-          (filterBy === "current" && !item.endDate) ||
-          (filterBy === "past" && !!item.endDate);
-
-        const matchesTags =
-          selectedTags.length === 0 ||
-          (Array.isArray(item.tools) && selectedTags.every((tag) =>
-            item.tools.some(tool => String(tool).toLowerCase() === tag.toLowerCase())
-          ));
-
-        return matchesSearch && matchesFilter && matchesTags;
-      } catch (e) {
-        console.error("Error filtering item:", item, e);
-        return true; // Include item if filtering fails
-      }
+      const q = searchTerm.trim().toLowerCase();
+      const matchesSearch = !q ||
+        item.role?.toLowerCase().includes(q) ||
+        item.company?.toLowerCase().includes(q) ||
+        item.project?.toLowerCase().includes(q) ||
+        item.location?.toLowerCase().includes(q) ||
+        item.descriptionHtml?.toLowerCase().includes(q) ||
+        (Array.isArray(item.tools) && item.tools.some((t) => String(t).toLowerCase().includes(q)));
+      const matchesFilter =
+        filterBy === "all" ||
+        (filterBy === "current" && !item.endDate) ||
+        (filterBy === "past" && !!item.endDate);
+      const matchesTags =
+        selectedTags.length === 0 ||
+        (Array.isArray(item.tools) && selectedTags.every((tag) =>
+          item.tools.some((tool) => String(tool).toLowerCase() === tag.toLowerCase())
+        ));
+      return matchesSearch && matchesFilter && matchesTags;
     });
 
-    // Enhanced sorting
     arr.sort((a, b) => {
-      try {
-        if (sortBy === "date") {
-          const aEnd = a.endDate || "9999-12";
-          const bEnd = b.endDate || "9999-12";
-          const endCmp = bEnd.localeCompare(aEnd);
-          if (endCmp !== 0) return endCmp;
-          return (b.startDate || "").localeCompare(a.startDate || "");
-        }
-        if (sortBy === "company") {
-          return (a.company || "").localeCompare(b.company || "", undefined, { numeric: true });
-        }
-        if (sortBy === "role") {
-          return (a.role || "").localeCompare(b.role || "", undefined, { numeric: true });
-        }
-        return 0;
-      } catch (e) {
-        console.error("Error sorting items:", a, b, e);
-        return 0;
+      if (sortBy === "date") {
+        const aEnd = a.endDate || "9999-12";
+        const bEnd = b.endDate || "9999-12";
+        const endCmp = bEnd.localeCompare(aEnd);
+        if (endCmp !== 0) return endCmp;
+        return (b.startDate || "").localeCompare(a.startDate || "");
       }
+      if (sortBy === "company") return (a.company || "").localeCompare(b.company || "", undefined, { numeric: true });
+      if (sortBy === "role") return (a.role || "").localeCompare(b.role || "", undefined, { numeric: true });
+      return 0;
     });
 
     return arr;
   }, [items, searchTerm, filterBy, sortBy, selectedTags]);
 
-  // Enhanced actions with better UX and error handling
+  // Actions
   const onDelete = useCallback(async (id, itemTitle) => {
     if (!owner) return;
-
-    const confirmMsg = itemTitle
-      ? `Delete "${itemTitle}"?\n\nThis action cannot be undone.`
-      : "Delete this experience?\n\nThis action cannot be undone.";
-
+    const confirmMsg = itemTitle ? `Delete "${itemTitle}"?\n\nThis action cannot be undone.` : "Delete this experience?\n\nThis action cannot be undone.";
     if (!window.confirm(confirmMsg)) return;
-
-    try {
-      setLoading(true);
-      await deleteExperience(id);
-      await load();
-    } catch (e) {
-      console.error("Failed to delete experience:", e);
-      setErrorMsg(e?.message || "Failed to delete experience. Please try again.");
-      setLoading(false);
-    }
+    try { setLoading(true); await deleteExperience(id); await load(); }
+    catch (e) { console.error("Failed to delete experience:", e); setErrorMsg(e?.message || "Failed to delete experience. Please try again."); setLoading(false); }
   }, [owner, load]);
 
   const exportData = useCallback(() => {
     if (!owner || items.length === 0) return;
-
     try {
-      const exportData = {
-        exportDate: new Date().toISOString(),
-        version: "1.0",
-        totalItems: items.length,
-        experiences: items.map(item => ({
-          ...item,
-          exportedAt: new Date().toISOString()
-        }))
-      };
-
+      const exportData = { exportDate: new Date().toISOString(), version: "1.0", totalItems: items.length,
+        experiences: items.map((item) => ({ ...item, exportedAt: new Date().toISOString() })) };
       const dataStr = JSON.stringify(exportData, null, 2);
       const blob = new Blob([dataStr], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `experience-data-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      a.download = `experience-data-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error("Failed to export data:", e);
-      alert("Failed to export data. Please try again.");
-    }
+    } catch { alert("Failed to export data. Please try again."); }
   }, [owner, items]);
-
-  // Enhanced keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (showFilters) {
-          setShowFilters(false);
-          e.preventDefault();
-        }
-      }
-      if (e.key === '/' && e.ctrlKey) {
-        setShowFilters(prev => !prev);
-        e.preventDefault();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showFilters]);
 
   // Loading state
   if (loading) {
     return (
-      <section className={`min-h-screen transition-colors duration-300 ${
-        darkMode ? "dark bg-gray-900 text-white" : "bg-gradient-to-br from-slate-50 to-blue-50 text-gray-900"
-      }`}>
+      <section className={`min-h-screen transition-colors duration-300 ${darkMode ? "dark bg-gray-900 text-white" : "bg-gradient-to-br from-slate-50 to-blue-50 text-gray-900"}`}>
         <div className="container mx-auto px-4">
           <LoadingSpinner dark={darkMode} />
           {retryCount > 0 && (
             <div className="text-center mt-4">
-              <p className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
-                Retrying... (Attempt {retryCount + 1}/3)
-              </p>
+              <p className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"}`}>Retrying... (Attempt {retryCount + 1}/3)</p>
             </div>
           )}
         </div>
@@ -682,11 +491,9 @@ export default function Experience() {
   }
 
   return (
-    <section className={`min-h-screen transition-colors duration-300 ${
-      darkMode ? "dark bg-gray-900" : "bg-gradient-to-br from-slate-50 to-blue-50"
-    }`}>
+    <section className={`min-h-screen transition-colors duration-300 ${darkMode ? "dark bg-gray-900" : "bg-gradient-to-br from-slate-50 to-blue-50"}`}>
       <div className="container mx-auto px-4 py-8">
-        {/* Enhanced Header */}
+        {/* Header */}
         <header className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="space-y-4">
@@ -697,57 +504,43 @@ export default function Experience() {
                 <div className="mt-3 h-1 w-32 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500" />
               </div>
 
-              {/* Enhanced stats */}
+              {/* Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/30 dark:to-green-900/30 rounded-xl border border-emerald-200 dark:border-emerald-700 shadow-sm">
                   <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                    Total: {stats.totalExperience}
-                  </span>
+                  <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Total: {stats.totalExperience}</span>
                 </div>
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl border border-blue-200 dark:border-blue-700 shadow-sm">
                   <Icon.TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-                    Active: {stats.currentJobs}
-                  </span>
+                  <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Active: {stats.currentJobs}</span>
                 </div>
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl border border-purple-200 dark:border-purple-700 shadow-sm">
                   <Icon.Award className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
-                    Completed: {stats.completedJobs}
-                  </span>
+                  <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">Completed: {stats.completedJobs}</span>
                 </div>
                 <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/30 dark:to-red-900/30 rounded-xl border border-orange-200 dark:border-orange-700 shadow-sm">
                   <Icon.Briefcase className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                  <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">
-                    Positions: {stats.totalPositions}
-                  </span>
+                  <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">Positions: {stats.totalPositions}</span>
                 </div>
               </div>
 
               {errorMsg && (
                 <div className="p-4 rounded-lg border bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
                   <p className="text-sm font-medium text-red-600 dark:text-red-300">{errorMsg}</p>
-                  <button
-                    onClick={() => {
-                      setErrorMsg("");
-                      load();
-                    }}
-                    className="mt-2 text-sm text-red-700 dark:text-red-400 hover:underline"
-                  >
+                  <button onClick={() => { setErrorMsg(""); load(); }} className="mt-2 text-sm text-red-700 dark:text-red-400 hover:underline">
                     Try again
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Enhanced Controls */}
+            {/* Controls (no Filter button) */}
             <div className="experience-controls flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => setDarkMode((v) => !v)}
                 className="px-4 py-2 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-white transition-all duration-200 font-medium"
-                aria-label={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
+                aria-label={`Switch to ${darkMode ? "light" : "dark"} mode`}
               >
                 {darkMode ? "🌙 Dark" : "☀️ Light"}
               </button>
@@ -756,11 +549,7 @@ export default function Experience() {
                 <button
                   type="button"
                   onClick={() => setViewMode("grid")}
-                  className={`p-3 transition-all duration-200 ${
-                    viewMode === "grid" 
-                      ? "bg-blue-500 text-white" 
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  }`}
+                  className={`p-3 transition-all duration-200 ${viewMode === "grid" ? "bg-blue-500 text-white" : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
                   aria-pressed={viewMode === "grid"}
                   aria-label="Grid view"
                 >
@@ -769,31 +558,13 @@ export default function Experience() {
                 <button
                   type="button"
                   onClick={() => setViewMode("list")}
-                  className={`p-3 transition-all duration-200 ${
-                    viewMode === "list" 
-                      ? "bg-blue-500 text-white" 
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  }`}
+                  className={`p-3 transition-all duration-200 ${viewMode === "list" ? "bg-blue-500 text-white" : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"}`}
                   aria-pressed={viewMode === "list"}
                   aria-label="List view"
                 >
                   <Icon.List />
                 </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowFilters((s) => !s)}
-                className={`p-3 rounded-xl border shadow-sm transition-all duration-200 ${
-                  showFilters 
-                    ? "bg-blue-500 text-white border-blue-500" 
-                    : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:shadow-md hover:text-gray-900 dark:hover:text-white"
-                }`}
-                aria-expanded={showFilters}
-                title="Toggle filters (Ctrl + /)"
-              >
-                <Icon.Filter />
-              </button>
 
               {owner && (
                 <button
@@ -810,15 +581,13 @@ export default function Experience() {
           </div>
         </header>
 
-        {/* Enhanced Search and Filters */}
+        {/* (Filter panel exists, but no button to open it) */}
         {showFilters && (
           <Reveal>
             <div className="mb-8 p-6 rounded-xl border shadow-sm bg-white/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor="search-input" className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
-                    Search
-                  </label>
+                  <label htmlFor="search-input" className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Search</label>
                   <div className="relative">
                     <Icon.Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400" />
                     <input
@@ -833,9 +602,7 @@ export default function Experience() {
                 </div>
 
                 <div>
-                  <label htmlFor="filter-select" className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
-                    Filter by Status
-                  </label>
+                  <label htmlFor="filter-select" className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Filter by Status</label>
                   <select
                     id="filter-select"
                     value={filterBy}
@@ -849,9 +616,7 @@ export default function Experience() {
                 </div>
 
                 <div>
-                  <label htmlFor="sort-select" className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
-                    Sort by
-                  </label>
+                  <label htmlFor="sort-select" className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Sort by</label>
                   <select
                     id="sort-select"
                     value={sortBy}
@@ -867,20 +632,14 @@ export default function Experience() {
 
               {allTags.length > 0 && (
                 <div className="mt-4">
-                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">
-                    Skills & Technologies
-                  </label>
+                  <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200">Skills & Technologies</label>
                   <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                     {allTags.map((tag) => (
                       <button
                         key={tag}
                         type="button"
                         onClick={() => {
-                          setSelectedTags(prev =>
-                            prev.includes(tag)
-                              ? prev.filter(t => t !== tag)
-                              : [...prev, tag]
-                          );
+                          setSelectedTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
                         }}
                         className={`px-3 py-1 text-xs rounded-full border transition-all ${
                           selectedTags.includes(tag)
@@ -899,11 +658,7 @@ export default function Experience() {
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <button
                     type="button"
-                    onClick={() => {
-                      setSearchTerm("");
-                      setFilterBy("all");
-                      setSelectedTags([]);
-                    }}
+                    onClick={() => { setSearchTerm(""); setFilterBy("all"); setSelectedTags([]); }}
                     className="text-sm hover:underline text-blue-600 dark:text-blue-400"
                   >
                     Clear all filters
@@ -924,14 +679,9 @@ export default function Experience() {
               <div className="mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-inner bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700">
                 <Icon.Search className="w-8 h-8 text-gray-500 dark:text-gray-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
-                No experiences found
-              </h3>
+              <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">No experiences found</h3>
               <p className="mb-8 max-w-md mx-auto text-gray-600 dark:text-gray-400">
-                {items.length === 0
-                  ? "Get started by adding your first professional experience."
-                  : "Try adjusting your search criteria or filters."
-                }
+                {items.length === 0 ? "Get started by adding your first professional experience." : "Try adjusting your search criteria or filters."}
               </p>
               {owner && (
                 <button
@@ -948,7 +698,7 @@ export default function Experience() {
         ) : (
           <main className={viewMode === "grid" ? "grid gap-6 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : "space-y-4"}>
             {filteredAndSortedItems.map((item, idx) => (
-              <Reveal key={item.id} delay={idx * 50}>
+              <Reveal key={item.id}>
                 {viewMode === "grid" ? (
                   /* Grid Card View */
                   <Card dark={darkMode} className="group relative p-6 h-full flex flex-col">
@@ -956,10 +706,7 @@ export default function Experience() {
                       <div className="owner-actions absolute top-4 right-4 flex gap-2 z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/experience/edit/${item.id}`);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/experience/edit/${item.id}`); }}
                           className="p-2 rounded-lg border transition-all duration-200 bg-white/95 dark:bg-gray-700/95 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                           title="Edit experience"
                           aria-label={`Edit ${item.role} at ${item.company}`}
@@ -968,10 +715,7 @@ export default function Experience() {
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(item.id, `${item.role} at ${item.company}`);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); onDelete(item.id, `${item.role} at ${item.company}`); }}
                           className="p-2 rounded-lg border transition-all duration-200 bg-white/95 dark:bg-gray-700/95 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/50"
                           title="Delete experience"
                           aria-label={`Delete ${item.role} at ${item.company}`}
@@ -982,15 +726,17 @@ export default function Experience() {
                     )}
 
                     <div className="flex flex-wrap items-start justify-between gap-2 mb-4 pr-20">
-                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      {/* NEW: solid colors — Completed = green, Current = red */}
+                      <div className={`status-badge px-3 py-1 rounded-full text-xs font-semibold border ${
                         item.endDate
-                          ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                          : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                          ? "bg-green-600 text-white border-green-700 dark:bg-green-600 dark:border-green-700"
+                          : "bg-red-600 text-white border-red-700 dark:bg-red-600 dark:border-red-700"
                       }`}>
                         {item.endDate ? "Completed" : "Current"}
                       </div>
+
                       {item.project && (
-                        <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                        <div className="project-badge inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border">
                           <Icon.Briefcase className="w-3 h-3" />
                           <span className="font-medium">{item.project}</span>
                         </div>
@@ -998,25 +744,28 @@ export default function Experience() {
                     </div>
 
                     <div className="mb-3">
-                      <h3 className="text-lg font-bold mb-1 text-gray-900 dark:text-white">
-                        {item.role}
-                      </h3>
-                      <div className="flex items-center gap-2 flex-wrap text-gray-700 dark:text-gray-300">
+                      <h3 className="text-lg font-bold mb-1 text-gray-900 dark:text-white">{item.role}</h3>
+
+                      {/* Company (colored) */}
+                      <div className="flex items-center gap-2 flex-wrap text-indigo-700 dark:text-indigo-300 text-company">
                         <Icon.Building className="w-4 h-4" />
                         <span className="font-medium">{item.company}</span>
                       </div>
                     </div>
 
                     <div className="space-y-2 mb-3 text-sm text-gray-600 dark:text-gray-300">
-                      <div className="flex items-center gap-2 flex-wrap">
+                      {/* Date (colored) */}
+                      <div className="flex items-center gap-2 flex-wrap text-sky-700 dark:text-sky-300 text-date">
                         <Icon.Calendar className="w-4 h-4" />
                         <span>{fmtYM(item.startDate)} – {fmtYM(item.endDate)}</span>
                         <span className="font-medium text-blue-600 dark:text-blue-400">
                           ({humanDuration(item.startDate, item.endDate)})
                         </span>
                       </div>
+
+                      {/* Location (colored) */}
                       {item.location && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300 text-location">
                           <Icon.MapPin className="w-4 h-4" />
                           <span>{item.location}</span>
                         </div>
@@ -1024,9 +773,7 @@ export default function Experience() {
                     </div>
 
                     <div className="flex-grow mb-4 experience-content">
-                      <div
-                        dangerouslySetInnerHTML={{ __html: item.descriptionHtml }}
-                      />
+                      <div dangerouslySetInnerHTML={{ __html: item.descriptionHtml }} />
                     </div>
 
                     {Array.isArray(item.tools) && item.tools.length > 0 && (
@@ -1048,18 +795,19 @@ export default function Experience() {
                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                       <div className="flex-grow min-w-0">
                         <div className="flex flex-wrap items-center gap-3 mb-2">
-                          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                            {item.role}
-                          </h3>
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-white">{item.role}</h3>
+
+                          {/* NEW: solid colors — Completed = green, Current = red */}
+                          <div className={`status-badge px-2 py-1 rounded-full text-xs font-semibold border ${
                             item.endDate
-                              ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                              : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                              ? "bg-green-600 text-white border-green-700 dark:bg-green-600 dark:border-green-700"
+                              : "bg-red-600 text-white border-red-700 dark:bg-red-600 dark:border-red-700"
                           }`}>
                             {item.endDate ? "Completed" : "Current"}
                           </div>
+
                           {item.project && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                            <span className="project-badge inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border">
                               <Icon.Briefcase className="w-3 h-3" />
                               {item.project}
                             </span>
@@ -1067,11 +815,14 @@ export default function Experience() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-4 text-sm mb-3 text-gray-600 dark:text-gray-300">
-                          <div className="flex items-center gap-1">
+                          {/* Company (colored) */}
+                          <div className="flex items-center gap-1 text-indigo-700 dark:text-indigo-300 text-company">
                             <Icon.Building className="w-4 h-4" />
                             <span className="font-medium">{item.company}</span>
                           </div>
-                          <div className="flex items-center gap-1">
+
+                          {/* Date (colored) */}
+                          <div className="flex items-center gap-1 text-sky-700 dark:text-sky-300 text-date">
                             <Icon.Calendar className="w-4 h-4" />
                             <span>
                               {fmtYM(item.startDate)} – {fmtYM(item.endDate)}
@@ -1080,8 +831,10 @@ export default function Experience() {
                               </span>
                             </span>
                           </div>
+
+                          {/* Location (colored) */}
                           {item.location && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 text-emerald-700 dark:text-emerald-300 text-location">
                               <Icon.MapPin className="w-4 h-4" />
                               <span>{item.location}</span>
                             </div>
@@ -1136,7 +889,7 @@ export default function Experience() {
 
             {/* Add New Experience Card for Grid View */}
             {owner && viewMode === "grid" && (
-              <Reveal delay={filteredAndSortedItems.length * 50}>
+              <Reveal>
                 <button
                   type="button"
                   onClick={() => navigate("/experience/new")}
@@ -1153,7 +906,7 @@ export default function Experience() {
 
         {/* Add New Experience Button for List View */}
         {owner && viewMode === "list" && filteredAndSortedItems.length > 0 && (
-          <Reveal delay={300}>
+          <Reveal>
             <div className="mt-8 text-center">
               <button
                 type="button"
@@ -1168,96 +921,57 @@ export default function Experience() {
         )}
       </div>
 
-      {/* Fixed Dark Mode Text Visibility + Bullets + Icon color */}
+      {/* Styles */}
       <style>{`
         /* Base experience content styling */
-        .experience-content {
-          line-height: 1.6;
+        .experience-content { line-height: 1.6; }
+        .experience-content, .experience-content * { color: rgb(55 65 81) !important; } /* gray-700 */
+
+        /* Dark mode: readable text */
+        html.dark .experience-card, html.dark .experience-card * { color: rgb(255 255 255) !important; }
+
+        /* Allow our colored lines to override in dark mode */
+        html.dark .experience-card .text-company { color: rgb(165 180 252) !important; } /* indigo-300 */
+        html.dark .experience-card .text-date    { color: rgb(125 211 252) !important; } /* sky-300 */
+        html.dark .experience-card .text-location{ color: rgb(110 231 183) !important; } /* emerald-300 */
+
+        /* Skills/tech chips in dark mode */
+        html.dark .experience-card .bg-gray-100 { background-color: rgb(55 65 81) !important; color: rgb(255 255 255) !important; }
+
+        /* Project badge (gradient) */
+        .project-badge {
+          background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%) !important;
+          color: white !important;
+          font-weight: 600;
+          text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+          box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+        html.dark .project-badge {
+          background: linear-gradient(135deg, #0891b2 0%, #2563eb 100%) !important;
+          color: white !important;
+          border-color: rgba(59, 130, 246, 0.5) !important;
+          box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
         }
 
-        /* Light mode default text */
-        .experience-content,
-        .experience-content * {
-          color: rgb(55 65 81) !important; /* gray-700 */
+        /* Controls icons: dark mode muted gray (Download, Grid/List) */
+        html.dark .experience-controls button:not(.bg-blue-500):not(.bg-blue-600) svg {
+          color: rgb(156 163 175) !important; /* gray-400 */
+          stroke: currentColor !important;
         }
 
-        /* Dark mode: force readable text across the card */
-        html.dark .experience-card,
-        html.dark .experience-card * {
-          color: rgb(255 255 255) !important;
-        }
-
-        /* Keep blue accents readable in dark mode */
-        html.dark .experience-card .text-blue-600,
-        html.dark .experience-card .text-blue-400 {
-          color: rgb(96 165 250) !important;
-        }
-
-        /* Tags in dark mode */
-        html.dark .experience-card .bg-gray-100 {
-          background-color: rgb(55 65 81) !important;
-          color: rgb(255 255 255) !important;
-        }
-
-        /* ===== BULLET LISTS (works for any list, with or without our classes) ===== */
-        .experience-content ul,
-        .experience-content ol {
-          margin: 0.5rem 0 0.75rem 0;
-          padding-left: 1.25rem;
-          list-style-position: outside;
-        }
+        /* Lists, code, links */
+        .experience-content ul, .experience-content ol { margin: 0.5rem 0 0.75rem 0; padding-left: 1.25rem; list-style-position: outside; }
         .experience-content ul { list-style-type: disc; }
         .experience-content ol { list-style-type: decimal; }
         .experience-content li { margin: 0.25rem 0; }
         .experience-content p.experience-paragraph { margin: 0.5rem 0; }
-
-        /* Inline code */
-        .experience-content code {
-          background: rgb(243 244 246);
-          padding: 0.125rem 0.25rem;
-          border-radius: 0.25rem;
-          font-family: ui-monospace, Menlo, Consolas, monospace;
-          font-size: 0.875em;
-          color: rgb(55 65 81) !important;
-        }
-        html.dark .experience-content code {
-          background: rgb(55 65 81) !important;
-          color: rgb(255 255 255) !important;
-        }
-
-        /* Links */
+        .experience-content code { background: rgb(243 244 246); padding: 0.125rem 0.25rem; border-radius: 0.25rem; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.875em; color: rgb(55 65 81) !important; }
+        html.dark .experience-content code { background: rgb(55 65 81) !important; color: rgb(255 255 255) !important; }
         .experience-content a { color: rgb(37 99 235) !important; text-decoration: underline; text-underline-offset: 2px; }
         html.dark .experience-content a { color: rgb(147 197 253) !important; }
 
-        /* Controls icons must be visible in dark mode */
-        html.dark .experience-controls button:not(.bg-blue-500):not(.bg-blue-600) svg {
-          color: #fff !important;
-          stroke: currentColor !important;
-        }
-        html.dark .owner-actions button svg {
-          color: #fff !important;
-          stroke: currentColor !important;
-        }
-
-        /* Inputs in dark mode */
-        html.dark input[type="text"],
-        html.dark input[type="search"],
-        html.dark select {
-          background-color: rgb(55 65 81);
-          color: #fff;
-          border-color: rgb(75 85 99);
-        }
-        html.dark input::placeholder { color: rgb(156 163 175); }
-
         /* Focus ring hint */
         .experience-card:focus-within { outline: 2px solid rgb(59 130 246); outline-offset: 2px; }
-
-        /* Print */
-        @media print {
-          .owner-actions, .experience-controls { display: none !important; }
-          .experience-card { box-shadow: none !important; border: 1px solid #ccc !important; }
-          .experience-content, .experience-content * { color: #000 !important; background: transparent !important; }
-        }
       `}</style>
     </section>
   );
