@@ -4,167 +4,104 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getProjects, deleteProject as apiDelete } from "../lib/api.js";
 import { useOwnerMode } from "../lib/owner.js";
 
-/* ---------- Constants & Modern Icons ---------- */
-const SORT_OPTIONS = [
-  { value: "recent", label: "Most Recent", icon: "📅" },
-  { value: "name-asc", label: "Name A→Z", icon: "🔤" },
-  { value: "name-desc", label: "Name Z→A", icon: "🔡" },
-  { value: "featured", label: "Featured First", icon: "⭐" },
-];
-
-const FILTER_OPTIONS = [
-  { value: "all", label: "All Projects", icon: "📋", count: 0 },
-  { value: "featured", label: "Featured", icon: "⭐", count: 0 },
-  { value: "with-links", label: "Live Projects", icon: "🔗", count: 0 },
-];
-
-const VIEW_MODES = [
-  { value: "grid", label: "Grid View", icon: "▦" },
-  { value: "list", label: "List View", icon: "☰" },
-  { value: "compact", label: "Compact View", icon: "▤" },
-];
-
-const ICONS = {
-  search: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" />
-      <path d="M21 21l-4.35-4.35" />
-    </svg>
-  ),
-  close: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 6L6 18" />
-      <path d="M6 6l12 12" />
-    </svg>
-  ),
-  add: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  ),
-  edit: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
-  ),
-  delete: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      <path d="M10 11v6M14 11v6" />
-    </svg>
-  ),
-  loading: (
-    <svg width="16" height="16" viewBox="0 0 24 24" className="animate-spin">
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity=".3" />
-      <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor" />
-    </svg>
-  ),
-  chevronRight: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 18l6-6-6-6" />
-    </svg>
-  ),
-  chevronDown: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  ),
-  externalLink: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-      <polyline points="15 3 21 3 21 9" />
-      <line x1="10" y1="14" x2="21" y2="3" />
-    </svg>
-  ),
-  star: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  ),
-  grid: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" />
-      <rect x="14" y="3" width="7" height="7" />
-      <rect x="14" y="14" width="7" height="7" />
-      <rect x="3" y="14" width="7" height="7" />
-    </svg>
-  ),
-  list: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="8" y1="6" x2="21" y2="6" />
-      <line x1="8" y1="12" x2="21" y2="12" />
-      <line x1="8" y1="18" x2="21" y2="18" />
-      <line x1="3" y1="6" x2="3.01" y2="6" />
-      <line x1="3" y1="12" x2="3.01" y2="12" />
-      <line x1="3" y1="18" x2="3.01" y2="18" />
-    </svg>
-  ),
-  compact: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="2" />
-      <rect x="3" y="10" width="18" height="2" />
-      <rect x="3" y="16" width="18" height="2" />
-    </svg>
-  ),
+/* ---------- Smart Features & Algorithms ---------- */
+const SMART_SUGGESTIONS = {
+  "react": ["javascript", "frontend", "ui", "component"],
+  "node": ["backend", "server", "api", "express"],
+  "python": ["data", "ml", "backend", "automation"],
+  "typescript": ["javascript", "type-safe", "frontend", "backend"],
+  "next": ["react", "fullstack", "ssr", "vercel"],
+  "vue": ["frontend", "spa", "component", "javascript"],
+  "angular": ["typescript", "frontend", "spa", "enterprise"],
+  "svelte": ["frontend", "lightweight", "performance", "javascript"]
 };
 
-/* ---------- Helpers ---------- */
+const DIFFICULTY_WEIGHTS = {
+  "react": 2, "vue": 2, "angular": 3, "svelte": 2,
+  "node": 2, "express": 1, "fastapi": 2, "django": 3,
+  "python": 1, "javascript": 1, "typescript": 2,
+  "next": 3, "nuxt": 3, "gatsby": 3,
+  "aws": 4, "docker": 3, "kubernetes": 5,
+  "tensorflow": 4, "pytorch": 4, "ml": 4,
+  "blockchain": 5, "solidity": 5, "web3": 4
+};
+
+/* ---------- Modern Icons ---------- */
+const ICONS = {
+  search: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>,
+  close: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>,
+  brain: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></svg>,
+  sparkles: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>,
+  timeline: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6"/><path d="M9 12H1m14 0h8"/></svg>,
+  trending: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
+  star: <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  external: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+  clock: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  code: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
+  edit: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  delete: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>,
+  loading: <svg width="16" height="16" viewBox="0 0 24 24" className="animate-spin"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity=".3"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"/></svg>,
+  add: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+};
+
+/* ---------- Helper Functions ---------- */
 function toArray(v) {
   if (Array.isArray(v)) return v.filter(Boolean);
   if (!v) return [];
   return String(v).split(",").map((s) => s.trim()).filter(Boolean);
 }
-function parseDateSafe(s) { if (!s) return null; const d = new Date(s); return Number.isFinite(d.getTime()) ? d : null; }
-function getRecencyKey(p) {
-  const ud = parseDateSafe(p?.updatedAt) || parseDateSafe(p?.modifiedAt);
-  const cd = parseDateSafe(p?.createdAt);
-  const d = ud || cd || new Date(0);
-  return d.getTime?.() ?? 0;
+
+function parseDateSafe(s) {
+  if (!s && s !== 0) return null;
+  const d = new Date(s);
+  return Number.isFinite(d.getTime()) ? d : null;
 }
 
-/** Enhanced sanitizer that preserves formatting and text colors but removes highlights and problematic styles */
+/* Make "Recent" robust across snake_case/camelCase and multiple fields */
+function getRecencyKey(p) {
+  const cand = [
+    p?.updatedAt, p?.updated_at, p?.modifiedAt, p?.modified_at,
+    p?.createdAt, p?.created_at, p?.created
+  ];
+  for (const v of cand) {
+    const d = parseDateSafe(v);
+    if (d) return d.getTime();
+  }
+  return 0;
+}
+
+/* Sanitize but keep colors coming from your editor */
 function sanitizeHtml(html) {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(`<div>${html || ""}</div>`, "text/html");
-    
-    // Remove highlight-y inline styles & tags but preserve other formatting including text colors
+
     const cleanElement = (el) => {
-      // Remove problematic tags but preserve their content
       el.querySelectorAll("mark, font").forEach((n) => n.replaceWith(...n.childNodes));
-      
-      // Clean inline styles but preserve text colors
       el.querySelectorAll("[style]").forEach((n) => {
         const style = n.getAttribute("style") || "";
         const filtered = style
           .split(";")
           .map((s) => s.trim())
           .filter((decl) => {
-            // Remove only background colors, highlights, and problematic border styles
-            // but KEEP text colors (color: property)
-            return !/^background(-color)?\s*:/i.test(decl) && 
+            return !/^background(-color)?\s*:/i.test(decl) &&
                    !/^border\s*:/i.test(decl) &&
                    !decl.includes("highlight") &&
-                   !decl.includes("rgba(255, 255, 255") && // Remove white text
+                   !decl.includes("rgba(255, 255, 255") &&
                    !decl.includes("rgb(255, 255, 255") &&
                    !decl.includes("#ffffff") &&
                    !decl.includes("#fff");
           })
           .join("; ");
-        
-        if (filtered.trim()) {
-          n.setAttribute("style", filtered);
-        } else {
-          n.removeAttribute("style");
-        }
+        if (filtered.trim()) n.setAttribute("style", filtered);
+        else n.removeAttribute("style");
       });
     };
-    
+
     cleanElement(doc.body);
     return doc.body.innerHTML;
-  } catch { 
-    return html || ""; 
+  } catch {
+    return html || "";
   }
 }
 
@@ -173,10 +110,78 @@ function htmlToPlain(text) {
   tmp.innerHTML = sanitizeHtml(text || "");
   return tmp.textContent || tmp.innerText || "";
 }
-function sortRecent(arr) { return [...(arr || [])].sort((a, b) => getRecencyKey(b) - getRecencyKey(a)); }
 
-/* ---------- Main ---------- */
-export default function Projects() {
+function calculateDifficulty(techStack) {
+  const score = toArray(techStack).reduce((acc, tech) => {
+    const weight = DIFFICULTY_WEIGHTS[tech.toLowerCase()] || 1;
+    return acc + weight;
+  }, 0);
+
+  if (score <= 5) return { level: "Beginner", color: "emerald", score };
+  if (score <= 12) return { level: "Intermediate", color: "amber", score };
+  if (score <= 20) return { level: "Advanced", color: "orange", score };
+  return { level: "Expert", color: "red", score };
+}
+
+function estimateReadingTime(text) {
+  const words = htmlToPlain(text).trim() ? htmlToPlain(text).split(/\s+/).length : 0;
+  const minutes = Math.ceil(words / 200); // 200 WPM average
+  return Number.isFinite(minutes) ? minutes : 0;
+}
+
+/* Normalize incoming project payload so sorting modes work everywhere */
+function normalizeProject(p = {}) {
+  const name = p.name ?? p.title ?? p.project_name ?? "";
+  const summary =
+    p.summary ??
+    p.summaryHtml ?? p.summary_html ??
+    p.bodyHtml ?? p.body_html ??
+    p.description ?? "";
+
+  const techStack =
+    p.techStack ?? p.tech_stack ?? p.technologies ?? p.techs ?? [];
+
+  // links may be string or object or split fields
+  let linkUrl = null;
+  if (typeof p.links === "string") linkUrl = p.links;
+  else if (p.links && typeof p.links === "object") linkUrl = p.links.url || p.links.link || null;
+  linkUrl = linkUrl || p.url || p.link || null;
+
+  const images = Array.isArray(p.images)
+    ? p.images
+    : toArray(p.images ?? p.image_urls ?? p.gallery);
+
+  return {
+    id: p.id ?? p.project_id ?? p.slug ?? name,
+    name,
+    summary,
+    techStack,
+    featured: Boolean(p.featured ?? p.is_featured ?? p.starred),
+    createdAt: p.createdAt ?? p.created_at ?? p.created ?? new Date().toISOString(),
+    updatedAt: p.updatedAt ?? p.updated_at ?? p.modifiedAt ?? p.modified_at ?? new Date().toISOString(),
+    links: linkUrl ? { url: linkUrl } : null,
+    images
+  };
+}
+
+function findSimilarProjects(project, allProjects) {
+  const projectTech = toArray(project?.techStack).map(t => t.toLowerCase());
+
+  return allProjects
+    .filter(p => p.id !== project.id)
+    .map(p => {
+      const otherTech = toArray(p?.techStack).map(t => t.toLowerCase());
+      const commonTech = projectTech.filter(tech => otherTech.includes(tech));
+      const similarity = commonTech.length / Math.max(projectTech.length || 1, otherTech.length || 1);
+      return { project: p, similarity, commonTech };
+    })
+    .filter(item => item.similarity > 0.2)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, 3);
+}
+
+/* ---------- Main Component ---------- */
+export default function SmartProjects() {
   const [darkMode, setDarkMode] = useState(false);
   const { owner } = useOwnerMode();
   const nav = useNavigate();
@@ -187,24 +192,17 @@ export default function Projects() {
   const [busyId, setBusyId] = useState("");
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [sortMode, setSortMode] = useState("recent");
-  const [filterMode, setFilterMode] = useState("all");
-  const [viewMode, setViewMode] = useState("grid");
-  const [expandedTech, setExpandedTech] = useState([]);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showAdvancedFilters] = useState(false);
-
-  // Modal state
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(null);
-  const backdropRef = useRef(null);
-  const modalRef = useRef(null);
+  const [smartMode, setSmartMode] = useState("intelligent");
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
 
   const fetchProjects = useCallback(async () => {
     try {
       setLoading(true);
       const res = await getProjects();
-      const data = Array.isArray(res) ? res : Array.isArray(res?.items) ? res.items : [];
+      const raw = Array.isArray(res) ? res : Array.isArray(res?.items) ? res.items : [];
+      const data = raw.map(normalizeProject);
       setItems(data);
       setErr("");
     } catch (e) {
@@ -246,64 +244,137 @@ export default function Projects() {
     };
   }, [fetchProjects, location.pathname, location.state, nav]);
 
+  // Smart search suggestions
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    if (!query.trim()) {
+      setSearchSuggestions([]);
+      return;
+    }
+
+    const suggestions = new Set();
+    const queryLower = query.toLowerCase();
+
+    Object.keys(SMART_SUGGESTIONS).forEach(tech => {
+      if (tech.includes(queryLower) || queryLower.includes(tech)) {
+        SMART_SUGGESTIONS[tech].forEach(suggestion => suggestions.add(suggestion));
+      }
+    });
+
+    items.forEach(project => {
+      toArray(project?.techStack).forEach(tech => {
+        if ((tech || "").toLowerCase().includes(queryLower)) {
+          suggestions.add((tech || "").toLowerCase());
+        }
+      });
+    });
+
+    setSearchSuggestions(Array.from(suggestions).slice(0, 6));
+  }, [query, items]);
+
+  // Fixed smart mode change handler
+  const handleSmartModeChange = useCallback((mode) => {
+    console.log('Changing smart mode to:', mode); // Debug log
+    setSmartMode(mode);
   }, []);
 
-  const filterOptionsWithCounts = useMemo(() => {
-    const featuredCount = items.filter((p) => !!p?.featured).length;
-    const withLinksCount = items.filter((p) => p?.links?.url || p?.links?.link).length;
-    return FILTER_OPTIONS.map((option) => ({
-      ...option,
-      count:
-        option.value === "all" ? items.length :
-        option.value === "featured" ? featuredCount :
-        option.value === "with-links" ? withLinksCount : 0,
-    }));
-  }, [items]);
+  const processedProjects = useMemo(() => {
+    console.log('Processing projects with mode:', smartMode); // Debug log
+    
+    let projects = items.map(project => {
+      const difficulty = calculateDifficulty(project?.techStack);
+      const readingTime = estimateReadingTime(project?.summary);
+      
+      return {
+        ...project,
+        difficulty,
+        readingTime,
+        searchScore: 0
+      };
+    });
 
-  const projects = useMemo(() => {
-    let arr = Array.isArray(items) ? items : [];
-    if (filterMode === "featured") arr = arr.filter((p) => !!p?.featured);
-    else if (filterMode === "with-links") arr = arr.filter((p) => !!(p?.links?.url || p?.links?.link));
-    const q = query.trim().toLowerCase();
-    if (q) {
-      arr = arr.filter((p) => {
-        const tech = toArray(p?.techStack).join(" ").toLowerCase();
-        const tags = toArray(p?.tags).join(" ").toLowerCase();
-        return (
-          String(p?.name || "").toLowerCase().includes(q) ||
-          String(htmlToPlain(p?.summary) || "").toLowerCase().includes(q) ||
-          tech.includes(q) || tags.includes(q)
+    // Apply search scoring
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      projects = projects.map(project => {
+        let score = 0;
+        if (project?.name?.toLowerCase().includes(q)) score += 10;
+
+        const techMatches = toArray(project?.techStack).filter(tech =>
+          (tech || "").toLowerCase().includes(q)
         );
-      });
-    }
-    if (sortMode === "name-asc") return [...arr].sort((a, b) => (a?.name || "").localeCompare(b?.name || ""));
-    if (sortMode === "name-desc") return [...arr].sort((a, b) => (b?.name || "").localeCompare(a?.name || ""));
-    if (sortMode === "featured") return [...arr].sort((a, b) => (b?.featured ? 1 : 0) - (a?.featured ? 1 : 0));
-    return sortRecent(arr);
-  }, [items, query, sortMode, filterMode]);
+        score += techMatches.length * 5;
 
-  const uniqueTechCount = useMemo(() => {
-    const set = new Set();
-    items.forEach((p) => toArray(p?.techStack).forEach((t) => set.add(String(t).toLowerCase())));
-    return set.size;
-  }, [items]);
-  const featuredCount = useMemo(() => items.filter((p) => !!p?.featured).length, [items]);
-  const withLinksCount = useMemo(() => items.filter((p) => p?.links?.url || p?.links?.link).length, [items]);
+        const plain = htmlToPlain(project?.summary).toLowerCase();
+        if (plain.includes(q)) score += 3;
+
+        const suggestions = SMART_SUGGESTIONS[q] || [];
+        suggestions.forEach(suggestion => {
+          if (plain.includes(suggestion) ||
+              toArray(project?.techStack).some(tech => (tech || "").toLowerCase().includes(suggestion))) {
+            score += 2;
+          }
+        });
+
+        return { ...project, searchScore: score };
+      }).filter(project => project.searchScore > 0);
+    }
+
+    // Smart sorting based on mode
+    let sortedProjects;
+    
+    switch (smartMode) {
+      case "difficulty": // Complex
+        sortedProjects = projects.slice().sort((a, b) => {
+          const scoreA = a.difficulty?.score || 0;
+          const scoreB = b.difficulty?.score || 0;
+          return scoreB - scoreA;
+        });
+        console.log('Sorted by difficulty:', sortedProjects.slice(0, 3).map(p => ({ name: p.name, score: p.difficulty?.score })));
+        break;
+        
+      case "recent":
+        sortedProjects = projects.slice().sort((a, b) => {
+          const timeA = getRecencyKey(a);
+          const timeB = getRecencyKey(b);
+          return timeB - timeA;
+        });
+        console.log('Sorted by recent:', sortedProjects.slice(0, 3).map(p => ({ name: p.name, time: getRecencyKey(p) })));
+        break;
+        
+      case "reading": // Quick (shorter first)
+        sortedProjects = projects.slice().sort((a, b) => {
+          const timeA = a.readingTime || 0;
+          const timeB = b.readingTime || 0;
+          return timeA - timeB;
+        });
+        console.log('Sorted by reading time:', sortedProjects.slice(0, 3).map(p => ({ name: p.name, time: p.readingTime })));
+        break;
+        
+      default: // "intelligent" (Smart)
+        if (query.trim()) {
+          sortedProjects = projects.slice().sort((a, b) => b.searchScore - a.searchScore);
+        } else {
+          sortedProjects = projects.slice().sort((a, b) => {
+            if (a.featured !== b.featured) return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
+            return getRecencyKey(b) - getRecencyKey(a);
+          });
+        }
+        console.log('Sorted by intelligent:', sortedProjects.slice(0, 3).map(p => ({ name: p.name, featured: p.featured })));
+        break;
+    }
+
+    return sortedProjects;
+  }, [items, query, smartMode]);
 
   const goAdd = () => { if (owner) nav("/projects/new"); };
   const goEdit = (id) => { if (owner) nav(`/projects/edit/${encodeURIComponent(id)}`); };
 
   const onDelete = async (id) => {
-    if (!owner) return;
-    if (!window.confirm("Delete this project?")) return;
+    if (!owner || !window.confirm("Delete this project?")) return;
     try {
       setBusyId(String(id));
       await apiDelete(id);
-      setItems((prev) => prev.filter((p) => String(p?.id) !== String(id)));
+      setItems(prev => prev.filter(p => String(p?.id) !== String(id)));
     } catch (e) {
       alert(e?.message || "Delete failed");
     } finally {
@@ -311,749 +382,560 @@ export default function Projects() {
     }
   };
 
-  const openModal = (p) => { setActive(p); setOpen(true); };
-  const toggleTechExpansion = (tech) => {
-    setExpandedTech((prev) => prev.includes(tech) ? prev.filter((t) => t !== tech) : [...prev, tech]);
+  const openModal = (project) => {
+    setSelectedProject(project);
+    setShowModal(true);
   };
-  const clearFilters = () => { setQuery(""); setFilterMode("all"); setExpandedTech([]); };
 
   if (err) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-gray-50 via-white to-gray-100"}`}>
-        <div className={`text-center p-8 ${darkMode ? "bg-gray-800" : "bg-white"} rounded-2xl shadow-xl border ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
+      <div className={`min-h-screen flex items-center justify-center ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-slate-50 via-white to-blue-50"}`}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className={`text-center p-8 max-w-md ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} rounded-3xl shadow-2xl border backdrop-blur-sm`}
+        >
           <div className="text-6xl mb-4">⚠️</div>
           <h2 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-900"} mb-2`}>Something went wrong</h2>
           <pre className={`${darkMode ? "text-red-400 bg-red-900/20" : "text-red-600 bg-red-50"} text-sm p-4 rounded-lg`}>{err}</pre>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <section className={`min-h-screen transition-colors duration-300 relative ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-gray-50 via-white to-gray-100"}`}>
+    <div className={`min-h-screen transition-all duration-500 ${darkMode ? "bg-gray-900" : "bg-gradient-to-br from-slate-50 via-white to-blue-50"}`}>
       <style>{`
-        .projects-grid {
-          display: grid;
-          gap: 1.5rem;
-          grid-template-columns: ${
-            viewMode === "grid" ? "repeat(auto-fill, minmax(350px, 1fr))" :
-            viewMode === "list" ? "1fr" :
-            "repeat(auto-fill, minmax(280px, 1fr))"
-          };
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+        .mono { font-family: 'JetBrains Mono', 'Monaco', 'Consolas', monospace; }
+
+        .glass-effect {
+          backdrop-filter: blur(20px);
+          background: ${darkMode ? 'rgba(17, 24, 39, 0.8)' : 'rgba(255, 255, 255, 0.8)'};
+          border: 1px solid ${darkMode ? 'rgba(55, 65, 81, 0.3)' : 'rgba(229, 231, 235, 0.3)'};
         }
-        
-        /* Fixed heights for all view modes */
-        .project-card {
-          position: relative;
-          height: ${
-            viewMode === "grid" ? "320px" :
-            viewMode === "list" ? "200px" :
-            "180px"
-          };
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .project-card:hover {
-          transform: translateY(-4px) scale(1.01);
-          box-shadow: 0 20px 40px -12px rgba(0,0,0,0.25);
-        }
-        
-        /* Project content styles - matching WYSIWYG editor styles with preserved colors */
-        .project-content {
-          color: ${darkMode ? '#f3f4f6' : '#1f2937'};
-          line-height: 1.6;
-        }
-        
-        /* Preserve custom text colors from editor */
-        .project-content [style*="color"] {
-          /* Don't override - let inline styles take precedence for colors */
-        }
-        
-        .project-content p {
-          margin: 0.4rem 0;
-          line-height: 1.6;
-        }
-        .project-content ul {
-          list-style: disc outside;
-          padding-left: 1.5rem;
-          margin: 0.4rem 0;
-        }
-        .project-content ol {
-          list-style: decimal outside;
-          padding-left: 1.75rem;
-          margin: 0.4rem 0;
-        }
-        .project-content li {
-          margin: 0.2rem 0;
-          line-height: 1.5;
-        }
-        .project-content a {
-          color: ${darkMode ? '#60a5fa' : '#3b82f6'};
-          text-decoration: underline;
-        }
-        .project-content strong {
-          font-weight: 600;
-        }
-        .project-content em {
-          font-style: italic;
-        }
-        .project-content h1, .project-content h2, .project-content h3, 
-        .project-content h4, .project-content h5, .project-content h6 {
-          font-weight: 600;
-          margin: 0.6rem 0 0.4rem 0;
-        }
+
+        .project-card { transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); transform-style: preserve-3d; }
+        .project-card:hover { transform: translateY(-8px) rotateX(2deg) rotateY(1deg); box-shadow: 0 32px 64px -12px rgba(0,0,0,0.25); }
+        .floating-animation { animation: floating 6s ease-in-out infinite; }
+        @keyframes floating { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+
+        .gradient-text { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .tech-pill { position: relative; overflow: hidden; }
+        .tech-pill::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); transition: left 0.5s; }
+        .tech-pill:hover::before { left: 100%; }
+
+        .project-content { color: ${darkMode ? '#f3f4f6' : '#1f2937'}; line-height: 1.6; }
+        .project-content p { margin: 0.4rem 0; line-height: 1.6; }
+        .project-content ul { list-style: disc outside; padding-left: 1.5rem; margin: 0.4rem 0; }
+        .project-content ol { list-style: decimal outside; padding-left: 1.75rem; margin: 0.4rem 0; }
+        .project-content li { margin: 0.2rem 0; line-height: 1.5; }
+        .project-content a { color: ${darkMode ? '#60a5fa' : '#3b82f6'}; text-decoration: underline; }
+        .project-content strong { font-weight: 600; }
+        .project-content em { font-style: italic; }
+        .project-content h1, .project-content h2, .project-content h3, .project-content h4, .project-content h5, .project-content h6 { font-weight: 600; margin: 0.6rem 0 0.4rem 0; }
         .project-content h1 { font-size: 1.25rem; }
         .project-content h2 { font-size: 1.125rem; }
         .project-content h3 { font-size: 1rem; }
-        
-        /* Content container with proper truncation */
-        .content-container {
-          position: relative;
-          overflow: hidden;
-          margin-bottom: 3.5rem; /* Space for View Details button */
-        }
-        
-        /* Text truncation with fade effect */
-        .content-container::after {
-          content: '';
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          height: 1.5rem;
-          background: linear-gradient(transparent, ${darkMode ? '#1f2937' : '#ffffff'});
-          pointer-events: none;
-        }
-        
-        /* Different truncation heights for different view modes */
-        .project-content.truncated {
-          max-height: ${
-            viewMode === "grid" ? "140px" :
-            viewMode === "list" ? "80px" :
-            "60px"
-          };
-          overflow: hidden;
-        }
-        
-        @media (min-width: 1024px) {
-          .main-layout { grid-template-columns: ${sidebarCollapsed ? "80px 1fr" : "320px 1fr"}; }
-        }
       `}</style>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Header - removed dark mode button */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  Projects
-                </h1>
-              </div>
+      <div className="container mx-auto px-6 py-12">
+        {/* Header Section */}
+        <motion.div
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="text-center mb-16"
+        >
+          <div className="relative inline-block">
+            <motion.h1
+              className="text-6xl md:text-8xl font-black mb-6"
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 1, ease: "easeOut" }}
+            >
+              <span className="gradient-text">Projects</span>
+            </motion.h1>
+            <motion.div
+              className="absolute -top-4 -right-4 floating-animation"
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+            >
+              {ICONS.brain}
+            </motion.div>
+          </div>
 
-              <div className="h-1 w-24 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-full" />
+          <motion.p
+            className={`text-xl md:text-2xl font-light max-w-2xl mx-auto leading-relaxed ${darkMode ? "text-gray-300" : "text-gray-600"}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.8 }}
+          >
+            Exploring the intersection of creativity and technology through intelligent design
+          </motion.p>
 
-              <div className={`flex flex-wrap items-center gap-4 text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-                <span className="flex items-center gap-2"><span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>{items.length} total projects</span>
-                <span className="flex items-center gap-2"><span className="w-2 h-2 bg-amber-500 rounded-full"></span>{featuredCount} featured</span>
-                <span className="flex items-center gap-2"><span className="w-2 h-2 bg-blue-500 rounded-full"></span>{withLinksCount} live projects</span>
+          <motion.div
+            className="flex items-center justify-center gap-8 mt-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.8 }}
+          >
+            <div className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+              <span className={`font-bold text-2xl ${darkMode ? "text-white" : "text-gray-900"}`}>{items.length}</span> Projects Created
+            </div>
+            <div className={`w-px h-8 ${darkMode ? "bg-gray-700" : "bg-gray-300"}`} />
+            <div className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+              <span className={`font-bold text-2xl ${darkMode ? "text-white" : "text-gray-900"}`}>
+                {new Set(items.flatMap(p => toArray(p?.techStack))).size}
+              </span> Technologies Used
+            </div>
+          </motion.div>
+        </motion.div>
+
+        {/* Smart Controls */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.8 }}
+          className="glass-effect rounded-3xl p-8 mb-12 shadow-xl"
+        >
+          <div className="flex flex-col lg:flex-row gap-6 items-center">
+            {/* Search */}
+            <div className="relative flex-1 max-w-2xl">
+              <div className={`absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                {ICONS.search}
               </div>
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search with AI-powered suggestions..."
+                className={`w-full h-14 rounded-2xl pl-16 pr-6 text-lg transition-all duration-300 ${
+                  darkMode
+                    ? "bg-gray-800/50 text-white border-2 border-gray-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20"
+                    : "bg-white/50 text-gray-900 border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20"
+                } backdrop-blur-sm`}
+              />
+
+              {/* Search Suggestions */}
+              <AnimatePresence>
+                {searchSuggestions.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className={`absolute top-full left-0 right-0 mt-2 ${darkMode ? "bg-gray-800" : "bg-white"} rounded-2xl shadow-2xl border ${darkMode ? "border-gray-700" : "border-gray-200"} overflow-hidden z-10`}
+                  >
+                    <div className="p-3">
+                      <div className={`text-xs font-semibold uppercase tracking-wide mb-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        Smart Suggestions
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {searchSuggestions.map((suggestion, index) => (
+                          <motion.button
+                            type="button"
+                            key={suggestion}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: index * 0.05 }}
+                            onClick={() => setQuery(suggestion)}
+                            className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
+                              darkMode
+                                ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            }`}
+                          >
+                            {suggestion}
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* Add Project Button (owner-only) */}
+            {/* Smart Mode Selector - FIXED */}
+            <div className={`flex items-center gap-3 p-2 rounded-2xl ${darkMode ? "bg-gray-800/50" : "bg-white/50"} backdrop-blur-sm`}>
+              {[
+                { value: "intelligent", label: "Smart", icon: ICONS.brain },
+                { value: "recent", label: "Recent", icon: ICONS.timeline },
+                { value: "difficulty", label: "Complex", icon: ICONS.trending },
+                { value: "reading", label: "Quick", icon: ICONS.clock }
+              ].map((mode) => (
+                <motion.button
+                  type="button"
+                  key={mode.value}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handleSmartModeChange(mode.value)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all duration-300 ${
+                    smartMode === mode.value
+                      ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg transform scale-105 ring-2 ring-blue-300"
+                      : darkMode
+                        ? "text-gray-300 hover:bg-gray-700 hover:text-white"
+                        : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  }`}
+                >
+                  <motion.div
+                    animate={{
+                      rotate: smartMode === mode.value ? 360 : 0,
+                      scale: smartMode === mode.value ? 1.1 : 1
+                    }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    {mode.icon}
+                  </motion.div>
+                  <span className="hidden sm:inline">{mode.label}</span>
+                  {smartMode === mode.value && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="w-2 h-2 bg-white rounded-full"
+                    />
+                  )}
+                </motion.button>
+              ))}
+            </div>
+
+            {/* Add Button */}
             {owner && (
               <motion.button
-                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                type="button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={goAdd}
-                className="flex items-center gap-3 px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700"
-                aria-label="Add New Project"
-                title="Add a project"
+                className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all"
               >
                 {ICONS.add}
-                <span>Add Project</span>
+                <span>Create</span>
               </motion.button>
             )}
           </div>
         </motion.div>
 
-        {/* Main Layout */}
-        <div
-          className="main-layout grid gap-8 transition-all duration-300"
-          style={{
-            gridTemplateColumns:
-              typeof window !== "undefined" && window.innerWidth >= 1024
-                ? sidebarCollapsed ? "80px 1fr" : "320px 1fr"
-                : "1fr",
-          }}
-        >
-          {/* Sidebar */}
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className={`space-y-6 ${sidebarCollapsed ? "w-20" : ""}`}>
-            <div className="flex items-center justify-between">
-              {!sidebarCollapsed && <h2 className={`text-lg font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>Filters & Stats</h2>}
-              <motion.button
-                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className={`p-2 rounded-lg ${darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-100 hover:bg-gray-200"} transition-colors`}
-                aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              >
-                <motion.div animate={{ rotate: sidebarCollapsed ? 180 : 0 }} transition={{ duration: 0.3 }}>
-                  {ICONS.chevronRight}
-                </motion.div>
-              </motion.button>
-            </div>
+        {/* Projects Grid */}
+        {loading ? (
+          <ProjectsSkeleton darkMode={darkMode} />
+        ) : processedProjects.length === 0 ? (
+          <EmptyState query={query} darkMode={darkMode} owner={owner} onClear={() => setQuery("")} onAdd={goAdd} />
+        ) : (
+          <ProjectsGrid
+            projects={processedProjects}
+            darkMode={darkMode}
+            owner={owner}
+            busyId={busyId}
+            onEdit={goEdit}
+            onDelete={onDelete}
+            onView={openModal}
+          />
+        )}
 
-            {!sidebarCollapsed && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <StatCard title="Total" value={items.length} icon="📊" darkMode={darkMode} />
-                  <StatCard title="Featured" value={featuredCount} icon="⭐" darkMode={darkMode} />
-                  <StatCard title="Live" value={withLinksCount} icon="🔗" darkMode={darkMode} />
-                  <StatCard title="Tech" value={uniqueTechCount} icon="⚡" darkMode={darkMode} />
-                </div>
-
-                <div className="space-y-2">
-                  {filterOptionsWithCounts.map((option, idx) => (
-                    <motion.button
-                      key={option.value}
-                      initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }}
-                      whileHover={{ scale: 1.02, x: 4 }} whileTap={{ scale: 0.98 }}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl transition-all font-medium ${
-                        filterMode === option.value
-                          ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg"
-                          : darkMode
-                          ? "bg-gray-800 hover:bg-gray-700 text-gray-300"
-                          : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                      }`}
-                      onClick={() => setFilterMode(option.value)}
-                      aria-pressed={filterMode === option.value}
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="text-lg">{option.icon}</span>
-                        <span>{option.label}</span>
-                      </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                        filterMode === option.value ? "bg-white/20 text-white" :
-                        darkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-600"
-                      }`}>{option.count}</span>
-                    </motion.button>
-                  ))}
-                </div>
-
-                <TechStackExplorer
-                  items={items}
-                  expandedTech={expandedTech}
-                  toggleTechExpansion={toggleTechExpansion}
-                  openModal={openModal}
-                  darkMode={darkMode}
-                />
-
-                {(query || filterMode !== "all") && (
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    onClick={clearFilters}
-                    className={`w-full flex items-center justify-center gap-2 p-3 rounded-xl transition-all font-medium ${
-                      darkMode ? "bg-red-900/30 text-red-300 hover:bg-red-900/50" : "bg-red-100 text-red-700 hover:bg-red-200"
-                    }`}
-                  >
-                    {ICONS.close}
-                    <span>Clear All Filters</span>
-                  </motion.button>
-                )}
-              </>
-            )}
-          </motion.div>
-
-          {/* Main Content */}
-          <div className="space-y-6">
-            <EnhancedControls
-              query={query}
-              setQuery={setQuery}
-              sortMode={sortMode}
-              setSortMode={setSortMode}
-              viewMode={viewMode}
-              setViewMode={setViewMode}
-              showAdvancedFilters={showAdvancedFilters}
-              resultsCount={projects.length}
-              darkMode={darkMode}
-            />
-
-            {loading ? (
-              <EnhancedSkeletonGrid viewMode={viewMode} darkMode={darkMode} />
-            ) : projects.length === 0 ? (
-              <EnhancedEmptyState
-                hasFilters={!!(query || filterMode !== "all")}
-                clearFilters={clearFilters}
-                owner={owner}
-                darkMode={darkMode}
-              />
-            ) : (
-              <EnhancedProjectsGrid
-                projects={projects}
-                owner={owner}
-                busyId={busyId}
-                onEdit={goEdit}
-                onDelete={onDelete}
-                openModal={openModal}
-                viewMode={viewMode}
-                darkMode={darkMode}
-              />
-            )}
-          </div>
-        </div>
-
-        <EnhancedProjectModal
-          open={open}
-          active={active}
-          setOpen={setOpen}
-          backdropRef={backdropRef}
-          modalRef={modalRef}
+        {/* Smart Project Modal */}
+        <SmartProjectModal
+          project={selectedProject}
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          allProjects={items}
           darkMode={darkMode}
+          onProjectSelect={openModal}
         />
-      </div>
 
-      {/* Dark/Light Mode Toggle - Bottom Right Corner */}
-      <motion.button
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={() => setDarkMode((v) => !v)}
-        className={`fixed bottom-6 right-6 z-40 p-4 rounded-full shadow-lg border-2 font-medium transition-all ${
-          darkMode 
-            ? "bg-gray-800 border-gray-600 hover:bg-gray-700 text-white" 
-            : "bg-white border-gray-300 hover:bg-gray-50 text-gray-700"
-        }`}
-        title={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
-      >
-        <span className="text-lg">
+        {/* Theme Toggle */}
+        <motion.button
+          type="button"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setDarkMode(!darkMode)}
+          className={`fixed bottom-8 right-8 w-16 h-16 rounded-2xl shadow-2xl ${
+            darkMode
+              ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white"
+              : "bg-gradient-to-r from-slate-800 to-slate-900 text-white"
+          } flex items-center justify-center text-2xl transition-all z-50`}
+        >
           {darkMode ? "☀️" : "🌙"}
-        </span>
-      </motion.button>
-    </section>
+        </motion.button>
+      </div>
+    </div>
   );
 }
 
 /* ---------- Components ---------- */
-function StatCard({ title, value, icon, darkMode }) {
+
+function ProjectsGrid({ projects, darkMode, owner, busyId, onEdit, onDelete, onView }) {
   return (
-    <div className={`p-4 rounded-2xl shadow-lg border ${darkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-2xl">{icon}</span>
-        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-indigo-500 text-white">
-          {value > 99 ? "99+" : value}
-        </div>
-      </div>
-      <div className="text-2xl font-black leading-none">{Number.isFinite(value) ? value.toLocaleString() : "0"}</div>
-      <div className={`text-xs font-medium uppercase tracking-wider ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-        {title}
-      </div>
-    </div>
-  );
-}
-
-function TechStackExplorer({ items, expandedTech, toggleTechExpansion, openModal, darkMode }) {
-  const topTech = useMemo(() => {
-    const techMap = new Map();
-    items.forEach((p) => {
-      toArray(p?.techStack).forEach((t) => {
-        const k = t.toLowerCase();
-        techMap.set(k, (techMap.get(k) || 0) + 1);
-      });
-    });
-    return Array.from(techMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([tech, count]) => ({ tech, count }));
-  }, [items]);
-
-  const techColors = [
-    "from-blue-500 to-cyan-500","from-green-500 to-emerald-500","from-purple-500 to-pink-500","from-amber-500 to-orange-500","from-red-500 to-rose-500",
-    "from-indigo-500 to-blue-500","from-teal-500 to-green-500","from-violet-500 to-purple-500","from-orange-500 to-red-500","from-cyan-500 to-blue-500",
-  ];
-
-  return (
-    <div className="space-y-2">
-      <h3 className={`text-sm font-bold uppercase tracking-wide ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Technology Stack</h3>
-      {topTech.map(({ tech, count }, idx) => (
-        <div key={tech} className="relative">
-          <button
-            className={`w-full flex items-center justify-between p-3 rounded-xl transition-all group ${darkMode ? "bg-gray-800 hover:bg-gray-700 text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-900"}`}
-            onClick={() => toggleTechExpansion(tech)}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${techColors[idx % techColors.length]} shadow-lg`} />
-              <span className="font-medium capitalize">{tech}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-1 rounded-full text-xs font-bold ${darkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-600"}`}>{count}</span>
-              <div className={`${darkMode ? "text-gray-400" : "text-gray-500"}`}>{ICONS.chevronDown}</div>
-            </div>
-          </button>
-
-          <AnimatePresence>
-            {expandedTech.includes(tech) && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }} className="mt-2 ml-6 space-y-1 overflow-hidden">
-                {items
-                  .filter((p) => toArray(p?.techStack).map((t) => t.toLowerCase()).includes(tech))
-                  .slice(0, 5)
-                  .map((p) => (
-                    <button
-                      key={p?.id}
-                      className={`block w-full text-left p-2 text-sm rounded-lg transition-all ${
-                        darkMode ? "text-gray-300 hover:text-white hover:bg-gray-800/50" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                      }`}
-                      onClick={() => openModal(p)}
-                    >
-                      • {p?.name || "Untitled"}
-                    </button>
-                  ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function EnhancedControls({
-  query, setQuery, sortMode, setSortMode, viewMode, setViewMode, showAdvancedFilters, resultsCount, darkMode,
-}) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-      <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 flex-1">
-          <div className="relative flex-1 group">
-            <div className={`absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none ${darkMode ? "text-gray-400" : "text-gray-400"}`}>{ICONS.search}</div>
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search projects, technologies, descriptions..."
-              className={`w-full h-12 rounded-xl border-2 pl-12 pr-4 text-sm transition-all ${
-                darkMode ? "bg-gray-800 text-white border-gray-700 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10"
-                          : "bg-white text-gray-900 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20"
-              }`}
-              aria-label="Search projects"
-            />
-            {query && (
-              <motion.button
-                initial={{ scale: 0 }} animate={{ scale: 1 }} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                onClick={() => setQuery("")}
-                className={`absolute inset-y-0 right-0 pr-4 flex items-center ${darkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-400 hover:text-gray-600"}`}
-                aria-label="Clear search"
-              >
-                {ICONS.close}
-              </motion.button>
-            )}
-          </div>
-
-          <div className="relative">
-            <select
-              value={sortMode}
-              onChange={(e) => setSortMode(e.target.value)}
-              className={`h-12 rounded-xl border-2 pr-10 pl-4 text-sm appearance-none min-w-[160px] transition-all ${
-                darkMode ? "bg-gray-800 text-white border-gray-700" : "bg-white text-gray-900 border-gray-200"
-              }`}
-              aria-label="Sort projects"
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.icon} {opt.label}
-                </option>
-              ))}
-            </select>
-            <div className={`absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-              {ICONS.chevronDown}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className={`text-sm font-medium ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-            <span className={`${darkMode ? "text-white" : "text-gray-900"} font-bold`}>{resultsCount}</span> projects
-          </div>
-
-          <div className={`flex items-center p-1 rounded-lg ${darkMode ? "bg-gray-800" : "bg-gray-100"}`}>
-            {VIEW_MODES.map((mode) => (
-              <motion.button
-                key={mode.value} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                onClick={() => setViewMode(mode.value)}
-                className={`p-2 rounded-md transition-all ${
-                  viewMode === mode.value
-                    ? darkMode ? "bg-gray-700 text-indigo-300 shadow-sm" : "bg-white text-indigo-600 shadow-sm"
-                    : darkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
-                }`}
-                title={mode.label} aria-label={mode.label}
-              >
-                {mode.value === "grid" ? ICONS.grid : mode.value === "list" ? ICONS.list : ICONS.compact}
-              </motion.button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {showAdvancedFilters && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-            className={`p-4 rounded-xl border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
-            <div className={`text-sm font-medium mb-3 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Advanced Filters</div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <input type="text" placeholder="React, Node.js..." className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"}`} />
-              <select className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
-                <option>All time</option><option>Last month</option><option>Last 6 months</option><option>Last year</option>
-              </select>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
-function EnhancedSkeletonGrid({ viewMode, darkMode }) {
-  const itemCount = viewMode === "list" ? 5 : viewMode === "compact" ? 8 : 6;
-  return (
-    <div className="projects-grid">
-      {Array.from({ length: itemCount }).map((_, i) => (
-        <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-          className={`project-card rounded-2xl p-4 shadow-lg border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
-          <div className="space-y-4 h-full flex flex-col">
-            <div className="h-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full animate-pulse" />
-            <div className="space-y-3">
-              <div className={`h-6 rounded-lg animate-pulse ${darkMode ? "bg-gray-700" : "bg-gray-200"}`} />
-              <div className={`h-4 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"} animate-pulse`} />
-              <div className={`h-4 rounded ${darkMode ? "bg-gray-700" : "bg-gray-200"} animate-pulse w-3/4`} />
-            </div>
-            <div className="mt-auto flex items-center justify-end">
-              <div className={`h-8 rounded-lg ${darkMode ? "bg-gray-700" : "bg-gray-200"} animate-pulse w-24`} />
-            </div>
-          </div>
-        </motion.div>
-      ))}
-    </div>
-  );
-}
-
-function EnhancedEmptyState({ hasFilters, clearFilters, owner, darkMode }) {
-  return (
-    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-16 px-8">
-      <div className="max-w-md mx-auto space-y-6">
-        <div className="text-8xl">{hasFilters ? "🔍" : "📁"}</div>
-        <div className="space-y-3">
-          <h3 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>
-            {hasFilters ? "No projects found" : "No projects yet"}
-          </h3>
-          <p className={`${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-            {hasFilters ? "Try adjusting your search criteria or filters." : owner ? "Use the Add Project button to create your first one." : "Ask the owner to add some projects."}
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          {hasFilters && (
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={clearFilters}
-              className={`px-6 py-3 rounded-xl font-medium ${
-                darkMode ? "bg-gray-800 text-gray-200 border border-gray-700 hover:bg-gray-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              Clear Filters
-            </motion.button>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-/** Enhanced Projects Grid with fixed heights and proper text truncation */
-function EnhancedProjectsGrid({ projects, owner, busyId, onEdit, onDelete, openModal, viewMode, darkMode }) {
-  return (
-    <div className="projects-grid">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
       <AnimatePresence mode="popLayout">
-        {projects.map((p, index) => {
-          const linkUrl = p?.links?.url || p?.links?.link || null;
-          const sanitizedSummary = sanitizeHtml(p?.summary);
-
-          return (
-            <motion.div
-              key={p?.id ?? `idx-${index}`}
-              layout
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.25, delay: index * 0.04, type: "spring", stiffness: 120 }}
-              className="project-card"
-            >
-              <div className={`h-full rounded-2xl shadow-lg border overflow-hidden relative ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} flex flex-col`}>
-                {/* Accent */}
-                <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
-
-                {/* Owner controls */}
-                {owner && (
-                  <div className="absolute top-4 right-4 flex gap-2 z-10">
-                    <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.96 }}
-                      onClick={() => onEdit(p?.id)}
-                      className={`p-2 rounded-lg border ${darkMode ? "bg-gray-800/90 border-gray-600 hover:border-indigo-500 text-white backdrop-blur-sm" : "bg-white/90 border-gray-200 hover:border-indigo-300 text-gray-800 backdrop-blur-sm"} transition-all`}
-                      title="Edit" aria-label={`Edit ${p?.name || "project"}`}
-                    >
-                      {ICONS.edit}
-                    </motion.button>
-                    <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.96 }}
-                      onClick={() => onDelete(p?.id)}
-                      className={`p-2 rounded-lg border ${darkMode ? "bg-gray-800/90 border-gray-600 hover:border-red-500 text-white backdrop-blur-sm" : "bg-white/90 border-gray-200 hover:border-red-300 text-gray-800 backdrop-blur-sm"} disabled:opacity-50 transition-all`}
-                      title="Delete" aria-label={`Delete ${p?.name || "project"}`} disabled={busyId === String(p?.id)}
-                    >
-                      {busyId === String(p?.id) ? ICONS.loading : ICONS.delete}
-                    </motion.button>
-                  </div>
-                )}
-
-                {/* Content */}
-                <div className="p-4 flex-1 flex flex-col">
-                  {/* Title + badges */}
-                  <div className="space-y-2 mb-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <h3 className={`text-lg font-bold leading-tight ${darkMode ? "text-white" : "text-gray-900"}`}>{p?.name || "Untitled Project"}</h3>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {p?.featured && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-white rounded-full text-xs font-bold shadow">
-                          {ICONS.star} Featured
-                        </span>
-                      )}
-                      {linkUrl && (
-                        <a
-                          href={linkUrl} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full text-xs font-bold shadow"
-                          title="View live project" onClick={(e) => e.stopPropagation()}
-                        >
-                          {ICONS.externalLink} Live
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* HTML Content with proper formatting and truncation */}
-                  <div className="content-container flex-1 relative">
-                    <div
-                      className={`project-content text-sm leading-relaxed truncated`}
-                      dangerouslySetInnerHTML={{ 
-                        __html: sanitizedSummary || "<p>No description available for this project.</p>" 
-                      }}
-                    />
-                  </div>
-
-                  {/* Tech chips */}
-                  {toArray(p?.techStack).length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {toArray(p?.techStack).slice(0, viewMode === "compact" ? 3 : viewMode === "list" ? 4 : 6).map((tech, idx) => (
-                        <span key={`${tech}-${idx}`} className={`px-2 py-1 rounded-md text-xs font-medium ${darkMode ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700"}`}>
-                          {tech}
-                        </span>
-                      ))}
-                      {toArray(p?.techStack).length > (viewMode === "compact" ? 3 : viewMode === "list" ? 4 : 6) && (
-                        <span className={`px-2 py-1 rounded-md text-xs font-medium ${darkMode ? "bg-gray-600 text-gray-300" : "bg-gray-200 text-gray-600"}`}>
-                          +{toArray(p?.techStack).length - (viewMode === "compact" ? 3 : viewMode === "list" ? 4 : 6)}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Optional meta at bottom */}
-                  {(p?.createdAt || p?.updatedAt) && (
-                    <div className="mt-2 text-xs">
-                      <span className={darkMode ? "text-gray-400" : "text-gray-500"}>
-                        {p?.createdAt && <>Created {new Date(p.createdAt).toLocaleDateString()}</>}
-                        {p?.updatedAt && <> • Updated {new Date(p.updatedAt).toLocaleDateString()}</>}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* View Details — pinned bottom-right with proper margin */}
-                <div className="absolute right-4 bottom-4">
-                  <motion.button
-                    whileHover={{ x: 4 }} whileTap={{ scale: 0.95 }}
-                    onClick={() => openModal(p)}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-xs transition-all shadow-sm ${
-                      darkMode ? "bg-indigo-900/60 text-indigo-200 hover:bg-indigo-900/80 border border-indigo-800/50" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200"
-                    }`}
-                    aria-label={`View details for ${p?.name || "project"}`}
-                  >
-                    <span>View Details</span>
-                    {ICONS.chevronRight}
-                  </motion.button>
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
+        {projects.map((project, index) => (
+          <ProjectCard
+            key={project.id}
+            project={project}
+            index={index}
+            darkMode={darkMode}
+            owner={owner}
+            isBusy={busyId === String(project.id)}
+            onEdit={() => onEdit(project.id)}
+            onDelete={() => onDelete(project.id)}
+            onView={() => onView(project)}
+          />
+        ))}
       </AnimatePresence>
     </div>
   );
 }
 
-function EnhancedProjectModal({ open, active, setOpen, backdropRef, modalRef, darkMode }) {
+function ProjectCard({ project, index, darkMode, owner, isBusy, onEdit, onDelete, onView }) {
+  const difficulty = project.difficulty;
+  const linkUrl = project?.links?.url || project?.links?.link;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.4, delay: index * 0.1 }}
+      className="project-card"
+    >
+      <div className={`h-full rounded-3xl overflow-hidden glass-effect border-2 ${
+        darkMode ? "border-gray-800/50" : "border-gray-200/50"
+      } group relative`}>
+        {/* Gradient accent */}
+        <div className="h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
+
+        {/* Owner controls */}
+        {owner && (
+          <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-10">
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={onEdit}
+              className={`p-2 rounded-xl ${darkMode ? "bg-gray-800/90 text-blue-400" : "bg-white/90 text-blue-600"} backdrop-blur-sm shadow-lg border ${darkMode ? "border-gray-700" : "border-gray-200"}`}
+            >
+              {ICONS.edit}
+            </motion.button>
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={onDelete}
+              disabled={isBusy}
+              className={`p-2 rounded-xl ${darkMode ? "bg-gray-800/90 text-red-400" : "bg-white/90 text-red-600"} backdrop-blur-sm shadow-lg border ${darkMode ? "border-gray-700" : "border-gray-200"} disabled:opacity-50`}
+            >
+              {isBusy ? ICONS.loading : ICONS.delete}
+            </motion.button>
+          </div>
+        )}
+
+        <div className="p-6 h-full flex flex-col">
+          {/* Header */}
+          <div className="mb-4">
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <h3 className={`text-xl font-bold leading-tight ${darkMode ? "text-white" : "text-gray-900"}`}>
+                {project?.name || "Untitled Project"}
+              </h3>
+            </div>
+
+            {/* Badges */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {project?.featured && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-amber-400 to-yellow-500 text-white rounded-full text-xs font-bold shadow-lg">
+                  {ICONS.star} Featured
+                </span>
+              )}
+
+              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold shadow-lg bg-gradient-to-r ${
+                difficulty.color === "emerald" ? "from-emerald-400 to-green-500" :
+                difficulty.color === "amber" ? "from-amber-400 to-orange-500" :
+                difficulty.color === "orange" ? "from-orange-400 to-red-500" :
+                "from-red-500 to-pink-600"
+              } text-white`}>
+                {ICONS.code} {difficulty.level}
+              </span>
+
+              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
+                darkMode ? "bg-blue-900/30 text-blue-300" : "bg-blue-100 text-blue-800"
+              }`}>
+                {ICONS.clock} {project.readingTime}m read
+              </span>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 mb-4">
+            <div
+              className={`project-content text-sm leading-relaxed line-clamp-4 ${darkMode ? "text-gray-300" : "text-gray-600"}`}
+              dangerouslySetInnerHTML={{
+                __html: sanitizeHtml(project?.summary) || "No description available."
+              }}
+            />
+          </div>
+
+          {/* Tech Stack */}
+          {toArray(project?.techStack).length > 0 && (
+            <div className="mb-4">
+              <div className="flex flex-wrap gap-2">
+                {toArray(project.techStack).slice(0, 4).map((tech, idx) => (
+                  <span
+                    key={`${tech}-${idx}`}
+                    className={`tech-pill px-3 py-1 rounded-lg text-xs font-medium ${
+                      darkMode ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {tech}
+                  </span>
+                ))}
+                {toArray(project.techStack).length > 4 && (
+                  <span className={`px-3 py-1 rounded-lg text-xs font-medium ${
+                    darkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-600"
+                  }`}>
+                    +{toArray(project.techStack).length - 4}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center justify-between gap-3">
+            {linkUrl && (
+              <motion.a
+                href={linkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl text-sm font-medium shadow-lg hover:shadow-xl transition-all"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {ICONS.external}
+                <span>Live Demo</span>
+              </motion.a>
+            )}
+
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onView}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                darkMode
+                  ? "bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
+                  : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+              }`}
+            >
+              {ICONS.sparkles}
+              <span>Explore</span>
+            </motion.button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function SmartProjectModal({ project, isOpen, onClose, allProjects, darkMode, onProjectSelect }) {
+  const similarProjects = project ? findSimilarProjects(project, allProjects) : [];
+  const images = toArray(project?.images);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const images = toArray(active?.images);
-  
-  if (!open || !active) return null;
+
+  if (!isOpen || !project) return null;
 
   return (
     <AnimatePresence>
       <motion.div
-        ref={backdropRef}
-        onMouseDown={(e) => { if (e.target === backdropRef.current) setOpen(false); }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        aria-modal="true" role="dialog"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        onClick={onClose}
       >
         <motion.div
-          ref={modalRef}
-          onMouseDown={(e) => e.stopPropagation()}
-          className={`w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl border overflow-hidden ${darkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}
-          initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-          transition={{ type: "spring", damping: 25, stiffness: 400 }}
+          initial={{ scale: 0.9, y: 20 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.9, y: 20 }}
+          className={`w-full max-w-4xl max-h-[90vh] rounded-3xl overflow-hidden glass-effect shadow-2xl`}
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className={`flex items-center justify-between p-6 border-b ${darkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50"}`}>
-            <div className="space-y-1">
-              <h2 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>{active?.name || "Project Details"}</h2>
-              <div className="flex items-center gap-3">
-                {active?.featured && (
-                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${darkMode ? "bg-amber-900/30 text-amber-200" : "bg-amber-100 text-amber-800"}`}>⭐ Featured</span>
-                )}
-                {(active?.links?.url || active?.links?.link) && (
-                  <a href={active?.links?.url || active?.links?.link} target="_blank" rel="noopener noreferrer"
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${darkMode ? "bg-green-900/30 text-green-200 hover:bg-green-900/50" : "bg-green-100 text-green-800 hover:bg-green-200"} transition-colors`}
-                  >
-                    {ICONS.externalLink} View Live
-                  </a>
-                )}
+          {/* Header */}
+          <div className={`p-8 border-b ${darkMode ? "border-gray-800" : "border-gray-200"}`}>
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <h2 className={`text-3xl font-bold mb-2 ${darkMode ? "text-white" : "text-gray-900"}`}>
+                  {project?.name || "Project Details"}
+                </h2>
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold bg-gradient-to-r ${
+                    project.difficulty.color === "emerald" ? "from-emerald-400 to-green-500" :
+                    project.difficulty.color === "amber" ? "from-amber-400 to-orange-500" :
+                    project.difficulty.color === "orange" ? "from-orange-400 to-red-500" :
+                    "from-red-500 to-pink-600"
+                  } text-white`}>
+                    {project.difficulty.level} • {project.readingTime}m read
+                  </span>
+                  {project?.featured && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-amber-400 to-yellow-500 text-white rounded-full text-sm font-bold">
+                      {ICONS.star} Featured
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => setOpen(false)}
-              className={`p-2 rounded-lg ${darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-100 hover:bg-gray-200"} transition-colors`} aria-label="Close modal">
-              {ICONS.close}
-            </motion.button>
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={onClose}
+                className={`p-3 rounded-xl ${darkMode ? "bg-gray-800 hover:bg-gray-700" : "bg-gray-100 hover:bg-gray-200"} transition-colors`}
+              >
+                {ICONS.close}
+              </motion.button>
+            </div>
           </div>
 
-          <div className="max-h-[calc(90vh-120px)] overflow-y-auto">
+          {/* Content */}
+          <div className="max-h[calc(90vh-200px)] overflow-y-auto p-8 space-y-8">
+            {/* Images */}
             {images.length > 0 && (
-              <div className="relative">
-                <motion.img key={activeImageIndex} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  src={images[activeImageIndex]} alt={`${active?.name} screenshot ${activeImageIndex + 1}`} className="w-full h-64 md:h-80 object-cover" />
+              <div className="relative -mx-8 -mt-8 mb-8">
+                <motion.img
+                  key={activeImageIndex}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  src={images[activeImageIndex]}
+                  alt={`${project?.name} screenshot ${activeImageIndex + 1}`}
+                  className="w-full h-64 md:h-80 object-cover"
+                />
                 {images.length > 1 && (
                   <>
-                    <button onClick={() => setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length)}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors" aria-label="Previous image">
+                    <button
+                      type="button"
+                      onClick={() => setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length)}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+                    >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" /></svg>
                     </button>
-                    <button onClick={() => setActiveImageIndex((prev) => (prev + 1) % images.length)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors" aria-label="Next image">
+                    <button
+                      type="button"
+                      onClick={() => setActiveImageIndex((prev) => (prev + 1) % images.length)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+                    >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
                     </button>
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
                       {images.map((_, idx) => (
-                        <button key={idx} onClick={() => setActiveImageIndex(idx)} className={`w-3 h-3 rounded-full transition-colors ${idx === activeImageIndex ? "bg-white" : "bg-white/50"}`} aria-label={`View image ${idx + 1}`} />
+                        <button
+                          type="button"
+                          key={idx}
+                          onClick={() => setActiveImageIndex(idx)}
+                          className={`w-3 h-3 rounded-full transition-colors ${idx === activeImageIndex ? "bg-white" : "bg-white/50"}`}
+                        />
                       ))}
                     </div>
                   </>
@@ -1061,62 +943,235 @@ function EnhancedProjectModal({ open, active, setOpen, backdropRef, modalRef, da
               </div>
             )}
 
-            <div className="p-6 space-y-6">
-              {active?.summary && (
-                <div className="space-y-3">
-                  <h3 className={`text-lg font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>About This Project</h3>
-                  {/* Render HTML content with proper styling in modal */}
-                  <div 
-                    className={`project-content leading-relaxed ${darkMode ? "text-gray-300" : "text-gray-700"}`}
-                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(active.summary) }} 
-                  />
-                </div>
-              )}
+            {/* Description */}
+            <div>
+              <h3 className={`text-xl font-bold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>
+                About This Project
+              </h3>
+              <div
+                className={`project-content text-lg leading-relaxed ${darkMode ? "text-gray-300" : "text-gray-700"}`}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(project?.summary) }}
+              />
+            </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  {active?.client && (<div><h4 className={`text-sm font-bold uppercase tracking-wide mb-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Client</h4><p className={`${darkMode ? "text-white" : "text-gray-900"} font-medium`}>{active.client}</p></div>)}
-                  {active?.role && (<div><h4 className={`text-sm font-bold uppercase tracking-wide mb-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Role</h4><p className={`${darkMode ? "text-white" : "text-gray-900"} font-medium`}>{active.role}</p></div>)}
-                  {active?.location && (<div><h4 className={`text-sm font-bold uppercase tracking-wide mb-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Location</h4><p className={`${darkMode ? "text-white" : "text-gray-900"} font-medium`}>{active.location}</p></div>)}
-                </div>
-
-                <div className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                {project?.client && (
                   <div>
-                    <h4 className={`text-sm font-bold uppercase tracking-wide mb-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Timeline</h4>
-                    <div className="space-y-1 text-sm">
-                      {active?.createdAt && (<p className={`${darkMode ? "text-gray-300" : "text-gray-700"}`}><span className="font-medium">Created:</span> {new Date(active.createdAt).toLocaleDateString()}</p>)}
-                      {active?.updatedAt && (<p className={`${darkMode ? "text-gray-300" : "text-gray-700"}`}><span className="font-medium">Updated:</span> {new Date(active.updatedAt).toLocaleDateString()}</p>)}
-                    </div>
+                    <h4 className={`text-sm font-bold uppercase tracking-wide mb-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Client</h4>
+                    <p className={`${darkMode ? "text-white" : "text-gray-900"} font-medium`}>{project.client}</p>
                   </div>
-
-                  {toArray(active?.techStack).length > 0 && (
-                    <div>
-                      <h4 className={`text-sm font-bold uppercase tracking-wide mb-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Technologies</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {toArray(active.techStack).map((tech, idx) => (
-                          <span key={`${tech}-${idx}`} className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                            darkMode ? "bg-indigo-900/30 border-indigo-700 text-indigo-200" : "bg-indigo-100 border-indigo-200 text-indigo-800"
-                          }`}>{tech}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
+                {project?.role && (
+                  <div>
+                    <h4 className={`text-sm font-bold uppercase tracking-wide mb-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Role</h4>
+                    <p className={`${darkMode ? "text-white" : "text-gray-900"} font-medium`}>{project.role}</p>
+                  </div>
+                )}
+                {project?.location && (
+                  <div>
+                    <h4 className={`text-sm font-bold uppercase tracking-wide mb-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Location</h4>
+                    <p className={`${darkMode ? "text-white" : "text-gray-900"} font-medium`}>{project.location}</p>
+                  </div>
+                )}
               </div>
 
-              {(active?.links?.url || active?.links?.link) && (
-                <div className={`flex flex-wrap gap-3 pt-4 border-t ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
-                  <a href={active?.links?.url || active?.links?.link} target="_blank" rel="noopener noreferrer"
-                     className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all font-medium">
-                    {ICONS.externalLink}
-                    <span>View Live Project</span>
-                  </a>
+              <div className="space-y-4">
+                <div>
+                  <h4 className={`text-sm font-bold uppercase tracking-wide mb-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Timeline</h4>
+                  <div className="space-y-1 text-sm">
+                    {project?.createdAt && (
+                      <p className={`${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                        <span className="font-medium">Created:</span> {new Date(project.createdAt).toLocaleDateString()}
+                      </p>
+                    )}
+                    {project?.updatedAt && (
+                      <p className={`${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                        <span className="font-medium">Updated:</span> {new Date(project.updatedAt).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              )}
+
+                {/* Tech Stack */}
+                {toArray(project?.techStack).length > 0 && (
+                  <div>
+                    <h4 className={`text-sm font-bold uppercase tracking-wide mb-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Technologies</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {toArray(project.techStack).map((tech, idx) => (
+                        <span
+                          key={`${tech}-${idx}`}
+                          className={`px-3 py-1 rounded-full text-xs font-medium border-2 ${
+                            darkMode
+                              ? "bg-blue-900/30 border-blue-700 text-blue-300"
+                              : "bg-blue-50 border-blue-200 text-blue-800"
+                          }`}
+                        >
+                          {tech}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Similar Projects */}
+            {similarProjects.length > 0 && (
+              <div>
+                <h3 className={`text-xl font-bold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>
+                  Similar Projects
+                </h3>
+                <div className="grid gap-4">
+                  {similarProjects.map(({ project: simProject, similarity, commonTech }) => (
+                    <motion.button
+                      type="button"
+                      key={simProject.id}
+                      whileHover={{ scale: 1.02 }}
+                      onClick={() => onProjectSelect(simProject)}
+                      className={`p-4 rounded-2xl text-left transition-all ${
+                        darkMode
+                          ? "bg-gray-800/50 hover:bg-gray-800 border border-gray-700"
+                          : "bg-gray-50 hover:bg-gray-100 border border-gray-200"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h4 className={`font-semibold mb-1 ${darkMode ? "text-white" : "text-gray-900"}`}>
+                            {simProject.name}
+                          </h4>
+                          <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+                            {Math.round(similarity * 100)}% similar • {commonTech.length} shared technologies
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {commonTech.slice(0, 3).map((tech, idx) => (
+                            <span
+                              key={idx}
+                              className={`px-2 py-1 rounded text-xs ${
+                                darkMode ? "bg-green-900/30 text-green-300" : "bg-green-100 text-green-700"
+                              }`}
+                            >
+                              {tech}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Link */}
+            {(project?.links?.url || project?.links?.link) && (
+              <div className="pt-4">
+                <motion.a
+                  href={project?.links?.url || project?.links?.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all text-lg"
+                >
+                  {ICONS.external}
+                  <span>View Live Project</span>
+                </motion.a>
+              </div>
+            )}
           </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+function ProjectsSkeleton({ darkMode }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.1 }}
+          className={`h-80 rounded-3xl glass-effect border-2 ${
+            darkMode ? "border-gray-800/50" : "border-gray-200/50"
+          } p-6`}
+        >
+          <div className="space-y-4 h-full flex flex-col">
+            <div className="h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full animate-pulse" />
+            <div className="space-y-3">
+              <div className={`h-6 rounded-lg animate-pulse ${darkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+              <div className={`h-4 rounded animate-pulse ${darkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+              <div className={`h-4 rounded animate-pulse ${darkMode ? "bg-gray-700" : "bg-gray-200"} w-3/4`} />
+            </div>
+            <div className="mt-auto flex items-center justify-end">
+              <div className={`h-10 rounded-xl animate-pulse ${darkMode ? "bg-gray-700" : "bg-gray-200"} w-32`} />
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({ query, darkMode, owner, onClear, onAdd }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="text-center py-20"
+    >
+      <div className="max-w-md mx-auto space-y-8">
+        <div className="text-8xl floating-animation">
+          {query ? "🔍" : "🚀"}
+        </div>
+
+        <div className="space-y-4">
+          <h3 className={`text-3xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>
+            {query ? "No matches found" : "Ready to build something amazing?"}
+          </h3>
+          <p className={`text-lg ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+            {query
+              ? "Try adjusting your search terms or explore different technologies."
+              : owner
+                ? "Your project portfolio is waiting for its first creation."
+                : "Check back soon for exciting new projects."
+            }
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          {query && (
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onClear}
+              className={`px-8 py-3 rounded-2xl font-medium ${
+                darkMode
+                  ? "bg-gray-800 text-gray-200 hover:bg-gray-700"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              } transition-all`}
+            >
+              Clear Search
+            </motion.button>
+          )}
+
+          {owner && !query && (
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onAdd}
+              className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all"
+            >
+              Create Your First Project
+            </motion.button>
+          )}
+        </div>
+      </div>
+    </motion.div>
   );
 }

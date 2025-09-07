@@ -1,16 +1,18 @@
-// src/pages/Blog.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getPosts, deletePost } from "../lib/api.js";
 import { useOwnerMode } from "../lib/owner.js";
 import Reveal from "../components/Reveal.jsx";
 
-/* ---------------- Local store ---------------- */
+/* ---------------- Local Storage Keys ---------------- */
 const LS_KEY = "localBlogs";
-const VIEW_PREFS_KEY = "blogViewPrefs";
-const FILTERS_KEY = "blogFilters";
-const THEME_KEY = "blog_theme";            // NEW: unified theme key ("dark" | "light")
+const THEME_KEY = "blog_theme";
+const VIEW_MODE_KEY = "blog_view_mode";
+const BOOKMARKS_KEY = "blog_bookmarks";
+const READING_PROGRESS_KEY = "blog_reading_progress";
+const RECENT_READS_KEY = "blog_recent_reads";
 
+/* ---------------- Helper Functions ---------------- */
 const readLocal = () => {
   try {
     const raw = localStorage.getItem(LS_KEY);
@@ -19,25 +21,16 @@ const readLocal = () => {
     return [];
   }
 };
+
 const writeLocal = (rows) => localStorage.setItem(LS_KEY, JSON.stringify(rows));
+
 const removeLocal = (id) => {
   writeLocal(readLocal().filter((r) => String(r.id) !== String(id)));
   return true;
 };
-const getViewPrefs = () => {
-  try {
-    const prefs = localStorage.getItem(VIEW_PREFS_KEY);
-    return prefs ? JSON.parse(prefs) : {};
-  } catch {
-    return {};
-  }
-};
-const setViewPrefs = (prefs) => {
-  localStorage.setItem(VIEW_PREFS_KEY, JSON.stringify(prefs));
-};
 
-/* Merge keys + local removal by id or slug */
 const keyOf = (p) => String(p?.slug || p?.id);
+
 const removeLocalBySlugOrId = (slugOrId) => {
   const rows = readLocal();
   const next = rows.filter(
@@ -47,7 +40,6 @@ const removeLocalBySlugOrId = (slugOrId) => {
   return true;
 };
 
-/* ---------------- Helpers ---------------- */
 const slugify = (s = "") =>
   s
     .toLowerCase()
@@ -62,17 +54,62 @@ const toHtml = (v) =>
     : `<p>${String(v || "").replace(/\n{2,}/g, "</p><p>")}</p>`;
 
 const clampAccent = (hex) =>
-  /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex || "") ? hex : "#4f46e5";
+  /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex || "") ? hex : "#6366f1";
 
-/* Pick the saved theme immediately (prevents flash) */
+/* Smart Reading Utilities */
+const getReadingProgress = () => {
+  try {
+    return JSON.parse(localStorage.getItem(READING_PROGRESS_KEY) || "{}");
+  } catch {
+    return {};
+  }
+};
+
+const setReadingProgress = (postId, progress) => {
+  const current = getReadingProgress();
+  localStorage.setItem(
+    READING_PROGRESS_KEY,
+    JSON.stringify({ ...current, [postId]: { progress, timestamp: Date.now() } })
+  );
+};
+
+const getBookmarks = () => {
+  try {
+    return JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+
+const toggleBookmark = (postId) => {
+  const bookmarks = getBookmarks();
+  const updated = bookmarks.includes(postId)
+    ? bookmarks.filter(id => id !== postId)
+    : [...bookmarks, postId];
+  localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(updated));
+  return updated.includes(postId);
+};
+
+const getRecentReads = () => {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_READS_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+
+const addToRecentReads = (postId) => {
+  const recent = getRecentReads().filter(id => id !== postId);
+  const updated = [postId, ...recent].slice(0, 5);
+  localStorage.setItem(RECENT_READS_KEY, JSON.stringify(updated));
+};
+
 function getInitialTheme() {
   try {
     const explicit = localStorage.getItem(THEME_KEY);
     if (explicit === "dark" || explicit === "light") return explicit;
-    // Back-compat with old boolean key
     const legacy = localStorage.getItem("blogDarkMode");
     if (legacy === "true" || legacy === "false") return legacy === "true" ? "dark" : "light";
-    // Fall back to system
     const mql = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
     return mql ? "dark" : "light";
   } catch {
@@ -80,80 +117,71 @@ function getInitialTheme() {
   }
 }
 
-/* Enhanced snippet function with better truncation */
-function snippetHtml(html, maxChars = 280) {
+function getInitialViewMode() {
   try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(`<div>${html || ""}</div>`, "text/html");
-    const allowed = new Set(["P","UL","OL","LI","STRONG","EM","U","BR","SPAN","B","I","H1","H2","H3"]);
-    const out = [];
-    let count = 0;
-    const walk = (node) => {
-      for (const n of Array.from(node.childNodes)) {
-        if (count >= maxChars) break;
-        if (n.nodeType === 3) {
-          const t = n.nodeValue || "";
-          const space = Math.min(maxChars - count, t.length);
-          out.push(t.slice(0, space));
-          count += space;
-        } else if (n.nodeType === 1 && allowed.has(n.tagName)) {
-          const tag = n.tagName.toLowerCase();
-          out.push(`<${tag}>`);
-          walk(n);
-          out.push(`</${tag}>`);
-        } else if (n.nodeType === 1) {
-          walk(n); // skip tag but keep children
-        }
-        if (count >= maxChars) break;
-      }
-    };
-    walk(doc.body);
-    const result = out.join("");
-    return result.length >= maxChars ? result + "..." : result;
+    const saved = localStorage.getItem(VIEW_MODE_KEY);
+    if (saved && ["grid", "list", "magazine"].includes(saved)) return saved;
+    return "grid";
   } catch {
-    const txt = (html || "").replace(/<[^>]+>/g, "");
-    return txt.length > maxChars ? txt.slice(0, maxChars) + "..." : txt;
+    return "grid";
   }
 }
 
-/* Reading time estimator */
+function createSnippet(html, maxChars = 200) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${html || ""}</div>`, "text/html");
+    const text = doc.body.textContent || "";
+    return text.length > maxChars ? text.slice(0, maxChars) + "..." : text;
+  } catch {
+    const text = (html || "").replace(/<[^>]+>/g, "");
+    return text.length > maxChars ? text.slice(0, maxChars) + "..." : text;
+  }
+}
+
 const estimateReadingTime = (html) => {
   const text = (html || "").replace(/<[^>]*>/g, "");
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-  return Math.max(1, Math.ceil(words / 200)); // 200 WPM
+  return Math.max(1, Math.ceil(words / 200));
+};
+
+const getTimeAgo = (dateStr) => {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffInSeconds = Math.floor((now - date) / 1000);
+  
+  if (diffInSeconds < 60) return "Just now";
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
 /* Modern Icons */
 const Icons = {
   Search: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
     </svg>
   ),
-  Grid: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+  BookmarkEmpty: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
     </svg>
   ),
-  List: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+  BookmarkFilled: () => (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
     </svg>
   ),
-  Card: () => (
+  Clock: () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   ),
-  Filter: () => (
+  Calendar: () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-    </svg>
-  ),
-  Settings: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
     </svg>
   ),
   Plus: () => (
@@ -171,24 +199,45 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
     </svg>
   ),
-  Clock: () => (
+  ArrowRight: () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+    </svg>
+  ),
+  Grid: () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+    </svg>
+  ),
+  List: () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+    </svg>
+  ),
+  Magazine: () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+  ),
+  History: () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   ),
-  Calendar: () => (
+  Sparkles: () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
     </svg>
   ),
-  Tag: () => (
+  TrendingUp: () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
     </svg>
   ),
-  ArrowRight: () => (
+  Eye: () => (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
     </svg>
   ),
   Clear: () => (
@@ -196,9 +245,9 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
   ),
-  ChevronDown: () => (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+  Pencil: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
     </svg>
   ),
 };
@@ -210,12 +259,15 @@ export default function Blog() {
   const [items, setItems] = useState([]);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState(getInitialViewMode);
+  const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
+  const [showRecentOnly, setShowRecentOnly] = useState(false);
 
-  /* ================= THEME: sticky and global ================= */
-  const [theme, setTheme] = useState(getInitialTheme);   // "dark" | "light"
+  /* Theme Management */
+  const [theme, setTheme] = useState(getInitialTheme);
   const darkMode = theme === "dark";
 
-  // Apply to <html> and persist (also update old boolean key for compatibility)
   useEffect(() => {
     try {
       localStorage.setItem(THEME_KEY, theme);
@@ -224,60 +276,23 @@ export default function Blog() {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
+  // Persist view mode
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_MODE_KEY, viewMode);
+    } catch {}
+  }, [viewMode]);
+
   const toggleTheme = useCallback(() => {
     setTheme((t) => (t === "dark" ? "light" : "dark"));
   }, []);
 
-  /* ================= Filters (persist between visits) ================= */
-  const initialFilters = (() => {
-    try {
-      return JSON.parse(localStorage.getItem(FILTERS_KEY) || "{}");
-    } catch {
-      return {};
-    }
-  })();
+  /* Smart State Management */
+  const [bookmarks, setBookmarks] = useState(getBookmarks);
+  const [recentReads, setRecentReads] = useState(getRecentReads);
+  const [readingProgress] = useState(getReadingProgress);
 
-  const [q, setQ] = useState(initialFilters.q || "");
-  const [sortBy, setSortBy] = useState(initialFilters.sortBy || "newest");
-  const [selectedTag, setSelectedTag] = useState(initialFilters.selectedTag || "");
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        FILTERS_KEY,
-        JSON.stringify({ q, sortBy, selectedTag })
-      );
-    } catch {}
-  }, [q, sortBy, selectedTag]);
-
-  /* ================= View prefs (already persisted) ================= */
-  const [viewMode, setViewMode] = useState(getViewPrefs().viewMode || "grid");
-  const [gridCols, setGridCols] = useState(getViewPrefs().gridCols || 2);
-  const [showFilters, setShowFilters] = useState(false);
-  const [compactMode, setCompactMode] = useState(getViewPrefs().compactMode || false);
-
-  const [openSug, setOpenSug] = useState(false);
-  const sugWrapRef = useRef(null);
-
-  const updateViewPrefs = useCallback((updates) => {
-    const currentPrefs = getViewPrefs();
-    const newPrefs = { ...currentPrefs, ...updates };
-    setViewPrefs(newPrefs);
-  }, []);
-  useEffect(() => { updateViewPrefs({ viewMode }); }, [viewMode, updateViewPrefs]);
-  useEffect(() => { updateViewPrefs({ gridCols }); }, [gridCols, updateViewPrefs]);
-  useEffect(() => { updateViewPrefs({ compactMode }); }, [compactMode, updateViewPrefs]);
-
-  // Close suggestions on outside click
-  useEffect(() => {
-    const onDocClick = (e) => {
-      if (sugWrapRef.current && !sugWrapRef.current.contains(e.target)) setOpenSug(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
-
-  // Load posts: API + local (local wins, dedupe by slug)
+  // Load posts: API + local (restored from original)
   const reloadPosts = useCallback(async () => {
     setLoading(true);
     setErr("");
@@ -293,15 +308,15 @@ export default function Blog() {
           bodyHtml,
           content: bodyHtml,
           tags: Array.isArray(x.tags) ? x.tags : [],
-          color: x.color || "#4f46e5",
-          theme: x.theme || { fontFamily: "", basePx: 16, headingScale: 1.15 },
+          color: x.color || "#6366f1",
+          theme: x.theme || { fontFamily: "Inter", basePx: 16, headingScale: 1.15 },
           createdAt: x.createdAt || x.publishedAt || new Date().toISOString(),
         };
       });
 
       const local = readLocal();
 
-      // Dedup by slug/id, local overrides API
+      // Dedup by slug/id, local overrides API (restored from original)
       const map = new Map();
       apiItems.forEach((p) => map.set(keyOf(p), p));
       local.forEach((p) =>
@@ -315,7 +330,7 @@ export default function Blog() {
       const merged = Array.from(map.values());
       setItems(merged);
 
-      // Prune local drafts that now exist on server
+      // Prune local drafts that now exist on server (restored from original)
       const apiSlugs = new Set(apiItems.map((p) => p.slug));
       const cleaned = local.filter((r) => !apiSlugs.has(r.slug));
       if (cleaned.length !== local.length) writeLocal(cleaned);
@@ -326,12 +341,11 @@ export default function Blog() {
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     reloadPosts();
   }, [reloadPosts]);
 
-  // Refresh when localStorage changes or when tab refocuses
+  // Refresh when localStorage changes or when tab refocuses (restored from original)
   useEffect(() => {
     const onStorage = (e) => { if (e.key === LS_KEY) reloadPosts(); };
     const onFocus = () => reloadPosts();
@@ -345,62 +359,118 @@ export default function Blog() {
     };
   }, [reloadPosts]);
 
-  // Tags with counts
-  const allTags = useMemo(() => {
-    const tagCounts = {};
-    items.forEach((p) => (p.tags || []).forEach((t) => (tagCounts[t] = (tagCounts[t] || 0) + 1)));
-    return Object.entries(tagCounts)
-      .sort(([, a], [, b]) => b - a)
-      .map(([tag, count]) => ({ tag, count }));
-  }, [items]);
-
-  // Filtered + sorted
+  // Smart filtering and sorting
   const processedItems = useMemo(() => {
     let filtered = items;
-    if (q.trim()) {
-      const k = q.trim().toLowerCase();
+
+    // Apply search
+    if (searchQuery.trim()) {
+      const k = searchQuery.trim().toLowerCase();
       filtered = filtered.filter((p) => {
-        const hay = `${p.title} ${(p.tags || []).join(" ")}`.toLowerCase();
-        return hay.includes(k);
+        const searchText = `${p.title} ${(p.tags || []).join(" ")} ${createSnippet(p.bodyHtml, 500)}`.toLowerCase();
+        return searchText.includes(k);
       });
     }
-    if (selectedTag) filtered = filtered.filter((p) => (p.tags || []).includes(selectedTag));
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case "oldest":
-          return new Date(a.createdAt) - new Date(b.createdAt);
-        case "title":
-          return a.title.localeCompare(b.title);
-        case "newest":
-        default:
-          return new Date(b.createdAt) - new Date(a.createdAt);
-      }
-    });
-    return filtered;
-  }, [items, q, selectedTag, sortBy]);
 
-  // Smart suggestions
-  const suggestions = useMemo(() => {
-    const k = q.trim().toLowerCase();
-    if (!k) return allTags.slice(0, 6).map((t) => ({ type: "tag", label: t.tag }));
-    const titleHits = items
-      .filter((p) => p.title.toLowerCase().includes(k))
-      .slice(0, 3)
-      .map((p) => ({ type: "title", label: p.title, slug: p.slug || p.id }));
-    const tagHits = allTags
-      .filter(({ tag }) => tag.toLowerCase().includes(k))
-      .slice(0, 3)
-      .map(({ tag }) => ({ type: "tag", label: tag }));
-    return [...titleHits, ...tagHits].slice(0, 6);
-  }, [q, items, allTags]);
+    // Apply bookmarks filter
+    if (showBookmarksOnly) {
+      filtered = filtered.filter(p => bookmarks.includes(String(p.id)));
+    }
+
+    // Apply recent reads filter
+    if (showRecentOnly) {
+      filtered = filtered.filter(p => recentReads.includes(String(p.id)));
+    }
+
+    // Smart sorting: prioritize recent reads and bookmarked posts
+    filtered.sort((a, b) => {
+      const aBookmarked = bookmarks.includes(String(a.id));
+      const bBookmarked = bookmarks.includes(String(b.id));
+      const aRecent = recentReads.includes(String(a.id));
+      const bRecent = recentReads.includes(String(b.id));
+      
+      // Bookmarked posts first
+      if (aBookmarked && !bBookmarked) return -1;
+      if (!aBookmarked && bBookmarked) return 1;
+      
+      // Then recent reads
+      if (aRecent && !bRecent) return -1;
+      if (!aRecent && bRecent) return 1;
+      
+      // Finally by date
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    return filtered;
+  }, [items, searchQuery, showBookmarksOnly, showRecentOnly, bookmarks, recentReads]);
+
+  // Calculate reading stats based on actual data
+  const readingStats = useMemo(() => {
+    const totalReadTime = items.reduce((acc, post) => acc + estimateReadingTime(post.bodyHtml), 0);
+    const postsRead = recentReads.length;
+    
+    return {
+      totalPosts: items.length,
+      totalReadTime,
+      postsRead,
+      streak: Math.min(postsRead, 7) // Simple streak calculation
+    };
+  }, [items, recentReads]);
+
+  // Smart suggestions for empty states
+  const smartSuggestions = useMemo(() => {
+    if (showBookmarksOnly && bookmarks.length === 0) {
+      return { type: "no-bookmarks", message: "No bookmarked posts yet", suggestion: "Start bookmarking posts you want to read later!" };
+    }
+    if (showRecentOnly && recentReads.length === 0) {
+      return { type: "no-recent", message: "No recent reads", suggestion: "Start reading to build your reading history!" };
+    }
+    if (searchQuery && processedItems.length === 0) {
+      return { type: "no-search", message: "No posts found", suggestion: "Try different search terms or browse all posts" };
+    }
+    if (items.length === 0) {
+      return { type: "no-posts", message: "No blog posts yet", suggestion: "Create your first post to get started!" };
+    }
+    return null;
+  }, [showBookmarksOnly, showRecentOnly, searchQuery, processedItems.length, bookmarks.length, recentReads.length, items.length]);
+
+  const handlePostClick = useCallback((post) => {
+    addToRecentReads(String(post.id));
+    setRecentReads(getRecentReads());
+    nav(`/blog/${post.slug}`);
+  }, [nav]);
+
+  const handleBookmarkToggle = useCallback((postId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const isBookmarked = toggleBookmark(String(postId));
+    setBookmarks(getBookmarks());
+    return isBookmarked;
+  }, []);
+
+  const handleCreateNew = useCallback(() => {
+    // Add a confirmation parameter to help prevent accidental empty posts
+    nav("/blog/edit/new?intent=create");
+  }, [nav]);
 
   const onDelete = useCallback(
     async (idOrSlug) => {
       if (!owner) return;
       if (!confirm("Delete this blog post?")) return;
+      
+      // Check if this is a local-only post
+      const isLocalPost = String(idOrSlug).startsWith('local-');
+      
       try {
-        await deletePost(idOrSlug).catch(() => {}); // 404 okay for local-only drafts
+        // Only call API for server posts, skip for local posts
+        if (!isLocalPost) {
+          await deletePost(idOrSlug);
+        }
+      } catch (error) {
+        // Log error but continue with local removal
+        console.warn('Failed to delete from server:', error);
       } finally {
+        // Always remove from local storage
         removeLocalBySlugOrId(idOrSlug);
         setItems((prev) =>
           prev.filter(
@@ -412,237 +482,203 @@ export default function Blog() {
     [owner]
   );
 
-  const clearFilters = () => {
-    setQ("");
-    setSelectedTag("");
-  };
-
   if (loading) {
     return (
-      <section
-        className={`min-h-screen transition-colors duration-300 ${
-          darkMode ? "bg-gray-900 text-white" : "bg-gradient-to-br from-slate-50 to-blue-50"
-        }`}
-      >
-        <div className="container mx-auto px-4 py-12">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="flex flex-col items-center space-y-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600"></div>
-              <p className={`${darkMode ? "text-gray-300" : "text-gray-600"} animate-pulse`}>
-                Loading amazing content...
-              </p>
+      <div className={`min-h-screen transition-all duration-500 ${
+        darkMode 
+          ? "bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900" 
+          : "bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100"
+      }`}>
+        <div className="container mx-auto px-6 py-16">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center space-y-8">
+              <div className="relative">
+                <div className={`w-20 h-20 mx-auto rounded-full border-4 border-transparent ${
+                  darkMode ? "border-t-blue-400" : "border-t-indigo-600"
+                } animate-spin`}></div>
+                <div className={`absolute inset-0 w-20 h-20 mx-auto rounded-full border-4 border-transparent ${
+                  darkMode ? "border-r-slate-400" : "border-r-blue-500"
+                } animate-spin animate-reverse`} style={{ animationDelay: '0.3s' }}></div>
+              </div>
+              <div className="space-y-3">
+                <h2 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-slate-800"}`}>
+                  Loading Your Stories
+                </h2>
+                <p className={`${darkMode ? "text-slate-300" : "text-slate-600"}`}>
+                  Preparing amazing content for you...
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </section>
+      </div>
     );
   }
 
   return (
-    <section
-      className={`min-h-screen transition-all duration-300 ${
-        darkMode ? "bg-gray-900 text-white" : "bg-gradient-to-br from-slate-50 to-blue-50"
-      }`}
-    >
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex-1">
-              <div className="flex items-center space-x-4 mb-3">
-                <div className="relative">
-                  <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent tracking-tight">
-                    Blog
-                  </h1>
-                  <div className="absolute -bottom-2 left-0 w-16 h-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
-                </div>
-              </div>
+    <div className={`min-h-screen transition-all duration-500 relative overflow-hidden ${
+      darkMode 
+        ? "bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900" 
+        : "bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100"
+    }`}>
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className={`absolute top-20 left-20 w-72 h-72 rounded-full opacity-20 blur-3xl animate-pulse ${
+          darkMode ? "bg-blue-500" : "bg-blue-400"
+        }`} style={{ animationDelay: '0s', animationDuration: '4s' }}></div>
+        <div className={`absolute bottom-20 right-20 w-96 h-96 rounded-full opacity-10 blur-3xl animate-pulse ${
+          darkMode ? "bg-slate-500" : "bg-indigo-400"
+        }`} style={{ animationDelay: '2s', animationDuration: '6s' }}></div>
+        <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-5 blur-3xl animate-spin ${
+          darkMode ? "bg-gradient-conic from-blue-400 via-slate-400 to-blue-400" : "bg-gradient-conic from-blue-300 via-indigo-300 to-blue-300"
+        }`} style={{ animationDuration: '20s' }}></div>
+      </div>
 
-              <div
-                className={`flex flex-wrap items-center gap-4 text-sm ${
-                  darkMode ? "text-gray-300" : "text-gray-700"
-                }`}
-              >
-                <div className="flex items-center space-x-1">
-                  <Icons.Tag />
-                  <span className="font-medium">
-                    {items.length} {items.length === 1 ? "post" : "posts"}
-                  </span>
+      <div className="relative z-10 container mx-auto px-6 py-12">
+        {/* Header Section */}
+        <header className="mb-16">
+          <div className="flex items-start justify-between mb-8">
+            <div className="space-y-6">
+              <div className="relative">
+                <h1 className={`text-5xl md:text-7xl font-black tracking-tight ${
+                  darkMode 
+                    ? "bg-gradient-to-r from-white via-blue-200 to-slate-300 bg-clip-text text-transparent"
+                    : "bg-gradient-to-r from-slate-900 via-indigo-800 to-purple-700 bg-clip-text text-transparent"
+                }`}>
+                  Stories
+                </h1>
+                <div className={`absolute -bottom-2 left-0 h-1.5 w-24 rounded-full ${
+                  darkMode 
+                    ? "bg-gradient-to-r from-blue-400 to-slate-600"
+                    : "bg-gradient-to-r from-indigo-500 to-purple-600"
+                }`}></div>
+              </div>
+              <p className={`text-lg md:text-xl ${
+                darkMode ? "text-slate-300" : "text-slate-600"
+              } max-w-2xl leading-relaxed`}>
+                Discover ideas, insights, and inspirations through thoughtfully crafted narratives
+              </p>
+
+              {/* Reading Stats */}
+              <div className={`flex flex-wrap gap-6 ${
+                darkMode ? "text-slate-300" : "text-slate-600"
+              }`}>
+                <div className="flex items-center space-x-2">
+                  <Icons.Sparkles />
+                  <span className="font-medium">{readingStats.totalPosts} Stories</span>
                 </div>
-                {processedItems.length !== items.length && (
-                  <div className="flex items-center space-x-1">
-                    <Icons.Filter />
-                    <span>{processedItems.length} filtered</span>
+                <div className="flex items-center space-x-2">
+                  <Icons.Clock />
+                  <span className="font-medium">{readingStats.totalReadTime} min total</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Icons.TrendingUp />
+                  <span className="font-medium">{readingStats.postsRead} read</span>
+                </div>
+                {readingStats.streak > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-orange-500">🔥</span>
+                    <span className="font-medium">{readingStats.streak} day streak</span>
                   </div>
                 )}
-                <div className="flex items-center space-x-1">
-                  <Icons.Calendar />
-                  <span>Updated {new Date().toLocaleDateString()}</span>
-                </div>
               </div>
             </div>
 
-            {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className={`px-4 py-2 rounded-full border transition-colors ${
+              className={`group relative overflow-hidden px-6 py-3 rounded-2xl transition-all duration-300 hover:scale-105 ${
                 darkMode
-                  ? "border-gray-600 bg-gray-800 text-white hover:bg-gray-700"
-                  : "border-gray-300 bg-white text-gray-800 hover:bg-gray-100"
-              }`}
-              title="Toggle theme"
+                  ? "bg-white/10 backdrop-blur-xl border border-white/20 text-white hover:bg-white/20"
+                  : "bg-white/70 backdrop-blur-xl border border-white/40 text-slate-800 hover:bg-white/90"
+              } shadow-2xl`}
             >
-              {darkMode ? "🌙 Dark" : "☀️ Light"} Mode
+              <div className="flex items-center space-x-2">
+                <span className="text-lg">{darkMode ? "🌙" : "☀️"}</span>
+                <span className="font-medium">{darkMode ? "Dark" : "Light"}</span>
+              </div>
             </button>
           </div>
 
           {err && (
-            <div
-              className={`mb-6 p-4 rounded-2xl border ${
-                darkMode
-                  ? "bg-red-900/20 border-red-800 text-red-300"
-                  : "bg-red-50 border-red-200 text-red-700"
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs">
+            <div className={`mb-8 p-6 rounded-2xl border backdrop-blur-xl ${
+              darkMode
+                ? "bg-red-900/30 border-red-700/50 text-red-300"
+                : "bg-red-50/80 border-red-200/60 text-red-700"
+            }`}>
+              <div className="flex items-center space-x-3">
+                <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
                   !
                 </div>
                 <span className="font-medium">{err}</span>
               </div>
             </div>
           )}
-        </div>
+        </header>
 
-        {/* Search & Controls */}
-        <div className="mb-8">
-          <div
-            className={`backdrop-blur-xl rounded-3xl border p-6 shadow-xl ${
-              darkMode ? "bg-gray-800/80 border-gray-700" : "bg-white/80 border-gray-200"
-            }`}
-          >
-            {/* Search Bar */}
-            <div className="relative mb-6" ref={sugWrapRef}>
-              <div className="relative">
-                <div className={`absolute left-4 top-1/2 -translate-y-1/2 ${darkMode ? "text-gray-300" : "text-gray-400"}`}>
+        {/* Smart Search and Controls */}
+        <div className="mb-12">
+          <div className={`backdrop-blur-xl rounded-3xl border p-8 shadow-2xl ${
+            darkMode 
+              ? "bg-white/5 border-white/10" 
+              : "bg-white/60 border-white/20"
+          }`}>
+            {/* Enhanced Search */}
+            <div className="relative mb-8">
+              <div className="relative group">
+                <div className={`absolute left-5 top-1/2 -translate-y-1/2 transition-colors duration-200 ${
+                  darkMode ? "text-slate-400 group-focus-within:text-blue-400" : "text-slate-500 group-focus-within:text-indigo-600"
+                }`}>
                   <Icons.Search />
                 </div>
                 <input
-                  value={q}
-                  onChange={(e) => {
-                    setQ(e.target.value);
-                    setOpenSug(true);
-                  }}
-                  onFocus={() => setOpenSug(true)}
-                  placeholder="Search posts, tags, or content..."
-                  className={`w-full h-14 rounded-2xl border-2 pl-12 pr-4 text-lg font-medium transition-all duration-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 focus:bg-white ${
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search stories, ideas, and inspirations..."
+                  className={`w-full h-16 rounded-2xl border-2 pl-14 pr-16 text-lg font-medium transition-all duration-300 focus:scale-[1.02] ${
                     darkMode
-                      ? "border-gray-600 bg-gray-700 text-gray-100 focus:ring-indigo-900/50 focus:bg-gray-800"
-                      : "border-gray-200 bg-gray-50 text-gray-800"
+                      ? "border-white/20 bg-white/10 text-white placeholder-slate-400 focus:border-blue-400 focus:bg-white/20"
+                      : "border-slate-200 bg-white/80 text-slate-800 placeholder-slate-500 focus:border-indigo-500 focus:bg-white"
+                  } focus:outline-none focus:ring-4 ${
+                    darkMode ? "focus:ring-blue-500/20" : "focus:ring-indigo-500/20"
                   }`}
                 />
-                {q && (
+                {searchQuery && (
                   <button
-                    onClick={() => setQ("")}
-                    className={`absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors ${
-                      darkMode ? "hover:bg-gray-600 text-gray-200" : "hover:bg-gray-200 text-gray-700"
+                    onClick={() => setSearchQuery("")}
+                    className={`absolute right-5 top-1/2 -translate-y-1/2 p-2 rounded-full transition-all duration-200 hover:scale-110 ${
+                      darkMode ? "hover:bg-white/20 text-slate-300" : "hover:bg-slate-100 text-slate-600"
                     }`}
                   >
                     <Icons.Clear />
                   </button>
                 )}
               </div>
-
-              {/* Suggestions */}
-              {openSug && suggestions.length > 0 && (
-                <div
-                  className={`absolute z-30 mt-2 w-full rounded-2xl border shadow-2xl overflow-hidden backdrop-blur-xl ${
-                    darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-                  }`}
-                >
-                  {suggestions.map((sug, i) => (
-                    <button
-                      key={i}
-                      className={`w-full text-left px-6 py-4 flex items-center gap-3 transition-all duration-150 group ${
-                        darkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                      }`}
-                      onClick={() => {
-                        if (sug.type === "title" && sug.slug) {
-                          setOpenSug(false);
-                          setQ("");
-                          nav(`/blog/${sug.slug}`);
-                        } else {
-                          setQ(sug.label);
-                          setOpenSug(false);
-                        }
-                      }}
-                    >
-                      <div
-                        className={`flex items-center justify-center w-8 h-8 rounded-lg text-indigo-600 group-hover:scale-110 transition-transform ${
-                          darkMode ? "bg-indigo-900/50 text-indigo-400" : "bg-indigo-100"
-                        }`}
-                      >
-                        {sug.type === "tag" ? <Icons.Tag /> : <Icons.ArrowRight />}
-                      </div>
-                      <div className="flex-1">
-                        <div className={`text-xs font-semibold uppercase tracking-wider mb-1 ${darkMode ? "text-indigo-400" : "text-indigo-500"}`}>
-                          {sug.type}
-                        </div>
-                        <div className={`font-medium truncate ${darkMode ? "text-gray-100" : "text-gray-800"}`}>{sug.label}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
 
-            {/* Control Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className={`appearance-none pr-9 pl-4 py-2 rounded-xl border font-medium text-sm transition-colors focus:border-indigo-500 focus:ring-2 ${
-                      darkMode
-                        ? "border-gray-600 bg-gray-700 text-gray-100 focus:ring-indigo-800"
-                        : "border-gray-300 bg-gray-50 text-gray-800 focus:ring-indigo-200"
-                    }`}
-                  >
-                    <option value="newest">🕐 Newest first</option>
-                    <option value="oldest">📅 Oldest first</option>
-                    <option value="title">🔤 By title</option>
-                  </select>
-                  <span
-                    className={`pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 ${
-                      darkMode ? "text-gray-300" : "text-gray-600"
-                    }`}
-                  >
-                    <Icons.ChevronDown />
-                  </span>
-                </div>
-
-                <div
-                  className={`flex rounded-xl overflow-hidden ${
-                    darkMode ? "border border-gray-600 bg-gray-700" : "border border-gray-300 bg-gray-50"
-                  }`}
-                >
+            {/* Smart Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-6">
+              <div className="flex flex-wrap items-center gap-4">
+                {/* View Mode */}
+                <div className={`flex rounded-xl overflow-hidden border ${
+                  darkMode ? "border-white/20 bg-white/10" : "border-slate-200 bg-slate-100"
+                }`}>
                   {[
                     { mode: "grid", icon: Icons.Grid, label: "Grid" },
                     { mode: "list", icon: Icons.List, label: "List" },
-                    { mode: "card", icon: Icons.Card, label: "Cards" },
+                    { mode: "magazine", icon: Icons.Magazine, label: "Magazine" },
                   ].map(({ mode, icon: IconComponent, label }) => (
                     <button
                       key={mode}
                       onClick={() => setViewMode(mode)}
-                      className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                      className={`flex items-center space-x-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 hover:scale-105 ${
                         viewMode === mode
-                          ? "bg-indigo-600 text-white shadow-lg"
+                          ? darkMode
+                            ? "bg-blue-500 text-white shadow-lg"
+                            : "bg-indigo-600 text-white shadow-lg"
                           : darkMode
-                          ? "text-gray-200 hover:bg-gray-600"
-                          : "text-gray-700 hover:bg-gray-100"
+                          ? "text-slate-200 hover:bg-white/20"
+                          : "text-slate-700 hover:bg-white"
                       }`}
-                      title={label}
                     >
                       <IconComponent />
                       <span className="hidden sm:inline">{label}</span>
@@ -650,72 +686,66 @@ export default function Blog() {
                   ))}
                 </div>
 
-                {viewMode === "grid" && (
-                  <div className="flex items-center space-x-2">
-                    <span className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Columns:</span>
-                    <div className={`flex rounded-lg overflow-hidden ${darkMode ? "border border-gray-600" : "border border-gray-300"}`}>
-                      {[1, 2, 3, 4].map((cols) => (
-                        <button
-                          key={cols}
-                          onClick={() => setGridCols(cols)}
-                          className={`px-3 py-1 text-sm font-medium transition-colors ${
-                            gridCols === cols
-                              ? "bg-indigo-600 text-white"
-                              : darkMode
-                              ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
-                              : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-                          }`}
-                        >
-                          {cols}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <label className="flex items-center space-x-2 cursor-pointer select-none">
-                  <span className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Compact</span>
-                  <div
-                    role="switch"
-                    aria-checked={compactMode}
-                    tabIndex={0}
-                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setCompactMode((v) => !v)}
-                    className={`relative w-12 h-7 rounded-full p-0.5 transition-colors duration-200 focus:outline-none ${
-                      compactMode ? "bg-indigo-600" : darkMode ? "bg-gray-600" : "bg-gray-300"
+                {/* Smart Filters */}
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setShowBookmarksOnly(!showBookmarksOnly)}
+                    className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:scale-105 ${
+                      showBookmarksOnly
+                        ? darkMode
+                          ? "bg-blue-500 text-white"
+                          : "bg-indigo-600 text-white"
+                        : darkMode
+                        ? "bg-white/10 text-slate-200 hover:bg-white/20"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                     }`}
-                    onClick={() => setCompactMode((v) => !v)}
                   >
-                    <span
-                      className={`absolute top-1/2 -translate-y-1/2 left-0.5 h-6 w-6 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-                        compactMode ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </div>
-                </label>
+                    <Icons.BookmarkFilled />
+                    <span>Bookmarks</span>
+                    {bookmarks.length > 0 && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${
+                        showBookmarksOnly ? "bg-white/20" : darkMode ? "bg-white/20" : "bg-slate-200"
+                      }`}>
+                        {bookmarks.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setShowRecentOnly(!showRecentOnly)}
+                    className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:scale-105 ${
+                      showRecentOnly
+                        ? darkMode
+                          ? "bg-blue-500 text-white"
+                          : "bg-indigo-600 text-white"
+                        : darkMode
+                        ? "bg-white/10 text-slate-200 hover:bg-white/20"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    <Icons.History />
+                    <span>Recent</span>
+                    {recentReads.length > 0 && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${
+                        showRecentOnly ? "bg-white/20" : darkMode ? "bg-white/20" : "bg-slate-200"
+                      }`}>
+                        {recentReads.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
 
+              {/* Quick Actions */}
               <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200 ${
-                    showFilters || selectedTag
-                      ? "bg-indigo-600 text-white shadow-lg"
-                      : darkMode
-                      ? "bg-gray-700 text-gray-100 hover:bg-gray-600"
-                      : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                  }`}
-                >
-                  <Icons.Filter />
-                  <span>Filters</span>
-                  {allTags.length > 0 && (
-                    <span className="bg-white/20 text-xs px-2 py-0.5 rounded-full">{allTags.length}</span>
-                  )}
-                </button>
-
-                {(q || selectedTag) && (
+                {(showBookmarksOnly || showRecentOnly || searchQuery) && (
                   <button
-                    onClick={clearFilters}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200 ${
+                    onClick={() => {
+                      setShowBookmarksOnly(false);
+                      setShowRecentOnly(false);
+                      setSearchQuery("");
+                    }}
+                    className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 hover:scale-105 ${
                       darkMode
                         ? "bg-red-900/30 text-red-300 hover:bg-red-900/50"
                         : "bg-red-100 text-red-700 hover:bg-red-200"
@@ -727,307 +757,302 @@ export default function Blog() {
                 )}
               </div>
             </div>
-
-            {(showFilters || selectedTag) && allTags.length > 0 && (
-              <div className={`mt-6 pt-6 ${darkMode ? "border-t border-gray-700" : "border-t border-gray-200"}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className={`font-semibold flex items-center space-x-2 ${darkMode ? "text-gray-100" : "text-gray-800"}`}>
-                    <Icons.Tag />
-                    <span>Filter by Tags</span>
-                  </h3>
-                  {selectedTag && (
-                    <button
-                      onClick={() => setSelectedTag("")}
-                      className={`text-sm font-medium ${
-                        darkMode
-                          ? "text-indigo-400 hover:text-indigo-300"
-                          : "text-indigo-600 hover:text-indigo-800"
-                      }`}
-                    >
-                      Show all
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {allTags.slice(0, 12).map(({ tag, count }) => (
-                    <button
-                      key={tag}
-                      onClick={() => setSelectedTag(selectedTag === tag ? "" : tag)}
-                      className={`group relative px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                        selectedTag === tag
-                          ? "bg-indigo-600 text-white shadow-lg scale-105"
-                          : darkMode
-                          ? "bg-gray-700 text-gray-100 hover:bg-indigo-900/50 hover:scale-105"
-                          : "bg-gray-100 text-gray-800 hover:bg-indigo-100 hover:scale-105"
-                      }`}
-                    >
-                      <span>{tag}</span>
-                      <span
-                        className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                          selectedTag === tag
-                            ? "bg-white/20"
-                            : darkMode
-                            ? "bg-gray-600 text-gray-200"
-                            : "bg-gray-200 text-gray-700"
-                        }`}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  ))}
-                  {allTags.length > 12 && (
-                    <span className={`${darkMode ? "text-gray-300" : "text-gray-600"} px-4 py-2 text-sm`}>
-                      +{allTags.length - 12} more
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Posts Display */}
-        <div
-          className={`transition-all duration-300 ${
-            viewMode === "grid"
-              ? `grid gap-6 ${
-                  gridCols === 1
-                    ? "grid-cols-1"
-                    : gridCols === 2
-                    ? "grid-cols-1 lg:grid-cols-2"
-                    : gridCols === 3
-                    ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
-                    : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                }`
-              : viewMode === "list"
-              ? "space-y-4"
-              : "grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-          }`}
-        >
-          {processedItems.map((p) => {
-            const tint = clampAccent(p.color);
-            const fontFamily = p?.theme?.fontFamily || "";
-            const basePx = p?.theme?.basePx || 16;
-            const readingTime = estimateReadingTime(p.bodyHtml);
-
-            return (
-              <Reveal key={p.id}>
-                <article
-                  className={`group relative backdrop-blur-sm rounded-3xl border transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 overflow-hidden ${
-                    darkMode
-                      ? "bg-gray-800/80 border-gray-700 hover:border-indigo-600"
-                      : "bg-white/80 border-gray-200 hover:border-indigo-300"
-                  } ${viewMode === "list" ? "flex flex-col md:flex-row" : "flex flex-col"} ${
-                    compactMode ? "p-4" : "p-6"
-                  }`}
-                >
-                  <div className={`flex-1 ${viewMode === "list" ? "md:pr-6" : ""}`}>
-                    <div className="flex items-start justify-between gap-3 mb-4">
-                      <Link
-                        to={`/blog/${p.slug}`}
-                        className={`group-hover:text-opacity-80 transition-all duration-200 ${
-                          compactMode ? "text-lg" : "text-xl md:text-2xl"
-                        } font-bold leading-tight`}
-                        style={{ color: tint, fontFamily }}
-                      >
-                        {p.title}
-                      </Link>
-
-                      {owner && (
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                          <button
-                            title="Edit post"
-                            onClick={() => nav(`/blog/edit/${encodeURIComponent(p.id)}`)}
-                            className={`w-8 h-8 rounded-full transition-all duration-200 flex items-center justify-center ${
-                              darkMode
-                                ? "bg-gray-700 text-gray-200 hover:bg-indigo-900/50 hover:text-indigo-400"
-                                : "bg-gray-100 text-gray-700 hover:bg-indigo-100 hover:text-indigo-600"
-                            }`}
-                          >
-                            <Icons.Edit />
-                          </button>
-                          <button
-                            title="Delete post"
-                            onClick={() => onDelete(p.id)}
-                            className={`w-8 h-8 rounded-full transition-all duration-200 flex items-center justify-center ${
-                              darkMode
-                                ? "bg-gray-700 text-gray-200 hover:bg-red-900/50 hover:text-red-300"
-                                : "bg-gray-100 text-gray-700 hover:bg-red-100 hover:text-red-600"
-                            }`}
-                          >
-                            <Icons.Delete />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className={`flex flex-wrap items-center gap-4 mb-4 text-sm ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
-                      <div className="flex items-center space-x-1">
-                        <Icons.Clock />
-                        <span>{readingTime} min read</span>
-                      </div>
-                      {p.createdAt && (
-                        <div className="flex items-center space-x-1">
-                          <Icons.Calendar />
-                          <span>
-                            {new Date(p.createdAt).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {(p.tags || []).length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {(p.tags || []).slice(0, compactMode ? 2 : 4).map((tag, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setSelectedTag(tag)}
-                            className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium transition-all duration-200 hover:scale-105 ${
-                              darkMode
-                                ? "bg-gray-700 text-gray-100 hover:bg-indigo-900/50 hover:text-indigo-300"
-                                : "bg-gray-100 text-gray-700 hover:bg-indigo-100 hover:text-indigo-700"
-                            }`}
-                          >
-                            <Icons.Tag />
-                            <span>{tag}</span>
-                          </button>
-                        ))}
-                        {(p.tags || []).length > (compactMode ? 2 : 4) && (
-                          <span className={`${darkMode ? "text-gray-300" : "text-gray-600"} px-3 py-1 text-xs`}>
-                            +{(p.tags || []).length - (compactMode ? 2 : 4)} more
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <div
-                      className={`prose prose-sm max-w-none mb-4 ${
-                        darkMode ? "text-gray-300" : "text-gray-700"
-                      } ${viewMode === "list" ? "line-clamp-2" : compactMode ? "line-clamp-3" : "line-clamp-4"}`}
-                      style={{ fontFamily, fontSize: Math.max(14, basePx - 2) }}
-                      dangerouslySetInnerHTML={{
-                        __html: snippetHtml(p.bodyHtml, viewMode === "list" ? 150 : compactMode ? 200 : 280),
-                      }}
-                    />
-
-                    <Link
-                      to={`/blog/${p.slug}`}
-                      className={`inline-flex items-center space-x-2 font-semibold transition-all duration-200 group-hover:translate-x-1 ${
-                        darkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-800"
-                      }`}
-                    >
-                      <span>Read full article</span>
-                      <Icons.ArrowRight />
-                    </Link>
-                  </div>
-
-                  <div
-                    className="absolute bottom-0 left-0 w-full h-1 rounded-b-3xl opacity-70"
-                    style={{ background: `linear-gradient(90deg, ${tint}, transparent)` }}
-                  />
-                </article>
-              </Reveal>
-            );
-          })}
-
-          {/* Add New Post Card */}
-          {owner && (
-            <Reveal>
-              <button
-                onClick={() => nav("/blog/edit/new")}
-                className={`group relative backdrop-blur-sm rounded-3xl border-2 border-dashed transition-all duration-300 hover:shadow-xl hover:-translate-y-1 p-8 min-h-[200px] flex flex-col items-center justify-center ${
-                  darkMode
-                    ? "bg-gray-800/50 border-gray-600 hover:border-indigo-500 text-gray-200 hover:bg-gray-800"
-                    : "bg-white/50 border-gray-300 hover:border-indigo-400 text-gray-600 hover:bg-white"
-                }`}
-              >
-                <div className="flex flex-col items-center space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-200 shadow-lg">
-                    <Icons.Plus />
-                  </div>
-                  <div className="text-center">
-                    <div className="font-bold text-lg mb-1">Create New Post</div>
-                    <div className="text-sm opacity-70">Share your thoughts with the world</div>
-                  </div>
-                </div>
-              </button>
-            </Reveal>
-          )}
-        </div>
-
-        {/* Empty State */}
-        {processedItems.length === 0 && !loading && (
-          <div className="text-center py-16">
-            <div className="max-w-md mx-auto">
-              <div
-                className={`w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center ${
-                  darkMode ? "bg-indigo-900/30" : "bg-gradient-to-br from-indigo-100 to-purple-100"
-                }`}
-              >
-                <div className={`${darkMode ? "text-gray-500" : "text-gray-400"} w-12 h-12`}>
-                  <Icons.Search />
-                </div>
+        {/* Content Area */}
+        {smartSuggestions ? (
+          <div className="text-center py-20">
+            <div className="max-w-md mx-auto space-y-8">
+              <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center ${
+                darkMode 
+                  ? "bg-gradient-to-br from-blue-500/20 to-slate-600/20" 
+                  : "bg-gradient-to-br from-indigo-100 to-purple-100"
+              }`}>
+                <Icons.Sparkles className={`w-16 h-16 ${
+                  darkMode ? "text-blue-400" : "text-indigo-500"
+                }`} />
               </div>
-              <h3 className={`text-xl font-bold mb-2 ${darkMode ? "text-gray-100" : "text-gray-800"}`}>
-                {q || selectedTag ? "No posts match your filters" : "No blog posts yet"}
-              </h3>
-              <p className={`${darkMode ? "text-gray-300" : "text-gray-600"} mb-6`}>
-                {q || selectedTag
-                  ? "Try adjusting your search terms or filters to find what you're looking for."
-                  : "This is where amazing stories will live."}
-              </p>
-              {q || selectedTag ? (
-                <button
-                  className="inline-flex items-center space-x-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-semibold hover:bg-indigo-700 transition-colors duration-200 shadow-lg hover:shadow-xl"
-                  onClick={clearFilters}
-                >
-                  <Icons.Clear />
-                  <span>Clear filters</span>
-                </button>
-              ) : null}
-            </div>
-          </div>
-        )}
-
-        {/* Footer Stats */}
-        {processedItems.length > 0 && (
-          <div className={`mt-12 pt-8 ${darkMode ? "border-t border-gray-700" : "border-t border-gray-200"}`}>
-            <div className={`flex flex-wrap items-center justify-between gap-4 text-sm ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-              <div className="flex items-center space-x-6">
-                <span>
-                  Showing {processedItems.length} of {items.length} posts
-                </span>
-                {allTags.length > 0 && <span>{allTags.length} unique tags</span>}
-              </div>
-              <div className="flex items-center space-x-2">
-                <span>View:</span>
-                <span className="font-medium capitalize">{viewMode}</span>
-                {viewMode === "grid" && (
-                  <span className={`${darkMode ? "text-indigo-400" : "text-indigo-600"}`}>
-                    ({gridCols} {gridCols === 1 ? "column" : "columns"})
-                  </span>
+              <div className="space-y-4">
+                <h3 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-slate-800"}`}>
+                  {smartSuggestions.message}
+                </h3>
+                <p className={`text-lg ${darkMode ? "text-slate-300" : "text-slate-600"}`}>
+                  {smartSuggestions.suggestion}
+                </p>
+                {(showBookmarksOnly || showRecentOnly || searchQuery) && (
+                  <button
+                    onClick={() => {
+                      setShowBookmarksOnly(false);
+                      setShowRecentOnly(false);
+                      setSearchQuery("");
+                    }}
+                    className={`inline-flex items-center space-x-2 px-8 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105 ${
+                      darkMode
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "bg-indigo-600 text-white hover:bg-indigo-700"
+                    } shadow-lg hover:shadow-2xl`}
+                  >
+                    <span>Show All Stories</span>
+                    <Icons.ArrowRight />
+                  </button>
                 )}
               </div>
             </div>
           </div>
+        ) : (
+          <>
+            {/* Create New Button for List Mode - Moved to Top */}
+            {owner && viewMode === "list" && (
+              <div className="mb-8">
+                <Reveal>
+                  <button
+                    onClick={handleCreateNew}
+                    className={`group w-full relative overflow-hidden rounded-2xl border backdrop-blur-xl transition-all duration-300 hover:scale-[1.01] hover:shadow-xl p-6 ${
+                      darkMode
+                        ? "bg-gradient-to-r from-blue-600/10 to-slate-600/10 border-white/10 hover:bg-gradient-to-r hover:from-blue-600/20 hover:to-slate-600/20 hover:border-white/20"
+                        : "bg-gradient-to-r from-indigo-50/80 to-blue-50/80 border-white/40 hover:bg-gradient-to-r hover:from-indigo-100/90 hover:to-blue-100/90 hover:border-white/60"
+                    }`}
+                  >
+                    <div className="flex items-center space-x-6">
+                      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 ${
+                        darkMode 
+                          ? "bg-gradient-to-br from-blue-500 to-slate-600"
+                          : "bg-gradient-to-br from-indigo-500 to-blue-600"
+                      } shadow-lg group-hover:shadow-xl`}>
+                        <Icons.Pencil className="text-white w-7 h-7" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <h3 className={`text-xl font-bold mb-2 ${darkMode ? "text-white" : "text-slate-800"}`}>
+                          Create New Story
+                        </h3>
+                        <p className={`text-base ${darkMode ? "text-slate-300" : "text-slate-600"}`}>
+                          Share your thoughts, ideas, and inspirations with the world
+                        </p>
+                      </div>
+                      <div className={`transition-all duration-300 group-hover:translate-x-2 ${
+                        darkMode ? "text-blue-400" : "text-indigo-600"
+                      }`}>
+                        <Icons.ArrowRight className="w-6 h-6" />
+                      </div>
+                    </div>
+                  </button>
+                </Reveal>
+              </div>
+            )}
+
+            <div className={`space-y-8 ${
+              viewMode === "grid" 
+                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+                : viewMode === "list"
+                ? "space-y-6"
+                : "grid grid-cols-1 lg:grid-cols-2 gap-8"
+            }`}>
+              {processedItems.map((post, index) => {
+                const isBookmarked = bookmarks.includes(String(post.id));
+                const isRecent = recentReads.includes(String(post.id));
+                const readingTime = estimateReadingTime(post.bodyHtml);
+                const progress = readingProgress[String(post.id)]?.progress || 0;
+                const tint = clampAccent(post.color);
+
+                return (
+                  <Reveal key={post.id} delay={index * 100}>
+                    <article
+                      className={`group relative overflow-hidden rounded-3xl border backdrop-blur-xl transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl cursor-pointer ${
+                        darkMode
+                          ? "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
+                          : "bg-white/60 border-white/20 hover:bg-white/80 hover:border-white/40"
+                      } ${viewMode === "list" ? "flex flex-col md:flex-row" : "flex flex-col"} ${
+                        viewMode === "magazine" ? "h-96" : ""
+                      }`}
+                      onClick={() => handlePostClick(post)}
+                    >
+                      {/* Progress Bar */}
+                      {progress > 0 && (
+                        <div className="absolute top-0 left-0 w-full h-1 bg-black/10">
+                          <div 
+                            className="h-full transition-all duration-300"
+                            style={{ width: `${progress}%`, backgroundColor: tint }}
+                          />
+                        </div>
+                      )}
+
+                      <div className={`flex-1 p-8 ${viewMode === "list" ? "md:pr-6" : ""}`}>
+                        {/* Header */}
+                        <div className="flex items-start justify-between mb-6">
+                          <div className="flex-1">
+                            <h2 className={`text-2xl font-bold leading-tight transition-all duration-300 group-hover:text-opacity-80 mb-3 ${
+                              darkMode ? "text-white" : "text-slate-800"
+                            }`}>
+                              {post.title}
+                            </h2>
+                            <div className={`flex items-center space-x-4 text-sm ${
+                              darkMode ? "text-slate-400" : "text-slate-600"
+                            }`}>
+                              <div className="flex items-center space-x-1">
+                                <Icons.Clock />
+                                <span>{readingTime} min read</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Icons.Calendar />
+                                <span>{getTimeAgo(post.createdAt)}</span>
+                              </div>
+                              {progress > 0 && (
+                                <div className="flex items-center space-x-1">
+                                  <Icons.Eye />
+                                  <span>{progress}% read</span>
+                                </div>
+                              )}
+                              {isRecent && (
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                  darkMode ? "bg-blue-500/20 text-blue-300" : "bg-indigo-100 text-indigo-700"
+                                }`}>
+                                  Recent
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2 ml-4">
+                            <button
+                              onClick={(e) => handleBookmarkToggle(post.id, e)}
+                              className={`p-2 rounded-full transition-all duration-300 hover:scale-110 ${
+                                isBookmarked
+                                  ? darkMode
+                                    ? "text-blue-400 hover:bg-blue-500/20"
+                                    : "text-indigo-600 hover:bg-indigo-100"
+                                  : darkMode
+                                  ? "text-slate-400 hover:bg-white/10 hover:text-blue-400"
+                                  : "text-slate-500 hover:bg-slate-100 hover:text-indigo-600"
+                              }`}
+                            >
+                              {isBookmarked ? <Icons.BookmarkFilled /> : <Icons.BookmarkEmpty />}
+                            </button>
+
+                            {owner && (
+                              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    nav(`/blog/edit/${encodeURIComponent(post.id)}`);
+                                  }}
+                                  className={`p-2 rounded-full transition-all duration-200 hover:scale-110 ${
+                                    darkMode
+                                      ? "text-slate-400 hover:bg-white/10 hover:text-blue-400"
+                                      : "text-slate-500 hover:bg-slate-100 hover:text-blue-600"
+                                  }`}
+                                >
+                                  <Icons.Edit />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDelete(post.id);
+                                  }}
+                                  className={`p-2 rounded-full transition-all duration-200 hover:scale-110 ${
+                                    darkMode
+                                      ? "text-slate-400 hover:bg-white/10 hover:text-red-400"
+                                      : "text-slate-500 hover:bg-slate-100 hover:text-red-600"
+                                  }`}
+                                >
+                                  <Icons.Delete />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Content Preview */}
+                        <p className={`text-lg leading-relaxed mb-6 ${
+                          darkMode ? "text-slate-300" : "text-slate-700"
+                        } ${viewMode === "list" ? "line-clamp-2" : "line-clamp-4"}`}>
+                          {createSnippet(post.bodyHtml, viewMode === "list" ? 120 : 200)}
+                        </p>
+
+                        {/* Tags */}
+                        {post.tags && post.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-6">
+                            {post.tags.slice(0, 3).map((tag, i) => (
+                              <span
+                                key={i}
+                                className={`px-3 py-1 rounded-full text-sm font-medium transition-all duration-200 hover:scale-105 ${
+                                  darkMode
+                                    ? "bg-white/10 text-slate-300 hover:bg-white/20"
+                                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                                }`}
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                            {post.tags.length > 3 && (
+                              <span className={`px-3 py-1 text-sm ${
+                                darkMode ? "text-slate-400" : "text-slate-500"
+                              }`}>
+                                +{post.tags.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Read More */}
+                        <div className={`inline-flex items-center space-x-2 font-semibold transition-all duration-300 group-hover:translate-x-2`}
+                             style={{ color: tint }}>
+                          <span>Continue reading</span>
+                          <Icons.ArrowRight />
+                        </div>
+                      </div>
+
+                      {/* Accent Border */}
+                      <div
+                        className="absolute bottom-0 left-0 w-full h-1 opacity-60 transition-all duration-300 group-hover:opacity-100"
+                        style={{ backgroundColor: tint }}
+                      />
+                    </article>
+                  </Reveal>
+                );
+              })}
+
+              {/* Create New Post for Grid/Magazine Mode */}
+              {owner && viewMode !== "list" && (
+                <Reveal delay={processedItems.length * 100}>
+                  <button
+                    onClick={handleCreateNew}
+                    className={`group relative overflow-hidden rounded-3xl border-2 border-dashed transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl p-12 min-h-[300px] flex flex-col items-center justify-center ${
+                      darkMode
+                        ? "bg-white/5 border-white/20 hover:bg-white/10 hover:border-slate-400 text-slate-300"
+                        : "bg-white/40 border-slate-300 hover:bg-white/70 hover:border-indigo-400 text-slate-600"
+                    }`}
+                  >
+                    <div className="text-center space-y-6">
+                      <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110 ${
+                        darkMode 
+                          ? "bg-gradient-to-br from-blue-500 to-slate-600"
+                          : "bg-gradient-to-br from-indigo-500 to-purple-600"
+                      } shadow-2xl`}>
+                        <Icons.Plus className="text-white" />
+                      </div>
+                      <div>
+                        <h3 className={`text-xl font-bold mb-2 ${darkMode ? "text-white" : "text-slate-800"}`}>
+                          Create New Story
+                        </h3>
+                        <p className="text-lg opacity-80">
+                          Share your thoughts with the world
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </Reveal>
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Custom Styles */}
+      {/* Enhanced Styles */}
       <style jsx>{`
         .line-clamp-2 {
           display: -webkit-box;
           -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-        .line-clamp-3 {
-          display: -webkit-box;
-          -webkit-line-clamp: 3;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
@@ -1037,13 +1062,36 @@ export default function Blog() {
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
-        .prose li::marker { color: currentColor; }
-        html { scroll-behavior: smooth; }
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.3); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.5); }
+        .animate-reverse {
+          animation-direction: reverse;
+        }
+        .bg-gradient-conic {
+          background: conic-gradient(var(--tw-gradient-stops));
+        }
+        html {
+          scroll-behavior: smooth;
+        }
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: rgba(156, 163, 175, 0.3);
+          border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(156, 163, 175, 0.5);
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
       `}</style>
-    </section>
+    </div>
   );
 }

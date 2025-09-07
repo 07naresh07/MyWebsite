@@ -5,9 +5,9 @@ import { getEducation, deleteEducation } from "../lib/api.js";
 import Reveal from "../components/Reveal.jsx";
 import { useOwnerMode } from "../lib/owner.js";
 
-/* -------------------- Import Google Fonts -------------------- */
+/* -------------------- Enhanced Font Loading -------------------- */
 const fontLink = document.createElement('link');
-fontLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap';
+fontLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap';
 fontLink.rel = 'stylesheet';
 document.head.appendChild(fontLink);
 
@@ -60,16 +60,19 @@ function getYM(obj, prefix) {
   }
   return { y: Number.isFinite(y) ? y : null, m: Number.isFinite(m) ? m : null };
 }
+
 function keyForEnd(obj) {
   const { y, m } = getYM(obj, "end");
   if (y == null) return 999999;
   return y * 100 + (m ?? 12);
 }
+
 function keyForStart(obj) {
   const { y, m } = getYM(obj, "start");
   if (y == null) return -1;
   return y * 100 + (m ?? 1);
 }
+
 function formatYM(obj, prefix, full = false) {
   const { y, m } = getYM(obj, prefix);
   if (!y) return "—";
@@ -77,18 +80,21 @@ function formatYM(obj, prefix, full = false) {
   if (m && m >= 1 && m <= 12) return `${months[m - 1]} ${y}`;
   return String(y);
 }
+
 function toDateFromObj(obj, prefix) {
   const { y, m } = getYM(obj, prefix);
   if (!y) return null;
   const mm = m && m >= 1 && m <= 12 ? m : 1;
   return new Date(y, mm - 1, 1);
 }
+
 function monthDiffObj(startObj, endObj) {
   const s = toDateFromObj(startObj, "start");
   const e = getYM(endObj, "end").y == null ? new Date() : toDateFromObj(endObj, "end");
   if (!s || !e) return 0;
   return Math.max(0, (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()));
 }
+
 function humanDurationObj(obj) {
   const months = monthDiffObj(obj, obj);
   const y = Math.floor(months / 12), m = months % 12;
@@ -98,19 +104,74 @@ function humanDurationObj(obj) {
   return `${m} month${m > 1 ? 's' : ''}`;
 }
 
-/* -------------------- Levels -------------------- */
+/* -------------------- Enhanced Level System -------------------- */
 const LEVEL_ORDER = ["Primary School","Secondary School","High School","Diploma/Certificate","Bachelor","Master","MPhil","PhD","Other"];
 const LEVEL_RANK = Object.fromEntries(LEVEL_ORDER.map((l, i) => [l.toLowerCase(), i]));
+
 const LEVEL_COLORS = {
-  "PhD": { bg: "from-purple-600 to-indigo-600", text: "text-purple-100", border: "border-purple-400" },
-  "MPhil": { bg: "from-indigo-600 to-purple-600", text: "text-indigo-100", border: "border-indigo-400" },
-  "Master": { bg: "from-blue-600 to-indigo-600", text: "text-blue-100", border: "border-blue-400" },
-  "Bachelor": { bg: "from-cyan-600 to-blue-600", text: "text-cyan-100", border: "border-cyan-400" },
-  "Diploma/Certificate": { bg: "from-teal-600 to-cyan-600", text: "text-teal-100", border: "border-teal-400" },
-  "High School": { bg: "from-green-600 to-teal-600", text: "text-green-100", border: "border-green-400" },
-  "Secondary School": { bg: "from-lime-600 to-green-600", text: "text-lime-100", border: "border-lime-400" },
-  "Primary School": { bg: "from-yellow-600 to-lime-600", text: "text-yellow-100", border: "border-yellow-400" },
-  "Other": { bg: "from-gray-600 to-gray-700", text: "text-gray-100", border: "border-gray-400" }
+  "PhD": { 
+    bg: "from-violet-600 via-purple-600 to-indigo-700", 
+    text: "text-violet-100", 
+    border: "border-violet-400",
+    shadow: "shadow-violet-500/25",
+    glow: "shadow-violet-500/50"
+  },
+  "MPhil": { 
+    bg: "from-indigo-600 via-blue-600 to-purple-700", 
+    text: "text-indigo-100", 
+    border: "border-indigo-400",
+    shadow: "shadow-indigo-500/25",
+    glow: "shadow-indigo-500/50"
+  },
+  "Master": { 
+    bg: "from-blue-600 via-cyan-600 to-indigo-700", 
+    text: "text-blue-100", 
+    border: "border-blue-400",
+    shadow: "shadow-blue-500/25",
+    glow: "shadow-blue-500/50"
+  },
+  "Bachelor": { 
+    bg: "from-emerald-600 via-teal-600 to-cyan-700", 
+    text: "text-emerald-100", 
+    border: "border-emerald-400",
+    shadow: "shadow-emerald-500/25",
+    glow: "shadow-emerald-500/50"
+  },
+  "Diploma/Certificate": { 
+    bg: "from-amber-600 via-orange-600 to-red-600", 
+    text: "text-amber-100", 
+    border: "border-amber-400",
+    shadow: "shadow-amber-500/25",
+    glow: "shadow-amber-500/50"
+  },
+  "High School": { 
+    bg: "from-green-600 via-emerald-600 to-teal-600", 
+    text: "text-green-100", 
+    border: "border-green-400",
+    shadow: "shadow-green-500/25",
+    glow: "shadow-green-500/50"
+  },
+  "Secondary School": { 
+    bg: "from-lime-600 via-green-600 to-emerald-600", 
+    text: "text-lime-100", 
+    border: "border-lime-400",
+    shadow: "shadow-lime-500/25",
+    glow: "shadow-lime-500/50"
+  },
+  "Primary School": { 
+    bg: "from-yellow-500 via-amber-600 to-orange-600", 
+    text: "text-yellow-100", 
+    border: "border-yellow-400",
+    shadow: "shadow-yellow-500/25",
+    glow: "shadow-yellow-500/50"
+  },
+  "Other": { 
+    bg: "from-slate-600 via-gray-700 to-zinc-700", 
+    text: "text-slate-100", 
+    border: "border-slate-400",
+    shadow: "shadow-slate-500/25",
+    glow: "shadow-slate-500/50"
+  }
 };
 
 function normalizeLevelText(s) {
@@ -123,8 +184,9 @@ function normalizeLevelText(s) {
   if (/high school|higher secondary|hsc/.test(t)) return "High School";
   if (/secondary/.test(t)) return "Secondary School";
   if (/primary/.test(t)) return "Primary School";
-  return "";
+  return "Other";
 }
+
 function displayLevelName(it) {
   return (
     normalizeLevelText(it?.level) ||
@@ -132,11 +194,13 @@ function displayLevelName(it) {
     String(it?.level ?? it?.degree ?? "")
   );
 }
+
 function detectLevelRank(it) {
   const canonical = String(displayLevelName(it) || it?.level || "").toLowerCase();
   if (canonical && LEVEL_RANK[canonical] != null) return LEVEL_RANK[canonical];
   return -1;
 }
+
 function highestLevelCanonical(items) {
   let best = -1;
   for (const it of items) best = Math.max(best, detectLevelRank(it));
@@ -157,6 +221,7 @@ function sortEdu(rows) {
   });
   return copy;
 }
+
 function mergeEdu(apiArr, localArr) {
   const map = new Map();
   (apiArr || []).forEach((it) => { if (it && it.id != null) map.set(String(it.id), it); });
@@ -212,6 +277,7 @@ function sanitizeHtml(html) {
     return html;
   }
 }
+
 function mdLiteToHtml(text) {
   const lines = (text || "").split("\n").map((s) => s.trim()).filter(Boolean);
   if (!lines.length) return "";
@@ -224,7 +290,22 @@ function mdLiteToHtml(text) {
   return `<p>${inline(lines.join("<br>"))}</p>`;
 }
 
-/* -------------------- Icons -------------------- */
+/* Certificate detection */
+function isCertificate(it) {
+  const t = `${it?.type || ""} ${it?.level || ""} ${it?.degree || ""}`.toLowerCase();
+  return /certificat|certificate|cert\b/i.test(t);
+}
+
+/* HTML renderer */
+function renderDetailsHTML(it) {
+  const raw =
+    it.detailsHtml ||
+    (it.details ? mdLiteToHtml(it.details) : "") ||
+    (it.description ? mdLiteToHtml(it.description) : "");
+  return sanitizeHtml(raw);
+}
+
+/* -------------------- Enhanced Icons -------------------- */
 const Icons = {
   sparkles: (cls="w-5 h-5") => (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -232,7 +313,7 @@ const Icons = {
       <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M17 7L18 6M6 12L5 13M19 19L18 18"/>
     </svg>
   ),
-  brightness: (cls="w-4 h-4") => (
+  brightness: (cls="w-5 h-5") => (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
       <circle cx="12" cy="12" r="5" strokeWidth="2"/>
       <line x1="12" y1="1" x2="12" y2="3" strokeWidth="2" strokeLinecap="round"/>
@@ -245,12 +326,17 @@ const Icons = {
       <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" strokeWidth="2" strokeLinecap="round"/>
     </svg>
   ),
-  moon: (cls="w-4 h-4") => (
+  moon: (cls="w-5 h-5") => (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
       <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
     </svg>
   ),
-  bento: (cls="w-4 h-4") => (
+  timeline: (cls="w-5 h-5") => (
+    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <path strokeWidth="2.5" strokeLinecap="round" d="M12 2v20M8 4l-4 4 4 4M16 12l4 4-4 4"/>
+    </svg>
+  ),
+  bento: (cls="w-5 h-5") => (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
       <rect x="3" y="3" width="8" height="8" rx="2" strokeWidth="2"/>
       <rect x="13" y="3" width="8" height="8" rx="2" strokeWidth="2"/>
@@ -258,18 +344,13 @@ const Icons = {
       <rect x="13" y="13" width="8" height="8" rx="2" strokeWidth="2"/>
     </svg>
   ),
-  timeline: (cls="w-4 h-4") => (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      <path strokeWidth="2" strokeLinecap="round" d="M12 2v20M8 4l-4 4 4 4M16 12l4 4-4 4"/>
-    </svg>
-  ),
-  card: (cls="w-4 h-4") => (
+  card: (cls="w-5 h-5") => (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
       <rect x="4" y="4" width="16" height="16" rx="3" strokeWidth="2"/>
       <path strokeWidth="2" d="M4 10h16M10 14h4"/>
     </svg>
   ),
-  stats: (cls="w-4 h-4") => (
+  stats: (cls="w-5 h-5") => (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
       <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M18 20V10M12 20V4M6 20v-6"/>
       <path strokeWidth="2" strokeLinecap="round" d="M2 20h20"/>
@@ -294,7 +375,7 @@ const Icons = {
       <line x1="14" y1="11" x2="14" y2="17" strokeWidth="2" strokeLinecap="round"/>
     </svg>
   ),
-  school: (cls="w-5 h-5") => (
+  school: (cls="w-6 h-6") => (
     <svg className={cls} viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"/>
     </svg>
@@ -318,13 +399,13 @@ const Icons = {
       <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M6 9H4.5a2.5 2.5 0 010-5H6m12 0h1.5a2.5 2.5 0 110 5H18m-12 0v6a4 4 0 008 0V9M8 21h8"/>
     </svg>
   ),
-  book: (cls="w-4 h-4") => (
+  book: (cls="w-5 h-5") => (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
       <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
       <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
     </svg>
   ),
-  certificate: (cls="w-4 h-4") => (
+  certificate: (cls="w-5 h-5") => (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
       <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
       <polyline points="14 2 14 8 20 8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -340,8 +421,8 @@ const Icons = {
   ),
 };
 
-/* -------------------- Stats Dashboard -------------------- */
-function EducationStats({ items }) {
+/* -------------------- Enhanced Stats Dashboard -------------------- */
+function EducationStats({ items, darkMode }) {
   const stats = useMemo(() => {
     const totalMonths = items.reduce((acc, it) => acc + monthDiffObj(it, it), 0);
     const currentCount = items.filter((it) => getYM(it, "end").y == null).length;
@@ -350,7 +431,7 @@ function EducationStats({ items }) {
     const y = Math.floor(totalMonths / 12), m = totalMonths % 12;
     let totalStudyLabel = "No data";
     if (totalMonths) {
-      if (y && m) totalStudyLabel = `${y} years, ${m} months`;
+      if (y && m) totalStudyLabel = `${y}y ${m}m`;
       else if (y) totalStudyLabel = `${y} year${y > 1 ? "s" : ""}`;
       else totalStudyLabel = `${m} month${m > 1 ? 's' : ''}`;
     }
@@ -359,57 +440,131 @@ function EducationStats({ items }) {
   }, [items]);
 
   return (
-    <div className="relative mb-8 p-8 rounded-3xl bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 dark:from-indigo-500/20 dark:via-purple-500/20 dark:to-pink-500/20 border border-white/50 dark:border-white/10 backdrop-blur-lg">
-      <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-white/50 to-white/30 dark:from-gray-900/50 dark:to-gray-900/30 backdrop-blur-sm" />
-      <div className="relative grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {[
-          { icon: Icons.calendar, label: "Total Duration", value: stats.totalStudyLabel, gradient: "from-blue-500 to-cyan-500" },
-          { icon: Icons.trophy, label: "Highest Degree", value: stats.highestLevel, gradient: "from-purple-500 to-pink-500" },
-          { icon: Icons.book, label: "Currently Pursuing", value: stats.currentCount, gradient: "from-green-500 to-emerald-500" },
-          { icon: Icons.certificate, label: "Completed", value: stats.completedCount, gradient: "from-orange-500 to-red-500" },
-          { icon: Icons.school, label: "Institutions", value: stats.institutionsCount, gradient: "from-indigo-500 to-purple-500" },
-        ].map((stat, idx) => (
-          <div key={idx} className="group relative overflow-hidden rounded-2xl bg-white/90 dark:bg-gray-800/90 p-4 hover:scale-105 transition-all duration-300 hover:shadow-xl">
-            <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
-            <div className="relative flex flex-col items-center text-center space-y-2">
-              <div className={`p-2 rounded-xl bg-gradient-to-br ${stat.gradient} text-white`}>
-                {stat.icon("w-5 h-5")}
-              </div>
-              <div className="text-2xl font-bold font-['Space_Grotesk'] bg-gradient-to-br from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                {stat.value}
-              </div>
-              <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                {stat.label}
-              </div>
-            </div>
+    <div className="relative mb-12 group">
+      <div className={`relative p-8 rounded-3xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.02] ${
+        darkMode 
+          ? "bg-slate-900/80 border-slate-700/50 shadow-2xl shadow-slate-900/25" 
+          : "bg-white/90 border-white/60 shadow-2xl shadow-indigo-500/10"
+      }`}>
+        {/* Animated background gradient */}
+        <div className={`absolute inset-0 rounded-3xl opacity-60 transition-opacity duration-500 group-hover:opacity-80 ${
+          darkMode 
+            ? "bg-gradient-to-br from-violet-900/20 via-blue-900/20 to-cyan-900/20" 
+            : "bg-gradient-to-br from-violet-500/10 via-blue-500/10 to-cyan-500/10"
+        }`} />
+        
+        <div className="relative">
+          <div className="text-center mb-8">
+            <h2 className={`text-2xl font-bold font-['Playfair_Display'] ${
+              darkMode ? "text-white" : "text-gray-900"
+            }`}>
+              Education Overview
+            </h2>
+            <p className={`text-sm font-medium ${
+              darkMode ? "text-slate-400" : "text-gray-600"
+            }`}>
+              Your academic journey at a glance
+            </p>
           </div>
-        ))}
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+            {[
+              { 
+                icon: Icons.calendar, 
+                label: "Total Study Time", 
+                value: stats.totalStudyLabel, 
+                gradient: "from-blue-500 via-cyan-500 to-teal-500",
+                bgGradient: darkMode ? "from-blue-900/20 to-cyan-900/20" : "from-blue-50 to-cyan-50"
+              },
+              { 
+                icon: Icons.trophy, 
+                label: "Highest Degree", 
+                value: stats.highestLevel, 
+                gradient: "from-violet-500 via-purple-500 to-indigo-500",
+                bgGradient: darkMode ? "from-violet-900/20 to-indigo-900/20" : "from-violet-50 to-indigo-50"
+              },
+              { 
+                icon: Icons.book, 
+                label: "Ongoing Studies", 
+                value: stats.currentCount, 
+                gradient: "from-emerald-500 via-green-500 to-teal-500",
+                bgGradient: darkMode ? "from-emerald-900/20 to-teal-900/20" : "from-emerald-50 to-teal-50"
+              },
+              { 
+                icon: Icons.certificate, 
+                label: "Completed", 
+                value: stats.completedCount, 
+                gradient: "from-amber-500 via-orange-500 to-red-500",
+                bgGradient: darkMode ? "from-amber-900/20 to-red-900/20" : "from-amber-50 to-red-50"
+              },
+              { 
+                icon: Icons.school, 
+                label: "Institutions", 
+                value: stats.institutionsCount, 
+                gradient: "from-pink-500 via-rose-500 to-red-500",
+                bgGradient: darkMode ? "from-pink-900/20 to-red-900/20" : "from-pink-50 to-red-50"
+              },
+            ].map((stat, idx) => (
+              <div 
+                key={idx} 
+                className={`group/stat relative overflow-hidden rounded-2xl backdrop-blur-sm border transition-all duration-500 hover:scale-110 hover:-translate-y-2 ${
+                  darkMode 
+                    ? "bg-slate-800/60 border-slate-700/50 hover:border-slate-600" 
+                    : "bg-white/90 border-white/60 hover:border-gray-200"
+                } p-6 cursor-pointer hover:shadow-2xl`}
+                style={{
+                  animationDelay: `${idx * 100}ms`
+                }}
+              >
+                {/* Background gradient overlay */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${stat.bgGradient} opacity-0 group-hover/stat:opacity-100 transition-opacity duration-500`} />
+                
+                {/* Glowing border effect */}
+                <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${stat.gradient} opacity-0 group-hover/stat:opacity-20 blur-xl transition-all duration-500`} />
+                
+                <div className="relative flex flex-col items-center text-center space-y-4">
+                  <div className={`p-3 rounded-2xl bg-gradient-to-br ${stat.gradient} text-white shadow-lg group-hover/stat:shadow-2xl transition-all duration-500 group-hover/stat:scale-110`}>
+                    {stat.icon("w-6 h-6")}
+                  </div>
+                  
+                  <div className={`text-3xl font-bold font-['Space_Grotesk'] transition-all duration-500 ${
+                    darkMode 
+                      ? "text-white group-hover/stat:text-white" 
+                      : "text-gray-900 group-hover/stat:text-gray-800"
+                  }`}>
+                    {stat.value}
+                  </div>
+                  
+                  <div className={`text-xs font-semibold uppercase tracking-wider transition-all duration-500 ${
+                    darkMode 
+                      ? "text-slate-400 group-hover/stat:text-slate-300" 
+                      : "text-gray-600 group-hover/stat:text-gray-700"
+                  }`}>
+                    {stat.label}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-/* Certificate detection */
-function isCertificate(it) {
-  const t = `${it?.type || ""} ${it?.level || ""} ${it?.degree || ""}`.toLowerCase();
-  return /certificat|certificate|cert\b/i.test(t);
-}
-
-/* HTML renderer */
-function renderDetailsHTML(it) {
-  const raw =
-    it.detailsHtml ||
-    (it.details ? mdLiteToHtml(it.details) : "") ||
-    (it.description ? mdLiteToHtml(it.description) : "");
-  return sanitizeHtml(raw);
-}
-
-/* -------------------- Timeline View Component -------------------- */
+/* -------------------- Enhanced Timeline View Component -------------------- */
 function TimelineView({ items, isOwner, onDelete, nav, darkMode }) {
   return (
     <div className="relative">
-      {/* Timeline line */}
-      <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-500 via-purple-500 to-pink-500" />
+      {/* Enhanced timeline line with gradient and glow */}
+      <div className="absolute left-8 top-0 bottom-0 w-1 rounded-full overflow-hidden">
+        <div className={`absolute inset-0 bg-gradient-to-b from-violet-500 via-blue-500 via-cyan-500 to-emerald-500 ${
+          darkMode ? "opacity-80" : "opacity-90"
+        }`} />
+        <div className={`absolute inset-0 bg-gradient-to-b from-violet-400 via-blue-400 via-cyan-400 to-emerald-400 blur-sm ${
+          darkMode ? "opacity-60" : "opacity-40"
+        }`} />
+      </div>
       
       {items.map((it, idx) => {
         const id = it.id ?? `edu-${idx}`;
@@ -433,112 +588,180 @@ function TimelineView({ items, isOwner, onDelete, nav, darkMode }) {
 
         return (
           <Reveal key={String(id)}>
-            <div className="relative flex items-start mb-12 group">
-              {/* Timeline dot */}
-              <div className={`absolute left-5 w-6 h-6 rounded-full border-4 ${isOngoing ? 'animate-pulse' : ''} bg-gradient-to-br ${levelColor.bg} border-white dark:border-gray-900 shadow-lg z-10`} />
+            <div 
+              className="relative flex items-start mb-16 group/timeline animate-fadeInUp"
+              style={{
+                animationDelay: `${idx * 200}ms`,
+              }}
+            >
+              {/* Enhanced timeline dot with pulsing animation for ongoing */}
+              <div className="absolute left-4 top-8">
+                <div className={`relative w-8 h-8 rounded-full border-4 ${
+                  darkMode ? "border-slate-900" : "border-white"
+                } shadow-xl z-20 overflow-hidden`}>
+                  <div className={`absolute inset-0 bg-gradient-to-br ${levelColor.bg} ${
+                    isOngoing ? "animate-pulse" : ""
+                  }`} />
+                  {isOngoing && (
+                    <div className={`absolute inset-0 bg-gradient-to-br ${levelColor.bg} animate-ping opacity-75`} />
+                  )}
+                </div>
+                {/* Glowing ring effect */}
+                <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${levelColor.bg} opacity-30 blur-md scale-150 ${
+                  isOngoing ? "animate-pulse" : ""
+                }`} />
+              </div>
               
-              {/* Content card */}
-              <div className={`ml-20 flex-1 rounded-2xl border transition-all duration-300 hover:shadow-2xl ${
-                darkMode ? "bg-gray-800/95 border-gray-700 hover:border-purple-500" : "bg-white/95 border-gray-200 hover:border-purple-400"
-              } backdrop-blur-sm p-6`}>
-                {/* Header with actions */}
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      {levelDisplay && (
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r ${levelColor.bg} text-white shadow-md`}>
-                          {levelDisplay}
-                        </span>
-                      )}
-                      {isOngoing && (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white animate-pulse">
-                          Ongoing
-                        </span>
-                      )}
-                      {gpa && (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white">
-                          GPA: {gpa}
-                        </span>
+              {/* Enhanced content card */}
+              <div className={`ml-24 flex-1 rounded-3xl border-2 transition-all duration-700 hover:scale-[1.02] hover:-translate-y-2 backdrop-blur-xl ${
+                darkMode 
+                  ? "bg-slate-800/90 border-slate-700/50 hover:border-slate-600 shadow-2xl shadow-slate-900/25" 
+                  : "bg-white/95 border-gray-200/50 hover:border-indigo-300 shadow-2xl shadow-indigo-500/10"
+              } group-hover/timeline:shadow-3xl overflow-hidden relative`}>
+                
+                {/* Animated gradient overlay */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${levelColor.bg} opacity-0 group-hover/timeline:opacity-5 transition-opacity duration-700`} />
+                
+                <div className="relative p-8">
+                  {/* Header section */}
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="flex-1">
+                      {/* Level and status badges */}
+                      <div className="flex items-center gap-3 mb-4">
+                        {levelDisplay && (
+                          <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-gradient-to-r ${levelColor.bg} text-white shadow-lg ${levelColor.shadow} transition-all duration-500 hover:shadow-xl hover:scale-105`}>
+                            {levelDisplay}
+                          </span>
+                        )}
+                        {isOngoing && (
+                          <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-gradient-to-r from-emerald-500 to-green-500 text-white animate-pulse shadow-lg shadow-emerald-500/25">
+                            <span className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></span>
+                            Ongoing
+                          </span>
+                        )}
+                        {gpa && (
+                          <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/25">
+                            {Icons.trophy("w-4 h-4 mr-1")}
+                            GPA: {gpa}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* School name with enhanced typography */}
+                      <h3 className={`text-3xl font-bold font-['Playfair_Display'] mb-3 leading-tight transition-all duration-500 group-hover/timeline:scale-105 ${
+                        darkMode 
+                          ? "text-white group-hover/timeline:text-violet-200" 
+                          : "text-gray-900 group-hover/timeline:text-indigo-700"
+                      }`}>
+                        {school}
+                      </h3>
+                      
+                      {/* Degree and field */}
+                      {(degree || field) && (
+                        <div className="mb-4">
+                          <p className={`text-xl font-semibold font-['Space_Grotesk'] ${
+                            darkMode ? "text-slate-200" : "text-gray-800"
+                          }`}>
+                            {degree}
+                          </p>
+                          {field && (
+                            <p className={`text-lg font-medium ${
+                              darkMode ? "text-slate-300" : "text-gray-700"
+                            }`}>
+                              {field}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
-                    <h3 className="text-2xl font-bold font-['Space_Grotesk'] mb-1 bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-                      {school}
-                    </h3>
-                    {(degree || field) && (
-                      <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {degree} {field && degree && "•"} {field}
-                      </p>
+                    
+                    {/* Enhanced action buttons */}
+                    {isOwner && (
+                      <div className="flex gap-3 opacity-0 group-hover/timeline:opacity-100 transition-all duration-500 transform translate-x-4 group-hover/timeline:translate-x-0">
+                        <button
+                          onClick={() => nav(editPath)}
+                          className={`p-3 rounded-2xl backdrop-blur-sm transition-all duration-300 hover:scale-110 shadow-lg ${
+                            darkMode 
+                              ? "bg-slate-700/80 hover:bg-slate-600/80 text-slate-200 hover:text-white" 
+                              : "bg-white/90 hover:bg-gray-50 text-gray-700 hover:text-gray-900"
+                          } hover:shadow-xl`}
+                          type="button"
+                        >
+                          {Icons.pencil("w-5 h-5")}
+                        </button>
+                        <button
+                          onClick={() => onDelete(id)}
+                          className="p-3 rounded-2xl bg-red-500/20 backdrop-blur-sm hover:bg-red-500/30 text-red-600 dark:text-red-400 transition-all duration-300 hover:scale-110 shadow-lg hover:shadow-xl"
+                          type="button"
+                        >
+                          {Icons.trash("w-5 h-5")}
+                        </button>
+                      </div>
                     )}
                   </div>
-                  
-                  {/* Actions */}
-                  {isOwner && (
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <button
-                        onClick={() => nav(editPath)}
-                        className={`p-2 rounded-xl ${darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"} transition-colors`}
-                        type="button"
-                      >
-                        {Icons.pencil()}
-                      </button>
-                      <button
-                        onClick={() => onDelete(id)}
-                        className="p-2 rounded-xl bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 transition-colors"
-                        type="button"
-                      >
-                        {Icons.trash()}
-                      </button>
+
+                  {/* Meta information with enhanced styling */}
+                  <div className={`flex flex-wrap items-center gap-6 text-sm mb-6 ${
+                    darkMode ? "text-slate-300" : "text-gray-700"
+                  }`}>
+                    <span className="flex items-center gap-2 font-medium">
+                      {Icons.calendar("w-5 h-5 text-blue-500")}
+                      <span className="font-['JetBrains_Mono']">{startLabel} — {endLabel}</span>
+                    </span>
+                    {dur && (
+                      <span className="flex items-center gap-2 font-medium">
+                        <span className="w-5 h-5 text-green-500">⏱️</span>
+                        <span className="font-['JetBrains_Mono']">{dur}</span>
+                      </span>
+                    )}
+                    {loc && (
+                      <span className="flex items-center gap-2 font-medium">
+                        {Icons.location("w-5 h-5 text-red-500")}
+                        {loc}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Description with enhanced styling */}
+                  {description && (
+                    <div className={`mb-6 p-5 rounded-2xl border transition-all duration-500 hover:scale-[1.02] ${
+                      darkMode 
+                        ? "bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border-blue-800/50" 
+                        : "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200/50"
+                    }`}>
+                      <p className={`text-base font-medium italic leading-relaxed ${
+                        darkMode ? "text-blue-200" : "text-blue-800"
+                      }`}>
+                        "{description}"
+                      </p>
                     </div>
                   )}
-                </div>
 
-                {/* Meta info (boosted contrast for dark mode) */}
-                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-700 dark:text-gray-200 mb-4">
-                  <span className="flex items-center gap-1">
-                    {Icons.calendar("w-4 h-4")}
-                    {startLabel} — {endLabel}
-                  </span>
-                  {dur && (
-                    <span className="flex items-center gap-1">
-                      ⏱️ {dur}
-                    </span>
+                  {/* Thesis with enhanced styling */}
+                  {thesis && (
+                    <div className={`mb-6 p-5 rounded-2xl border transition-all duration-500 hover:scale-[1.02] ${
+                      darkMode 
+                        ? "bg-gradient-to-r from-purple-900/30 to-pink-900/30 border-purple-800/50" 
+                        : "bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200/50"
+                    }`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-2xl">📝</span>
+                        <h4 className={`text-lg font-bold font-['Space_Grotesk'] ${
+                          darkMode ? "text-purple-200" : "text-purple-800"
+                        }`}>
+                          Research & Thesis
+                        </h4>
+                      </div>
+                      <p className={`text-base leading-relaxed ${
+                        darkMode ? "text-purple-100" : "text-purple-700"
+                      }`}>
+                        {thesis}
+                      </p>
+                    </div>
                   )}
-                  {loc && (
-                    <span className="flex items-center gap-1">
-                      {Icons.location("w-4 h-4")}
-                      {loc}
-                    </span>
-                  )}
+
+
                 </div>
-
-                {/* Description (higher contrast) */}
-                {description && (
-                  <div className="mb-3 p-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/25 dark:to-indigo-900/25 border border-blue-200 dark:border-blue-800/60">
-                    <p className="text-sm text-gray-800 dark:text-gray-100 italic">
-                      {description}
-                    </p>
-                  </div>
-                )}
-
-                {/* Thesis */}
-                {thesis && (
-                  <div className="mb-3 p-3 rounded-xl bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/25 dark:to-pink-900/25 border border-purple-200 dark:border-purple-800/60">
-                    <p className="text-sm font-semibold text-purple-700 dark:text-purple-200 mb-1">
-                      📝 Thesis/Research:
-                    </p>
-                    <p className="text-sm text-gray-800 dark:text-gray-100">
-                      {thesis}
-                    </p>
-                  </div>
-                )}
-
-                {/* Details */}
-                {detailsHtml && (
-                  <div
-                    className={`prose prose-sm max-w-none ${darkMode ? "prose-invert" : ""} text-gray-800 dark:text-gray-100`}
-                    dangerouslySetInnerHTML={{ __html: detailsHtml }}
-                  />
-                )}
               </div>
             </div>
           </Reveal>
@@ -548,23 +771,55 @@ function TimelineView({ items, isOwner, onDelete, nav, darkMode }) {
   );
 }
 
-/* -------------------- Page -------------------- */
+/* -------------------- Filter helper -------------------- */
+function filterEducation(items, filterType, sortBy) {
+  let filtered = [...items];
+
+  if (filterType === "current") filtered = filtered.filter((item) => getYM(item, "end").y == null);
+  else if (filterType === "completed") filtered = filtered.filter((item) => getYM(item, "end").y != null);
+
+  if (sortBy === "school") filtered.sort((a, b) => String(a.school || "").localeCompare(String(b.school || "")));
+  else if (sortBy === "level") filtered.sort((a, b) => (detectLevelRank(b) - detectLevelRank(a)));
+  else filtered = sortEdu(filtered);
+  return filtered;
+}
+
+/* -------------------- Main Page Component -------------------- */
 export default function Education() {
   const nav = useNavigate();
   let ownerCtx;
   try { ownerCtx = useOwnerMode?.(); } catch { ownerCtx = null; }
   const isOwner = !!(ownerCtx?.isOwner ?? ownerCtx?.owner ?? ownerCtx?.value ?? ownerCtx);
 
+  // Enhanced dark mode with proper persistence
   const [darkMode, setDarkMode] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("darkModeEducation") || "false"); } catch { return false; }
+    try { 
+      const stored = localStorage.getItem("darkModeEducation");
+      return stored ? JSON.parse(stored) : false; 
+    } catch { 
+      return false; 
+    }
   });
+
+  // Apply dark mode changes immediately and properly
   useEffect(() => {
     try {
       localStorage.setItem("darkModeEducation", JSON.stringify(darkMode));
       localStorage.setItem("darkMode", JSON.stringify(darkMode));
     } catch {}
-    const root = document.documentElement.classList;
-    if (darkMode) root.add("dark"); else root.remove("dark");
+    
+    const root = document.documentElement;
+    const body = document.body;
+    
+    if (darkMode) {
+      root.classList.add("dark");
+      body.style.backgroundColor = "#0f172a";
+      body.style.color = "#ffffff";
+    } else {
+      root.classList.remove("dark");
+      body.style.backgroundColor = "#ffffff";
+      body.style.color = "#000000";
+    }
   }, [darkMode]);
 
   const [showStats, setShowStats] = useState(() => {
@@ -588,6 +843,7 @@ export default function Education() {
     [items, filterType, sortBy]
   );
 
+  // Database loading effect - this is your existing logic
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -614,6 +870,7 @@ export default function Education() {
     };
   }, []);
 
+  // Delete function - your existing logic
   async function onDelete(id) {
     if (!window.confirm("Delete this entry? This cannot be undone.")) return;
     try {
@@ -633,73 +890,94 @@ export default function Education() {
   }
 
   return (
-    <div className={`min-h-screen transition-all duration-300 font-['Inter'] ${
+    <div className={`min-h-screen transition-all duration-700 font-['Inter'] ${
       darkMode 
-        ? "bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 text-white" 
-        : "bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 text-gray-900"
+        ? "bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950 text-white" 
+        : "bg-gradient-to-br from-violet-50 via-blue-50 via-indigo-50 to-purple-50 text-gray-900"
     }`}>
-      <div className="container mx-auto py-12 px-4 pb-32">
-        {/* Header */}
-        <div className="mb-10 text-center">
-          <div className="inline-block">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 shadow-xl">
-                {Icons.school("w-8 h-8 text-white")}
+      {/* Enhanced background effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className={`absolute top-0 -left-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob ${
+          darkMode ? "bg-violet-900" : "bg-violet-300"
+        }`} />
+        <div className={`absolute top-0 -right-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000 ${
+          darkMode ? "bg-cyan-900" : "bg-cyan-300"
+        }`} />
+        <div className={`absolute -bottom-8 left-20 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000 ${
+          darkMode ? "bg-pink-900" : "bg-pink-300"
+        }`} />
+      </div>
+
+      <div className="relative container mx-auto py-16 px-6 pb-32">
+        {/* Enhanced Header */}
+        <div className="mb-16 text-center">
+          <div className="inline-block group">
+            <div className="flex items-center justify-center gap-4 mb-6">
+              <div className={`p-4 rounded-3xl bg-gradient-to-br from-violet-600 to-purple-600 shadow-2xl transform transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 ${
+                darkMode ? "shadow-violet-900/50" : "shadow-violet-500/25"
+              }`}>
+                {Icons.school("w-10 h-10 text-white")}
               </div>
-              <h1 className="text-5xl md:text-6xl font-black font-['Space_Grotesk'] tracking-tight">
-                <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 bg-clip-text text-transparent">
-                  Academic Journey
-                </span>
+              <h1 className={`text-5xl md:text-6xl lg:text-7xl font-black font-['Playfair_Display'] tracking-tight transition-all duration-500 group-hover:scale-105 ${
+                darkMode 
+                  ? "bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent" 
+                  : "bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent"
+              }`}>
+                Academic Journey
               </h1>
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 shadow-xl">
-                {Icons.sparkles("w-8 h-8 text-white")}
+              <div className={`p-4 rounded-3xl bg-gradient-to-br from-indigo-600 to-blue-600 shadow-2xl transform transition-all duration-500 group-hover:scale-110 group-hover:-rotate-12 ${
+                darkMode ? "shadow-indigo-900/50" : "shadow-indigo-500/25"
+              }`}>
+                {Icons.sparkles("w-10 h-10 text-white")}
               </div>
             </div>
-            <p className={`text-lg font-medium ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
-              Exploring knowledge, achieving excellence, shaping the future
+            <p className={`text-lg md:text-xl font-medium font-['Space_Grotesk'] transition-all duration-500 ${
+              darkMode ? "text-slate-300 group-hover:text-slate-200" : "text-gray-600 group-hover:text-gray-700"
+            }`}>
+              Exploring knowledge • Achieving excellence • Shaping the future
             </p>
           </div>
         </div>
 
-        {/* Controls (search removed; left-aligned, compact) */}
-        <div className={`mb-8 p-6 rounded-3xl backdrop-blur-xl border ${
+        {/* Enhanced Controls */}
+        <div className={`mb-12 p-6 md:p-8 rounded-3xl backdrop-blur-xl border-2 transition-all duration-500 hover:scale-[1.02] ${
           darkMode 
-            ? "bg-gray-800/60 border-gray-700/50" 
-            : "bg-white/70 border-white/50"
-        } shadow-2xl`}>
-          <div className="flex flex-wrap items-center gap-3 justify-start">
-            {/* Filter */}
+            ? "bg-slate-800/60 border-slate-700/50 shadow-2xl shadow-slate-900/25" 
+            : "bg-white/80 border-white/50 shadow-2xl shadow-indigo-500/10"
+        }`}>
+          <div className="flex flex-wrap items-center gap-4 justify-center md:justify-start">
+            {/* Enhanced Filter */}
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className={`px-4 py-3 rounded-2xl border-2 font-medium transition-all ${
+              className={`px-4 md:px-6 py-3 md:py-4 rounded-2xl border-2 font-semibold text-sm md:text-base transition-all duration-300 focus:scale-105 ${
                 darkMode 
-                  ? "bg-gray-900/60 border-gray-700 text-white hover:border-purple-500" 
-                  : "bg-white/80 border-gray-200 text-gray-900 hover:border-purple-400"
-              } focus:outline-none focus:ring-4 focus:ring-purple-500/20`}
+                  ? "bg-slate-900/80 border-slate-700 text-white hover:border-violet-500 focus:border-violet-400" 
+                  : "bg-white/90 border-gray-200 text-gray-900 hover:border-indigo-400 focus:border-indigo-500"
+              } focus:outline-none focus:ring-4 focus:ring-violet-500/20 shadow-lg`}
             >
-              <option value="all">All Records</option>
-              <option value="current">Currently Studying</option>
-              <option value="completed">Completed</option>
+              <option value="all">🎓 All Records</option>
+              <option value="current">📚 Currently Studying</option>
+              <option value="completed">✅ Completed</option>
             </select>
 
-            {/* Sort */}
+            {/* Enhanced Sort */}
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className={`px-4 py-3 rounded-2xl border-2 font-medium transition-all ${
+              className={`px-4 md:px-6 py-3 md:py-4 rounded-2xl border-2 font-semibold text-sm md:text-base transition-all duration-300 focus:scale-105 ${
                 darkMode 
-                  ? "bg-gray-900/60 border-gray-700 text-white hover:border-purple-500" 
-                  : "bg-white/80 border-gray-200 text-gray-900 hover:border-purple-400"
-              } focus:outline-none focus:ring-4 focus:ring-purple-500/20`}
+                  ? "bg-slate-900/80 border-slate-700 text-white hover:border-violet-500 focus:border-violet-400" 
+                  : "bg-white/90 border-gray-200 text-gray-900 hover:border-indigo-400 focus:border-indigo-500"
+              } focus:outline-none focus:ring-4 focus:ring-violet-500/20 shadow-lg`}
             >
-              <option value="date">By Date</option>
-              <option value="school">By School</option>
-              <option value="level">By Level</option>
+              <option value="date">📅 By Date</option>
+              <option value="school">🏫 By School</option>
+              <option value="level">🏆 By Level</option>
             </select>
 
-            {/* View toggles */}
-            <div className="flex gap-2">
+            {/* Enhanced View toggles */}
+            <div className="flex gap-2 md:gap-3">
               {[
                 { value: "timeline", icon: Icons.timeline, label: "Timeline" },
                 { value: "bento", icon: Icons.bento, label: "Cards" },
@@ -708,52 +986,58 @@ export default function Education() {
                 <button
                   key={view.value}
                   onClick={() => setLayout(view.value)}
-                  className={`px-4 py-3 rounded-2xl border-2 font-medium transition-all flex items-center gap-2 ${
+                  className={`px-3 md:px-6 py-3 md:py-4 rounded-2xl border-2 font-semibold text-sm md:text-base transition-all duration-300 flex items-center gap-2 md:gap-3 hover:scale-105 shadow-lg ${
                     layout === view.value
-                      ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white border-transparent shadow-lg"
+                      ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white border-transparent shadow-violet-500/25"
                       : darkMode
-                        ? "bg-gray-900/60 border-gray-700 text-gray-200 hover:border-purple-500"
-                        : "bg-white/80 border-gray-200 text-gray-700 hover:border-purple-400"
+                        ? "bg-slate-900/80 border-slate-700 text-slate-200 hover:border-violet-500 hover:text-white"
+                        : "bg-white/90 border-gray-200 text-gray-700 hover:border-indigo-400 hover:text-gray-900"
                   }`}
                   type="button"
                 >
                   {view.icon()}
-                  <span className="hidden sm:inline">{view.label}</span>
+                  <span className="hidden sm:inline font-['Space_Grotesk']">{view.label}</span>
                 </button>
               ))}
             </div>
 
-            {/* Stats toggle */}
+            {/* Enhanced Stats toggle */}
             <button
               onClick={() => setShowStats(v => !v)}
-              className={`px-4 py-3 rounded-2xl border-2 font-medium transition-all flex items-center gap-2 ${
+              className={`px-4 md:px-6 py-3 md:py-4 rounded-2xl border-2 font-semibold text-sm md:text-base transition-all duration-300 flex items-center gap-2 md:gap-3 hover:scale-105 shadow-lg ${
                 darkMode 
-                  ? "bg-gray-900/60 border-gray-700 text-gray-200 hover:border-purple-500" 
-                  : "bg-white/80 border-gray-200 text-gray-700 hover:border-purple-400"
+                  ? "bg-slate-900/80 border-slate-700 text-slate-200 hover:border-violet-500 hover:text-white" 
+                  : "bg-white/90 border-gray-200 text-gray-700 hover:border-indigo-400 hover:text-gray-900"
               }`}
               type="button"
             >
               {Icons.stats()}
-              <span className="hidden sm:inline">{showStats ? "Hide" : "Show"} Stats</span>
+              <span className="hidden sm:inline font-['Space_Grotesk']">{showStats ? "Hide" : "Show"} Stats</span>
             </button>
 
-            {/* Theme toggle */}
+            {/* Enhanced Theme toggle */}
             <button
               onClick={() => setDarkMode(v => !v)}
-              className="p-3 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg hover:shadow-xl transition-all"
+              className="p-3 md:p-4 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-110 group"
               type="button"
             >
-              {darkMode ? Icons.brightness() : Icons.moon()}
+              <div className="transform transition-transform duration-500 group-hover:rotate-180">
+                {darkMode ? Icons.brightness("w-5 h-5") : Icons.moon("w-5 h-5")}
+              </div>
             </button>
           </div>
 
-          <div className={`mt-4 text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+          <div className={`mt-6 text-sm md:text-base font-semibold font-['JetBrains_Mono'] ${
+            darkMode ? "text-slate-300" : "text-gray-700"
+          }`}>
             Found {filteredItems.length} of {items.length} education record{items.length === 1 ? "" : "s"}
           </div>
         </div>
 
-        {/* Stats Dashboard */}
-        {!loading && items.length > 0 && showStats && <EducationStats items={items} />}
+        {/* Enhanced Stats Dashboard */}
+        {!loading && items.length > 0 && showStats && (
+          <EducationStats items={items} darkMode={darkMode} />
+        )}
 
         {/* Error */}
         {err && (
@@ -762,30 +1046,46 @@ export default function Education() {
           </div>
         )}
 
-        {/* Content */}
+        {/* Enhanced Content */}
         {loading ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="animate-pulse">
-                <div className={`p-6 rounded-2xl ${darkMode ? "bg-gray-800" : "bg-white"}`}>
-                  <div className={`h-6 rounded-xl mb-3 ${darkMode ? "bg-gray-700" : "bg-gray-200"}`} />
-                  <div className={`h-4 rounded-xl mb-2 w-3/4 ${darkMode ? "bg-gray-700" : "bg-gray-200"}`} />
-                  <div className={`h-4 rounded-xl w-1/2 ${darkMode ? "bg-gray-700" : "bg-gray-200"}`} />
+                <div className={`p-8 rounded-3xl ${
+                  darkMode ? "bg-slate-800/60" : "bg-white/80"
+                } backdrop-blur-sm`}>
+                  <div className={`h-8 rounded-2xl mb-4 ${
+                    darkMode ? "bg-slate-700" : "bg-gray-200"
+                  }`} />
+                  <div className={`h-6 rounded-xl mb-3 w-3/4 ${
+                    darkMode ? "bg-slate-700" : "bg-gray-200"
+                  }`} />
+                  <div className={`h-6 rounded-xl w-1/2 ${
+                    darkMode ? "bg-slate-700" : "bg-gray-200"
+                  }`} />
                 </div>
               </div>
             ))}
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="inline-block p-6 rounded-3xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-xl">
-              {Icons.school("w-20 h-20 mx-auto mb-4 text-gray-400")}
-              <h3 className="text-2xl font-bold mb-2">
+          <div className="text-center py-24">
+            <div className={`inline-block p-12 rounded-3xl backdrop-blur-xl ${
+              darkMode 
+                ? "bg-slate-800/60 border border-slate-700/50" 
+                : "bg-white/80 border border-white/50"
+            } shadow-2xl`}>
+              {Icons.school("w-24 h-24 mx-auto mb-6 text-gray-400")}
+              <h3 className={`text-2xl md:text-3xl font-bold font-['Playfair_Display'] mb-4 ${
+                darkMode ? "text-white" : "text-gray-900"
+              }`}>
                 {items.length === 0 ? "No Education Records" : "No Matches Found"}
               </h3>
-              <p className="text-gray-700 dark:text-gray-300">
+              <p className={`text-base md:text-lg ${
+                darkMode ? "text-slate-300" : "text-gray-600"
+              }`}>
                 {items.length === 0 
                   ? (isOwner ? "Click the Add button to create your first record" : "No records available")
-                  : "Try changing the filters or sort"}
+                  : "Try changing the filters or sort options"}
               </p>
             </div>
           </div>
@@ -820,92 +1120,105 @@ export default function Education() {
 
               return (
                 <Reveal key={String(id)}>
-                  <div className={`group relative h-full rounded-3xl border-2 p-6 transition-all duration-300 hover:scale-105 hover:shadow-2xl ${
+                  <div className={`group relative h-full rounded-3xl border-2 p-6 transition-all duration-500 hover:scale-105 hover:-translate-y-2 backdrop-blur-xl ${
                     darkMode 
-                      ? "bg-gradient-to-br from-gray-800 via-gray-800/90 to-gray-900 border-gray-700 hover:border-purple-500" 
-                      : "bg-gradient-to-br from-white via-white/90 to-gray-50 border-gray-200 hover:border-purple-400"
-                  }`}>
+                      ? "bg-slate-800/90 border-slate-700/50 hover:border-slate-600 shadow-2xl shadow-slate-900/25" 
+                      : "bg-white/95 border-gray-200/50 hover:border-indigo-300 shadow-2xl shadow-indigo-500/10"
+                  } animate-fadeInUp overflow-hidden`}
+                    style={{
+                      animationDelay: `${idx * 150}ms`,
+                    }}
+                  >
                     {/* Gradient overlay on hover */}
-                    <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${levelColor.bg} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
+                    <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${levelColor.bg} opacity-0 group-hover:opacity-5 transition-opacity duration-500`} />
                     
                     {/* Content */}
-                    <div className="relative">
+                    <div className="relative h-full flex flex-col">
                       {/* Level badge */}
                       {levelDisplay && (
-                        <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r ${levelColor.bg} text-white mb-3 shadow-lg`}>
+                        <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r ${levelColor.bg} text-white mb-4 shadow-lg self-start`}>
                           {levelDisplay}
                         </div>
                       )}
 
                       {/* School name */}
-                      <h3 className="text-xl font-bold font-['Space_Grotesk'] mb-2 line-clamp-2 text-gray-900 dark:text-white">
+                      <h3 className={`text-xl font-bold font-['Playfair_Display'] mb-3 line-clamp-2 transition-colors duration-300 ${
+                        darkMode ? "text-white group-hover:text-violet-200" : "text-gray-900 group-hover:text-indigo-700"
+                      }`}>
                         {school}
                       </h3>
 
                       {/* Degree & Field */}
                       {(degree || field) && (
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-3">
-                          {degree} {field && degree && "•"} {field}
-                        </p>
+                        <div className="mb-4">
+                          <p className={`text-sm font-semibold font-['Space_Grotesk'] ${
+                            darkMode ? "text-slate-200" : "text-gray-800"
+                          }`}>
+                            {degree}
+                          </p>
+                          {field && (
+                            <p className={`text-sm font-medium ${
+                              darkMode ? "text-slate-300" : "text-gray-700"
+                            }`}>
+                              {field}
+                            </p>
+                          )}
+                        </div>
                       )}
 
                       {/* Description */}
                       {description && (
-                        <p className="text-sm text-gray-700 dark:text-gray-200 mb-3 italic line-clamp-2">
+                        <p className={`text-sm leading-relaxed italic line-clamp-3 mb-4 ${
+                          darkMode ? "text-slate-300" : "text-gray-700"
+                        }`}>
                           "{description}"
                         </p>
                       )}
 
-                      {/* Date & Duration */}
-                      <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300 mb-3">
-                        {Icons.calendar("w-3 h-3")}
-                        <span>{startLabel} — {endLabel}</span>
-                        {dur && <span>({dur})</span>}
-                      </div>
-
-                      {/* GPA, Location */}
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {gpa && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                            GPA: {gpa}
-                          </span>
-                        )}
-                        {loc && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
-                            {Icons.location("w-3 h-3")}
-                            {loc}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Thesis */}
-                      {thesis && (
-                        <div className="text-xs text-gray-700 dark:text-gray-200 mb-3">
-                          <span className="font-semibold">Thesis:</span> {thesis}
+                      {/* Meta info - pushed to bottom */}
+                      <div className="mt-auto space-y-3">
+                        {/* Date & Duration */}
+                        <div className={`flex items-center gap-2 text-xs font-medium ${
+                          darkMode ? "text-slate-400" : "text-gray-600"
+                        }`}>
+                          {Icons.calendar("w-3 h-3 text-blue-500")}
+                          <span className="font-['JetBrains_Mono']">{startLabel} — {endLabel}</span>
+                          {dur && <span className="text-green-500">({dur})</span>}
                         </div>
-                      )}
 
-                      {/* Details HTML (optional) */}
-                      {detailsHtml && (
-                        <div
-                          className={`prose prose-sm max-w-none ${darkMode ? "prose-invert" : ""} text-gray-800 dark:text-gray-100`}
-                          dangerouslySetInnerHTML={{ __html: detailsHtml }}
-                        />
-                      )}
+                        {/* GPA, Location */}
+                        <div className="flex flex-wrap gap-2">
+                          {gpa && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                              GPA: {gpa}
+                            </span>
+                          )}
+                          {loc && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
+                              darkMode ? "bg-slate-700/50 text-slate-300" : "bg-gray-100 text-gray-700"
+                            }`}>
+                              {Icons.location("w-3 h-3")}
+                              {loc}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
                       {/* Actions */}
                       {isOwner && (
-                        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
                           <button
                             onClick={() => nav(editPath)}
-                            className="p-2 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all"
+                            className={`p-2 rounded-xl backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 ${
+                              darkMode ? "bg-slate-700/80 text-slate-200" : "bg-white/90 text-gray-700"
+                            }`}
                             type="button"
                           >
                             {Icons.pencil()}
                           </button>
                           <button
                             onClick={() => onDelete(id)}
-                            className="p-2 rounded-xl bg-red-500/20 backdrop-blur-sm text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-all"
+                            className="p-2 rounded-xl bg-red-500/20 backdrop-blur-sm text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-all duration-300 hover:scale-110 shadow-lg"
                             type="button"
                           >
                             {Icons.trash()}
@@ -936,47 +1249,66 @@ export default function Education() {
                 : `/education/edit/${encodeURIComponent(id)}`;
 
               return (
-                <div key={String(id)} className={`group flex items-center gap-4 p-4 rounded-2xl border-2 transition-all hover:shadow-lg ${
-                  darkMode 
-                    ? "bg-gray-800/60 border-gray-700 hover:border-purple-500" 
-                    : "bg-white/80 border-gray-200 hover:border-purple-400"
-                }`}>
+                <div 
+                  key={String(id)} 
+                  className={`group flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg backdrop-blur-sm ${
+                    darkMode 
+                      ? "bg-slate-800/60 border-slate-700/50 hover:border-slate-600" 
+                      : "bg-white/80 border-gray-200/50 hover:border-indigo-300"
+                  } animate-fadeInUp`}
+                  style={{
+                    animationDelay: `${idx * 100}ms`,
+                  }}
+                >
                   {/* Level indicator */}
-                  <div className={`w-2 h-16 rounded-full bg-gradient-to-b ${levelColor.bg}`} />
+                  <div className={`w-2 h-16 rounded-full bg-gradient-to-b ${levelColor.bg} flex-shrink-0`} />
                   
                   {/* Content */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-bold font-['Space_Grotesk'] text-lg text-gray-900 dark:text-white">{school}</h3>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className={`font-bold font-['Space_Grotesk'] text-lg truncate ${
+                        darkMode ? "text-white" : "text-gray-900"
+                      }`}>
+                        {school}
+                      </h3>
                       {levelDisplay && (
-                        <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold bg-gradient-to-r ${levelColor.bg} text-white`}>
+                        <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold bg-gradient-to-r ${levelColor.bg} text-white flex-shrink-0`}>
                           {levelDisplay}
                         </span>
                       )}
                       {gpa && (
-                        <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                        <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold flex-shrink-0 ${
+                          darkMode ? "bg-amber-900/30 text-amber-300" : "bg-amber-100 text-amber-700"
+                        }`}>
                           GPA: {gpa}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-700 dark:text-gray-200">
-                      {degree} {field && degree && "•"} {field} • {startLabel} — {endLabel}
+                    <p className={`text-sm truncate ${
+                      darkMode ? "text-slate-200" : "text-gray-700"
+                    }`}>
+                      {degree} {field && degree && "•"} {field} • 
+                      <span className="font-['JetBrains_Mono'] ml-1">{startLabel} — {endLabel}</span>
                     </p>
                   </div>
 
                   {/* Actions */}
                   {isOwner && (
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex-shrink-0">
                       <button
                         onClick={() => nav(editPath)}
-                        className="p-2 rounded-xl bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        className={`p-2 rounded-xl transition-colors duration-200 ${
+                          darkMode ? "bg-slate-700 hover:bg-slate-600" : "bg-gray-100 hover:bg-gray-200"
+                        }`}
                         type="button"
                       >
                         {Icons.pencil()}
                       </button>
                       <button
                         onClick={() => onDelete(id)}
-                        className="p-2 rounded-xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                        className={`p-2 rounded-xl text-red-600 dark:text-red-400 transition-colors duration-200 ${
+                          darkMode ? "bg-red-900/30 hover:bg-red-900/50" : "bg-red-100 hover:bg-red-200"
+                        }`}
                         type="button"
                       >
                         {Icons.trash()}
@@ -989,39 +1321,58 @@ export default function Education() {
           </div>
         )}
 
-        {/* Floating Add Button */}
+        {/* Enhanced Floating Add Button */}
         {isOwner && (
           <button
             onClick={() => nav("/education/new")}
-            className="fixed bottom-8 right-8 p-4 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-300 group"
+            className="fixed bottom-8 right-8 p-4 md:p-5 rounded-full bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-500 group z-50"
             type="button"
           >
             <div className="relative">
-              {Icons.plus("w-6 h-6")}
-              <span className="absolute -top-2 -right-2 flex h-3 w-3">
+              {Icons.plus("w-6 h-6 md:w-7 md:h-7")}
+              <span className="absolute -top-1 -right-1 flex h-3 w-3 md:h-4 md:w-4">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 md:h-4 md:w-4 bg-white"></span>
               </span>
             </div>
-            <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-3 py-1 rounded-lg bg-gray-900 text-white text-sm font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-              Add Education
+            <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0 shadow-xl">
+              Add Education Record
             </span>
           </button>
         )}
       </div>
+
+      {/* Enhanced CSS for animations */}
+      <style jsx>{`
+        @keyframes blob {
+          0% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeInUp {
+          animation: fadeInUp 0.8s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
-}
-
-/* -------------------- Filter helper (search removed) -------------------- */
-function filterEducation(items, filterType, sortBy) {
-  let filtered = [...items];
-
-  if (filterType === "current") filtered = filtered.filter((item) => getYM(item, "end").y == null);
-  else if (filterType === "completed") filtered = filtered.filter((item) => getYM(item, "end").y != null);
-
-  if (sortBy === "school") filtered.sort((a, b) => String(a.school || "").localeCompare(String(b.school || "")));
-  else if (sortBy === "level") filtered.sort((a, b) => (detectLevelRank(b) - detectLevelRank(a)));
-  else filtered = sortEdu(filtered);
-  return filtered;
 }
