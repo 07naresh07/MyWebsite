@@ -1,10 +1,8 @@
-// src/pages/BlogPost.jsx
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useOwnerMode } from "../lib/owner.js";
-import Reveal from "../components/Reveal.jsx";
 
-/* ----------------------------- Local store ----------------------------- */
+/* ----------------------------- Local Storage & Utilities ----------------------------- */
 const LS_KEY = "localBlogs";
 const THEME_KEY = "blog_theme";
 const READING_PROGRESS_KEY = "readingProgress";
@@ -46,7 +44,6 @@ const removeLocalByIdOrSlug = (idOrSlug) => {
   return true;
 };
 
-// Enhanced reading preferences
 const saveReadingPreferences = (prefs) => {
   try {
     localStorage.setItem(READING_PREFERENCES_KEY, JSON.stringify(prefs));
@@ -77,7 +74,6 @@ const getReadingProfiles = () => {
   }
 };
 
-// Reading progress and stats
 const saveReadingProgress = (postId, progress, wordsRead = 0) => {
   try {
     const data = JSON.parse(localStorage.getItem(READING_PROGRESS_KEY) || "{}");
@@ -112,7 +108,6 @@ const updateReadingStats = (wordsRead, timeSpent) => {
   } catch {}
 };
 
-/* ----------------------------- Utilities ----------------------------- */
 const slugify = (s = "") =>
   s
     .toLowerCase()
@@ -139,7 +134,7 @@ const countWords = (html) => {
 
 const looksLikeHtml = (s) => /<\/?[a-z][\s\S]*>/i.test(String(s || ""));
 
-// Enhanced reading themes
+/* ----------------------------- Reading Themes ----------------------------- */
 const READING_THEMES = {
   default: {
     name: "Default",
@@ -181,10 +176,170 @@ const FONT_FAMILIES = {
   literata: { name: "Literata", value: "'Literata', Georgia, serif" },
   crimson: { name: "Crimson Text", value: "'Crimson Text', Georgia, serif" },
   openSans: { name: "Open Sans", value: "'Open Sans', Arial, sans-serif" },
-  sourceSerif: { name: "Source Serif", value: "'Source Serif Pro', Georgia, serif" }
+  sourceSerif: { name: "Source Serif Pro", value: "'Source Serif Pro', Georgia, serif" }
 };
 
-/** Markdown → HTML converter */
+/* ----------------------------- Icons ----------------------------- */
+const Icons = {
+  ArrowLeft: ({ size = 20, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M19 12H5m7-7l-7 7 7 7" />
+    </svg>
+  ),
+  Clock: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12,6 12,12 16,14" />
+    </svg>
+  ),
+  Menu: ({ size = 20, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  ),
+  Settings: ({ size = 20, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  ),
+  Sun: ({ size = 18, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="12" cy="12" r="5" />
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+  ),
+  Moon: ({ size = 18, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  ),
+  ZoomIn: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="M21 21l-4.35-4.35" />
+      <line x1="8" y1="11" x2="14" y2="11" />
+      <line x1="11" y1="8" x2="11" y2="14" />
+    </svg>
+  ),
+  ZoomOut: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="M21 21l-4.35-4.35" />
+      <line x1="8" y1="11" x2="14" y2="11" />
+    </svg>
+  ),
+  BookOpen: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+    </svg>
+  ),
+  Bookmark: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  ),
+  Focus: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v6m0 6v6M5.05 5.05l4.24 4.24m5.66 5.66l4.24 4.24M1 12h6m6 0h6M5.05 18.95l4.24-4.24m5.66-5.66l4.24-4.24" />
+    </svg>
+  ),
+  Type: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <polyline points="4,7 4,4 20,4 20,7" />
+      <line x1="9" y1="20" x2="15" y2="20" />
+      <line x1="12" y1="4" x2="12" y2="20" />
+    </svg>
+  ),
+  Play: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <polygon points="5,3 19,12 5,21" />
+    </svg>
+  ),
+  Pause: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <rect x="6" y="4" width="4" height="16" />
+      <rect x="14" y="4" width="4" height="16" />
+    </svg>
+  ),
+  Target: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  ),
+  Zap: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <polygon points="13,2 3,14 12,14 11,22 21,10 12,10" />
+    </svg>
+  ),
+  Eye: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
+  Edit: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  ),
+  Delete: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  ),
+  Brain: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" />
+      <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" />
+    </svg>
+  ),
+  Share: ({ size = 20, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
+  ),
+  Palette: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="13.5" cy="6.5" r=".5" />
+      <circle cx="17.5" cy="10.5" r=".5" />
+      <circle cx="8.5" cy="7.5" r=".5" />
+      <circle cx="6.5" cy="12.5" r=".5" />
+      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+    </svg>
+  ),
+  X: ({ size = 16, className = "" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+};
+
+/* ----------------------------- Markdown Converter ----------------------------- */
 function mdToHtml(md) {
   if (!md) return "";
   let src = String(md).replace(/\r\n?/g, "\n");
@@ -195,7 +350,6 @@ function mdToHtml(md) {
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.+?)\*/g, "<em>$1</em>");
 
-  // Headings
   src = src
     .split("\n")
     .map((line) => {
@@ -209,7 +363,6 @@ function mdToHtml(md) {
     })
     .join("\n");
 
-  // Paragraphs & lists
   const blocks = src.split(/\n{2,}/);
   const htmlBlocks = blocks.map((block) => {
     const hasHtml = /<\/?(div|h[1-6]|ul|ol|li|pre|blockquote|table|p|img|code|span)/i.test(block);
@@ -311,161 +464,7 @@ function stripHtml(html) {
   }
 }
 
-/* ----------------------------- Enhanced Icons ----------------------------- */
-const Icons = {
-  ArrowLeft: ({ size = 20, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <path d="M19 12H5m7-7l-7 7 7 7" />
-    </svg>
-  ),
-  Clock: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12,6 12,12 16,14" />
-    </svg>
-  ),
-  Menu: ({ size = 20, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <line x1="8" y1="6" x2="21" y2="6" />
-      <line x1="8" y1="12" x2="21" y2="12" />
-      <line x1="8" y1="18" x2="21" y2="18" />
-      <line x1="3" y1="6" x2="3.01" y2="6" />
-      <line x1="3" y1="12" x2="3.01" y2="12" />
-      <line x1="3" y1="18" x2="3.01" y2="18" />
-    </svg>
-  ),
-  Settings: ({ size = 20, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  ),
-  Sun: ({ size = 18, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <circle cx="12" cy="12" r="5" />
-      <line x1="12" y1="1" x2="12" y2="3" />
-      <line x1="12" y1="21" x2="12" y2="23" />
-      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-      <line x1="1" y1="12" x2="3" y2="12" />
-      <line x1="21" y1="12" x2="23" y2="12" />
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-    </svg>
-  ),
-  Moon: ({ size = 18, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  ),
-  ZoomIn: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <circle cx="11" cy="11" r="8" />
-      <path d="M21 21l-4.35-4.35" />
-      <line x1="8" y1="11" x2="14" y2="11" />
-      <line x1="11" y1="8" x2="11" y2="14" />
-    </svg>
-  ),
-  ZoomOut: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <circle cx="11" cy="11" r="8" />
-      <path d="M21 21l-4.35-4.35" />
-      <line x1="8" y1="11" x2="14" y2="11" />
-    </svg>
-  ),
-  BookOpen: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-    </svg>
-  ),
-  Bookmark: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-    </svg>
-  ),
-  Eye: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  ),
-  Edit: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  ),
-  Delete: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-      <path d="M10 11v6M14 11v6" />
-    </svg>
-  ),
-  Palette: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <circle cx="13.5" cy="6.5" r=".5" />
-      <circle cx="17.5" cy="10.5" r=".5" />
-      <circle cx="8.5" cy="7.5" r=".5" />
-      <circle cx="6.5" cy="12.5" r=".5" />
-      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
-    </svg>
-  ),
-  Focus: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 1v6m0 6v6M5.05 5.05l4.24 4.24m5.66 5.66l4.24 4.24M1 12h6m6 0h6M5.05 18.95l4.24-4.24m5.66-5.66l4.24-4.24" />
-    </svg>
-  ),
-  Type: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <polyline points="4,7 4,4 20,4 20,7" />
-      <line x1="9" y1="20" x2="15" y2="20" />
-      <line x1="12" y1="4" x2="12" y2="20" />
-    </svg>
-  ),
-  Play: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <polygon points="5,3 19,12 5,21" />
-    </svg>
-  ),
-  Pause: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <rect x="6" y="4" width="4" height="16" />
-      <rect x="14" y="4" width="4" height="16" />
-    </svg>
-  ),
-  Target: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <circle cx="12" cy="12" r="10" />
-      <circle cx="12" cy="12" r="6" />
-      <circle cx="12" cy="12" r="2" />
-    </svg>
-  ),
-  Zap: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <polygon points="13,2 3,14 12,14 11,22 21,10 12,10" />
-    </svg>
-  ),
-  Brain: ({ size = 16, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z" />
-      <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z" />
-    </svg>
-  ),
-  Share: ({ size = 20, className = "" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <circle cx="18" cy="5" r="3" />
-      <circle cx="6" cy="12" r="3" />
-      <circle cx="18" cy="19" r="3" />
-      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-    </svg>
-  )
-};
-
-/* ----------------------------- Component ----------------------------- */
+/* ----------------------------- Main Component ----------------------------- */
 export default function BlogPost() {
   const { slug } = useParams();
   const nav = useNavigate();
@@ -511,7 +510,6 @@ export default function BlogPost() {
   // Smart features
   const [autoNightMode, setAutoNightMode] = useState(false);
   const [binocularView, setBinocularView] = useState(false);
-  const [highlightCurrentParagraph, setHighlightCurrentParagraph] = useState(false);
 
   // UI state
   const [showToc, setShowToc] = useState(false);
@@ -524,7 +522,6 @@ export default function BlogPost() {
   const [readingProgress, setReadingProgress] = useState(0);
   const [wordsRead, setWordsRead] = useState(0);
   const [activeHeading, setActiveHeading] = useState("");
-  const [activeParagraph, setActiveParagraph] = useState(0);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [readingSpeed, setReadingSpeed] = useState(200);
   const [timeSpent, setTimeSpent] = useState(0);
@@ -533,7 +530,11 @@ export default function BlogPost() {
   const settingsRef = useRef(null);
   const profilesRef = useRef(null);
   const shareRef = useRef(null);
-  const autoScrollRef = useRef(null);
+
+  // rAF-based auto scroll refs
+  const autoScrollRafRef = useRef(null);
+  const lastTsRef = useRef(0);
+  const pauseUntilRef = useRef(0);
 
   // Always safe theme colors
   const themeColors = getThemeColors(darkMode, readingTheme);
@@ -555,7 +556,6 @@ export default function BlogPost() {
       if (typeof prefs.margins === 'number') setMargins(prefs.margins);
       if (typeof prefs.autoNightMode === 'boolean') setAutoNightMode(prefs.autoNightMode);
       if (typeof prefs.binocularView === 'boolean') setBinocularView(prefs.binocularView);
-      if (typeof prefs.highlightCurrentParagraph === 'boolean') setHighlightCurrentParagraph(prefs.highlightCurrentParagraph);
     } catch {}
   }, []);
 
@@ -564,16 +564,15 @@ export default function BlogPost() {
     saveReadingPreferences({
       readingTheme, fontSize, lineHeight, fontFamily, readingMode, focusMode, 
       blueLight, wordSpacing, letterSpacing, paragraphSpacing, margins,
-      autoNightMode, binocularView, highlightCurrentParagraph
+      autoNightMode, binocularView
     });
   }, [readingTheme, fontSize, lineHeight, fontFamily, readingMode, focusMode, 
       blueLight, wordSpacing, letterSpacing, paragraphSpacing, margins,
-      autoNightMode, binocularView, highlightCurrentParagraph]);
+      autoNightMode, binocularView]);
 
   // Auto night mode
   useEffect(() => {
     if (!autoNightMode) return;
-    
     const checkTime = () => {
       const hour = new Date().getHours();
       const shouldBeDark = hour < 6 || hour > 20;
@@ -581,26 +580,65 @@ export default function BlogPost() {
         setDarkMode(shouldBeDark);
       }
     };
-    
     checkTime();
     const interval = setInterval(checkTime, 60000);
     return () => clearInterval(interval);
   }, [autoNightMode, darkMode]);
 
-  // Auto scroll functionality
+  // Smooth Auto Scroll with user override
   useEffect(() => {
-    if (!autoScroll) return;
-    
-    const scroll = () => {
-      window.scrollBy(0, scrollSpeed);
+    const pauseFor = (ms) => { pauseUntilRef.current = Date.now() + ms; };
+    const handleWheel = () => pauseFor(2000);
+    const handleTouch = () => pauseFor(2000);
+    const handleKey = (e) => {
+      // Common scroll/navigation keys
+      const keys = ["ArrowUp","ArrowDown","PageUp","PageDown","Home","End"," "];
+      if (keys.includes(e.key)) pauseFor(2000);
     };
-    
-    autoScrollRef.current = setInterval(scroll, 50);
-    return () => {
-      if (autoScrollRef.current) {
-        clearInterval(autoScrollRef.current);
-      }
-    };
+
+    if (autoScroll) {
+      window.addEventListener("wheel", handleWheel, { passive: true });
+      window.addEventListener("touchstart", handleTouch, { passive: true });
+      window.addEventListener("touchmove", handleTouch, { passive: true });
+      window.addEventListener("keydown", handleKey);
+
+      const step = (ts) => {
+        if (!autoScroll) return; // bail if toggled off
+        if (!lastTsRef.current) lastTsRef.current = ts;
+
+        const now = Date.now();
+        if (now < pauseUntilRef.current) {
+          autoScrollRafRef.current = requestAnimationFrame(step);
+          return;
+        }
+
+        // Convert slider (0.5–5) to px/sec (30–300)
+        const pxPerSec = Math.max(0.5, Number(scrollSpeed)) * 60;
+        const dt = (ts - lastTsRef.current) / 1000; // seconds
+        lastTsRef.current = ts;
+
+        const dy = pxPerSec * dt;
+        window.scrollBy(0, dy);
+
+        autoScrollRafRef.current = requestAnimationFrame(step);
+      };
+
+      autoScrollRafRef.current = requestAnimationFrame(step);
+
+      return () => {
+        window.removeEventListener("wheel", handleWheel);
+        window.removeEventListener("touchstart", handleTouch);
+        window.removeEventListener("touchmove", handleTouch);
+        window.removeEventListener("keydown", handleKey);
+        if (autoScrollRafRef.current) cancelAnimationFrame(autoScrollRafRef.current);
+        autoScrollRafRef.current = null;
+        lastTsRef.current = 0;
+        pauseUntilRef.current = 0;
+      };
+    } else {
+      // ensure listeners are off if toggled off
+      return () => {};
+    }
   }, [autoScroll, scrollSpeed]);
 
   // Apply theme
@@ -755,25 +793,12 @@ export default function BlogPost() {
         if (r.top <= 100) current = h.id;
       }
       setActiveHeading(current);
-
-      // Active paragraph for highlighting
-      if (highlightCurrentParagraph) {
-        const paragraphs = document.querySelectorAll(".article-content p");
-        let activeParagraphIndex = 0;
-        paragraphs.forEach((p, index) => {
-          const r = p.getBoundingClientRect();
-          if (r.top <= windowHeight / 2 && r.bottom >= windowHeight / 2) {
-            activeParagraphIndex = index;
-          }
-        });
-        setActiveParagraph(activeParagraphIndex);
-      }
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
-  }, [post, totalWords, sessionStart, highlightCurrentParagraph]);
+  }, [post, totalWords, sessionStart]);
 
   // Track time spent
   useEffect(() => {
@@ -845,17 +870,17 @@ export default function BlogPost() {
     }
   }, [owner, post, nav]);
 
-  // Profile management
+  // Profile management (no highlight flag anymore)
   const saveProfile = useCallback((name) => {
     const profile = {
       readingTheme, fontSize, lineHeight, fontFamily, readingMode, focusMode,
       blueLight, wordSpacing, letterSpacing, paragraphSpacing, margins,
-      binocularView, highlightCurrentParagraph
+      binocularView
     };
     saveReadingProfile(name, profile);
   }, [readingTheme, fontSize, lineHeight, fontFamily, readingMode, focusMode,
       blueLight, wordSpacing, letterSpacing, paragraphSpacing, margins,
-      binocularView, highlightCurrentParagraph]);
+      binocularView]);
 
   const loadProfile = useCallback((name) => {
     const profiles = getReadingProfiles();
@@ -874,7 +899,6 @@ export default function BlogPost() {
     setParagraphSpacing(profile.paragraphSpacing || 1);
     setMargins(profile.margins || 1);
     setBinocularView(profile.binocularView || false);
-    setHighlightCurrentParagraph(profile.highlightCurrentParagraph || false);
     setCurrentProfile(name);
   }, []);
 
@@ -1144,8 +1168,6 @@ export default function BlogPost() {
                 setFocusMode={setFocusMode}
                 binocularView={binocularView}
                 setBinocularView={setBinocularView}
-                highlightCurrentParagraph={highlightCurrentParagraph}
-                setHighlightCurrentParagraph={setHighlightCurrentParagraph}
                 // Comfort
                 blueLight={blueLight}
                 setBlueLight={setBlueLight}
@@ -1219,299 +1241,365 @@ export default function BlogPost() {
         />
       )}
 
+      {/* Focus Mode Stats - widened and clearer layout */}
+      {focusMode && (
+        <div 
+          className="fixed top-32 left-4 sm:left-6 lg:top-36 lg:left-8 rounded-xl p-3 sm:p-4 shadow-2xl border z-30 transition-all duration-300 hover:scale-105"
+          style={{ 
+            backgroundColor: `${themeColors.background}98`,
+            borderColor: `${themeColors.accent}30`,
+            backdropFilter: 'blur(20px)',
+            boxShadow: `0 20px 40px ${themeColors.accent}15, 0 0 0 1px ${themeColors.accent}20`,
+            minWidth: "240px"
+          }}
+        >
+          <div className="space-y-3 text-xs sm:text-sm">
+            <div className="flex items-center justify-center mb-2">
+              <div 
+                className="w-2 h-2 rounded-full animate-pulse"
+                style={{ backgroundColor: themeColors.accent }}
+              />
+              <span className="ml-2 font-semibold" style={{ color: themeColors.accent }}>Focus Mode</span>
+            </div>
+            
+            <div className="space-y-2">
+              {/* Each row now uses a 2-col grid with gap */}
+              <div
+                className="grid items-center"
+                style={{ gridTemplateColumns: "1fr auto", columnGap: "12px", color: themeColors.secondary }}
+              >
+                <div className="flex items-center gap-2" style={{ minWidth: 110 }}>
+                  <Icons.Zap size={14} />
+                  <span>Speed</span>
+                </div>
+                <span className="font-mono text-xs px-1.5 py-0.5 rounded"
+                  style={{ color: themeColors.text, backgroundColor: `${themeColors.accent}10` }}>
+                  {readingSpeed} WPM
+                </span>
+              </div>
+              
+              <div
+                className="grid items-center"
+                style={{ gridTemplateColumns: "1fr auto", columnGap: "12px", color: themeColors.secondary }}
+              >
+                <div className="flex items-center gap-2" style={{ minWidth: 110 }}>
+                  <Icons.Clock size={14} />
+                  <span>Time</span>
+                </div>
+                <span className="font-mono text-xs px-1.5 py-0.5 rounded"
+                  style={{ color: themeColors.text, backgroundColor: `${themeColors.accent}10` }}>
+                  {Math.floor(timeSpent / 60)}:{(timeSpent % 60).toString().padStart(2, '0')}
+                </span>
+              </div>
+              
+              <div
+                className="grid items-center"
+                style={{ gridTemplateColumns: "1fr auto", columnGap: "12px", color: themeColors.secondary }}
+              >
+                <div className="flex items-center gap-2" style={{ minWidth: 110 }}>
+                  <Icons.Target size={14} />
+                  <span>Left</span>
+                </div>
+                <span className="font-mono text-xs px-1.5 py-0.5 rounded"
+                  style={{ color: themeColors.text, backgroundColor: `${themeColors.accent}10` }}>
+                  {remainingTime}m
+                </span>
+              </div>
+              
+              <div
+                className="grid items-center"
+                style={{ gridTemplateColumns: "1fr auto", columnGap: "12px", color: themeColors.secondary }}
+              >
+                <div className="flex items-center gap-2" style={{ minWidth: 110 }}>
+                  <Icons.BookOpen size={14} />
+                  <span>Progress</span>
+                </div>
+                <span className="font-mono text-xs px-1.5 py-0.5 rounded"
+                  style={{ color: themeColors.text, backgroundColor: `${themeColors.accent}10` }}>
+                  {Math.round(readingProgress)}%
+                </span>
+              </div>
+            </div>
+            
+            {/* Mini progress bar */}
+            <div className="mt-3">
+              <div 
+                className="w-full h-1 rounded-full"
+                style={{ backgroundColor: `${themeColors.accent}20` }}
+              >
+                <div
+                  className="h-1 rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${readingProgress}%`, 
+                    backgroundColor: themeColors.accent
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main content */}
       <main className="container py-8 transition-all duration-300">
-        <Reveal>
-          <article
-            className={`mx-auto transition-all duration-300 ${binocularView ? '' : 'max-w-4xl'}`}
-            data-article-content
-            style={{
-              maxWidth: binocularView ? "80ch" : "65rem",
-              backgroundColor: readingMode ? themeColors.background : "transparent",
-              borderRadius: readingMode ? "1rem" : "0",
-              padding: readingMode ? `${2 * margins}rem` : "0",
-              boxShadow: readingMode ? "0 8px 32px rgba(0,0,0,0.12)" : "none",
-              fontFamily: selectedFont.value,
-              fontSize: `${fontSize}%`,
-              lineHeight,
-              wordSpacing: `${wordSpacing}px`,
-              letterSpacing: `${letterSpacing}px`,
-              color: themeColors.text,
-              margin: binocularView ? "0 auto" : "0 auto",
-              filter: blueLight > 0 ? `sepia(${blueLight}%) saturate(90%) hue-rotate(15deg)` : 'none'
-            }}
-          >
-            {/* Header */}
-            <header className="mb-12 text-center">
-              <div className="relative">
-                {post.tags && post.tags.length > 0 && (
-                  <div className="mb-6">
-                    <span
-                      className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium rounded-full border transition-all duration-200 hover:scale-105"
-                      style={{
-                        backgroundColor: `${tint}15`,
-                        borderColor: `${tint}30`,
-                        color: tint,
-                      }}
-                    >
-                      <Icons.Eye size={12} />
-                      {post.tags[0]}
-                    </span>
-                  </div>
-                )}
+        <article
+          className={`mx-auto transition-all duration-300 ${binocularView ? '' : 'max-w-4xl'}`}
+          data-article-content
+          style={{
+            maxWidth: binocularView ? "80ch" : "65rem",
+            backgroundColor: readingMode ? themeColors.background : "transparent",
+            borderRadius: readingMode ? "1rem" : "0",
+            padding: readingMode ? `${2 * margins}rem` : "0",
+            boxShadow: readingMode ? "0 8px 32px rgba(0,0,0,0.12)" : "none",
+            fontFamily: selectedFont.value,
+            fontSize: `${fontSize}%`,
+            lineHeight,
+            wordSpacing: `${wordSpacing}px`,
+            letterSpacing: `${letterSpacing}px`,
+            color: themeColors.text,
+            margin: binocularView ? "0 auto" : "0 auto",
+            filter: blueLight > 0 ? `sepia(${blueLight}%) saturate(90%) hue-rotate(15deg)` : 'none'
+          }}
+        >
+          {/* Header */}
+          <header className="mb-12 text-center">
+            <div className="relative">
+              {post.tags && post.tags.length > 0 && (
+                <div className="mb-6">
+                  <span
+                    className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium rounded-full border transition-all duration-200 hover:scale-105"
+                    style={{
+                      backgroundColor: `${tint}15`,
+                      borderColor: `${tint}30`,
+                      color: tint,
+                    }}
+                  >
+                    <Icons.Eye size={12} />
+                    {post.tags[0]}
+                  </span>
+                </div>
+              )}
 
-                <h1
-                  className="text-4xl md:text-6xl font-bold mb-6 leading-tight tracking-tight transition-all duration-300"
-                  style={{
-                    color: themeColors.text,
-                    fontFamily: selectedFont.value,
-                    fontSize: `${2.5 * (fontSize / 100)}em`,
-                  }}
-                >
-                  {post.title}
-                </h1>
+              <h1
+                className="text-4xl md:text-6xl font-bold mb-6 leading-tight tracking-tight transition-all duration-300"
+                style={{
+                  color: themeColors.text,
+                  fontFamily: selectedFont.value,
+                  fontSize: `${2.5 * (fontSize / 100)}em`,
+                }}
+              >
+                {post.title}
+              </h1>
 
+              <div 
+                className="flex flex-wrap items-center justify-center gap-6 text-sm mb-8"
+                style={{ color: themeColors.secondary }}
+              >
                 <div 
-                  className="flex flex-wrap items-center justify-center gap-6 text-sm mb-8"
-                  style={{ color: themeColors.secondary }}
+                  className="flex items-center gap-2 rounded-full px-3 py-1 transition-all duration-200 hover:scale-105"
+                  style={{ backgroundColor: `${themeColors.accent}10` }}
                 >
+                  <Icons.Clock size={14} />
+                  <span className="font-medium">{readingTime} min read</span>
+                </div>
+                {post.createdAt && (
                   <div 
                     className="flex items-center gap-2 rounded-full px-3 py-1 transition-all duration-200 hover:scale-105"
                     style={{ backgroundColor: `${themeColors.accent}10` }}
                   >
-                    <Icons.Clock size={14} />
-                    <span className="font-medium">{readingTime} min read</span>
+                    <Icons.Target size={14} />
+                    <span className="font-medium">{wordsRead} / {totalWords} words</span>
                   </div>
-                  {post.createdAt && (
-                    <div 
-                      className="flex items-center gap-2 rounded-full px-3 py-1 transition-all duration-200 hover:scale-105"
-                      style={{ backgroundColor: `${themeColors.accent}10` }}
-                    >
-                      <Icons.Target size={14} />
-                      <span className="font-medium">{wordsRead} / {totalWords} words</span>
-                    </div>
-                  )}
-                </div>
-
-                {post.coverImageUrl && (
-                  <img
-                    src={post.coverImageUrl}
-                    alt=""
-                    className="mx-auto mb-8 rounded-2xl shadow-lg max-h-[420px] object-cover w-full transition-all duration-300 hover:scale-[1.02]"
-                  />
                 )}
+              </div>
 
-                <div 
-                  className="w-full rounded-full h-2 mb-8"
-                  style={{ backgroundColor: `${themeColors.accent}20` }}
-                >
-                  <div
-                    className="h-2 rounded-full transition-all duration-300"
-                    style={{ 
-                      width: `${readingProgress}%`, 
-                      background: `linear-gradient(90deg, ${themeColors.accent}, ${tint})` 
-                    }}
+              {post.coverImageUrl && (
+                <img
+                  src={post.coverImageUrl}
+                  alt=""
+                  className="mx-auto mb-8 rounded-2xl shadow-lg max-h-[420px] object-cover w-full transition-all duration-300 hover:scale-[1.02]"
+                />
+              )}
+
+              <div 
+                className="w-full rounded-full h-2 mb-8"
+                style={{ backgroundColor: `${themeColors.accent}20` }}
+              >
+                <div
+                  className="h-2 rounded-full transition-all duration-300"
+                  style={{ 
+                    width: `${readingProgress}%`, 
+                    background: `linear-gradient(90deg, ${themeColors.accent}, ${tint})` 
+                  }}
+                />
+              </div>
+            </div>
+          </header>
+
+          {/* Enhanced article body */}
+          <div
+            className="article-content"
+            style={{
+              color: themeColors.text,
+              fontSize: "inherit",
+              lineHeight: "inherit",
+            }}
+            dangerouslySetInnerHTML={{ 
+              __html: normalizedHtml || "<p><em>No content available</em></p>" 
+            }}
+          />
+
+          {/* Floating progress indicator */}
+          {readingProgress > 10 && readingProgress < 95 && (
+            <div 
+              className="fixed bottom-6 right-6 rounded-2xl p-4 shadow-2xl border z-20 transition-all duration-300 hover:scale-105"
+              style={{ 
+                backgroundColor: themeColors.background,
+                borderColor: themeColors.border
+              }}
+            >
+              <div className="relative w-16 h-16">
+                <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 100 100">
+                  <circle 
+                    cx="50" cy="50" r="45" 
+                    stroke={themeColors.border}
+                    strokeWidth="4" 
+                    fill="transparent" 
                   />
+                  <circle
+                    cx="50" cy="50" r="45"
+                    stroke={themeColors.accent}
+                    strokeWidth="4"
+                    fill="transparent"
+                    strokeDasharray={`${2 * Math.PI * 45}`}
+                    strokeDashoffset={`${2 * Math.PI * 45 * (1 - readingProgress / 100)}`}
+                    className="transition-all duration-300 filter drop-shadow-sm"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span 
+                    className="text-sm font-bold"
+                    style={{ color: themeColors.text }}
+                  >
+                    {Math.round(readingProgress)}%
+                  </span>
+                  <Icons.BookOpen size={12} style={{ color: themeColors.secondary }} />
                 </div>
               </div>
-            </header>
-
-            {/* Enhanced article body */}
-            <div
-              className="article-content"
-              style={{
-                color: themeColors.text,
-                fontSize: "inherit",
-                lineHeight: "inherit",
-              }}
-              dangerouslySetInnerHTML={{ 
-                __html: normalizedHtml || "<p><em>No content available</em></p>" 
-              }}
-            />
-
-            {/* Floating progress indicator */}
-            {readingProgress > 10 && readingProgress < 95 && (
-              <div 
-                className="fixed bottom-6 right-6 rounded-2xl p-4 shadow-2xl border z-20 transition-all duration-300 hover:scale-105"
-                style={{ 
-                  backgroundColor: themeColors.background,
-                  borderColor: themeColors.border
-                }}
-              >
-                <div className="relative w-16 h-16">
-                  <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 100 100">
-                    <circle 
-                      cx="50" cy="50" r="45" 
-                      stroke={themeColors.border}
-                      strokeWidth="4" 
-                      fill="transparent" 
-                    />
-                    <circle
-                      cx="50" cy="50" r="45"
-                      stroke={themeColors.accent}
-                      strokeWidth="4"
-                      fill="transparent"
-                      strokeDasharray={`${2 * Math.PI * 45}`}
-                      strokeDashoffset={`${2 * Math.PI * 45 * (1 - readingProgress / 100)}`}
-                      className="transition-all duration-300 filter drop-shadow-sm"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span 
-                      className="text-sm font-bold"
-                      style={{ color: themeColors.text }}
-                    >
-                      {Math.round(readingProgress)}%
-                    </span>
-                    <Icons.BookOpen size={12} style={{ color: themeColors.secondary }} />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Reading stats overlay for focus mode */}
-            {focusMode && (
-              <div 
-                className="fixed top-20 left-4 rounded-xl p-4 shadow-lg border z-20"
-                style={{ 
-                  backgroundColor: `${themeColors.background}95`,
-                  borderColor: themeColors.border
-                }}
-              >
-                <div className="space-y-2 text-sm">
-                  <div style={{ color: themeColors.secondary }}>
-                    <Icons.Zap size={14} className="inline mr-2" />
-                    {readingSpeed} WPM
-                  </div>
-                  <div style={{ color: themeColors.secondary }}>
-                    <Icons.Clock size={14} className="inline mr-2" />
-                    {Math.floor(timeSpent / 60)}:{(timeSpent % 60).toString().padStart(2, '0')}
-                  </div>
-                  <div style={{ color: themeColors.secondary }}>
-                    <Icons.Target size={14} className="inline mr-2" />
-                    {remainingTime}m left
-                  </div>
-                </div>
-              </div>
-            )}
-          </article>
-        </Reveal>
+            </div>
+          )}
+        </article>
 
         {/* Enhanced related posts */}
         {relatedPosts.length > 0 && (
-          <Reveal>
-            <section 
-              className="max-w-4xl mx-auto mt-20 pt-12 border-t"
-              style={{ borderColor: themeColors.border }}
-            >
-              <div className="text-center mb-8">
-                <h2 
-                  className="text-3xl font-bold mb-3"
-                  style={{ color: themeColors.text }}
-                >
-                  Related Articles
-                </h2>
-                <p style={{ color: themeColors.secondary }}>
-                  Continue your reading journey with these related posts
-                </p>
-              </div>
-              <div className="grid md:grid-cols-3 gap-8">
-                {relatedPosts.map((rp) => {
-                  const rt = clampAccent(rp.color);
-                  const rtRaw = pickBodyRaw(rp);
-                  const rtHtml = looksLikeHtml(rtRaw) ? stripCopyHighlights(rtRaw) : mdToHtml(rtRaw);
-                  const rtTime = estimateReadingTime(rtHtml);
-                  const excerpt = stripHtml(rtHtml).slice(0, 120);
-                  return (
-                    <Link key={rp.id} to={`/blog/${rp.slug || rp.id}`} className="group block">
-                      <article 
-                        className="h-full p-6 rounded-2xl border transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
-                        style={{ 
-                          borderColor: themeColors.border,
-                          backgroundColor: `${themeColors.accent}05`
-                        }}
-                      >
-                        <div className="flex items-start gap-3 mb-4">
-                          <div 
-                            className="w-3 h-3 rounded-full mt-2 flex-shrink-0"
-                            style={{ backgroundColor: rt }}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <h3 
-                              className="font-semibold text-lg mb-2 line-clamp-2 group-hover:underline"
-                              style={{ color: themeColors.text }}
-                            >
-                              {rp.title}
-                            </h3>
-                            {excerpt && (
-                              <p 
-                                className="text-sm mb-3 line-clamp-3"
-                                style={{ color: themeColors.secondary }}
-                              >
-                                {excerpt}...
-                              </p>
-                            )}
-                          </div>
-                        </div>
+          <section 
+            className="max-w-4xl mx-auto mt-20 pt-12 border-t"
+            style={{ borderColor: themeColors.border }}
+          >
+            <div className="text-center mb-8">
+              <h2 
+                className="text-3xl font-bold mb-3"
+                style={{ color: themeColors.text }}
+              >
+                Related Articles
+              </h2>
+              <p style={{ color: themeColors.secondary }}>
+                Continue your reading journey with these related posts
+              </p>
+            </div>
+            <div className="grid md:grid-cols-3 gap-8">
+              {relatedPosts.map((rp) => {
+                const rt = clampAccent(rp.color);
+                const rtRaw = pickBodyRaw(rp);
+                const rtHtml = looksLikeHtml(rtRaw) ? stripCopyHighlights(rtRaw) : mdToHtml(rtRaw);
+                const rtTime = estimateReadingTime(rtHtml);
+                const excerpt = stripHtml(rtHtml).slice(0, 120);
+                return (
+                  <Link key={rp.id} to={`/blog/${rp.slug || rp.id}`} className="group block">
+                    <article 
+                      className="h-full p-6 rounded-2xl border transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+                      style={{ 
+                        borderColor: themeColors.border,
+                        backgroundColor: `${themeColors.accent}05`
+                      }}
+                    >
+                      <div className="flex items-start gap-3 mb-4">
                         <div 
-                          className="flex items-center justify-between text-xs"
-                          style={{ color: themeColors.secondary }}
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="flex items-center gap-1">
-                              <Icons.Clock size={12} />
-                              {rtTime} min
-                            </span>
-                            {rp.createdAt && (
-                              <span>
-                                {new Date(rp.createdAt).toLocaleDateString()}
-                              </span>
-                            )}
-                          </div>
-                          {rp.tags && rp.tags.length > 0 && (
-                            <span 
-                              className="px-2 py-1 rounded-full text-xs font-medium"
-                              style={{
-                                backgroundColor: `${rt}15`,
-                                color: rt,
-                              }}
+                          className="w-3 h-3 rounded-full mt-2 flex-shrink-0"
+                          style={{ backgroundColor: rt }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <h3 
+                            className="font-semibold text-lg mb-2 line-clamp-2 group-hover:underline"
+                            style={{ color: themeColors.text }}
+                          >
+                            {rp.title}
+                          </h3>
+                          {excerpt && (
+                            <p 
+                              className="text-sm mb-3 line-clamp-3"
+                              style={{ color: themeColors.secondary }}
                             >
-                              {rp.tags[0]}
+                              {excerpt}...
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div 
+                        className="flex items-center justify-between text-xs"
+                        style={{ color: themeColors.secondary }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="flex items-center gap-1">
+                            <Icons.Clock size={12} />
+                            {rtTime} min
+                          </span>
+                          {rp.createdAt && (
+                            <span>
+                              {new Date(rp.createdAt).toLocaleDateString()}
                             </span>
                           )}
                         </div>
-                      </article>
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          </Reveal>
+                        {rp.tags && rp.tags.length > 0 && (
+                          <span 
+                            className="px-2 py-1 rounded-full text-xs font-medium"
+                            style={{
+                              backgroundColor: `${rt}15`,
+                              color: rt,
+                            }}
+                          >
+                            {rp.tags[0]}
+                          </span>
+                        )}
+                      </div>
+                    </article>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
         )}
       </main>
 
-      {/* Enhanced paragraph highlighting */}
-      {highlightCurrentParagraph && (
-        <style jsx>{`
-          .article-content p:nth-child(${activeParagraph + 1}) {
-            background-color: ${themeColors.accent}15 !important;
-            padding: ${paragraphSpacing}rem !important;
-            border-radius: 0.5rem !important;
-            border-left: 4px solid ${themeColors.accent} !important;
-            transition: all 0.3s ease !important;
-            margin-bottom: ${paragraphSpacing}em !important;
-          }
-        `}</style>
-      )}
-
-      {/* Global enhanced styles */}
+      {/* Enhanced styles with better mobile support and fixed text selection */}
       <style jsx>{`
         .article-content {
           transition: all 0.3s ease;
         }
         
         .article-content * {
+          color: ${themeColors.text} !important;
+        }
+        
+        /* Better text selection styling */
+        .article-content ::selection {
+          background-color: ${themeColors.accent}30 !important;
+          color: ${themeColors.text} !important;
+        }
+        
+        .article-content ::-moz-selection {
+          background-color: ${themeColors.accent}30 !important;
           color: ${themeColors.text} !important;
         }
         
@@ -1887,7 +1975,7 @@ function EnhancedReadingSettings({
   fontSize, setFontSize, lineHeight, setLineHeight, fontFamily, setFontFamily, 
   wordSpacing, setWordSpacing, letterSpacing, setLetterSpacing, paragraphSpacing, setParagraphSpacing, 
   margins, setMargins, readingMode, setReadingMode, focusMode, setFocusMode,
-  binocularView, setBinocularView, highlightCurrentParagraph, setHighlightCurrentParagraph,
+  binocularView, setBinocularView,
   blueLight, setBlueLight, autoNightMode, setAutoNightMode, autoScroll, setAutoScroll,
   scrollSpeed, setScrollSpeed, adjustFontSize, themeColors 
 }) {
@@ -2189,13 +2277,6 @@ function EnhancedReadingSettings({
                 />
                 
                 <SettingToggle
-                  label="Highlight Current Paragraph"
-                  checked={highlightCurrentParagraph}
-                  onChange={setHighlightCurrentParagraph}
-                  description="Highlight the paragraph you're currently reading"
-                />
-                
-                <SettingToggle
                   label="Auto Scroll"
                   checked={autoScroll}
                   onChange={setAutoScroll}
@@ -2268,12 +2349,14 @@ function ShareMenu({ refEl, show, setShow, onShare, themeColors }) {
                   backgroundColor: "transparent"
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = `${color}15`;
-                  e.target.style.borderLeft = `3px solid ${color}`;
+                  const el = e.currentTarget;
+                  el.style.backgroundColor = `${color}15`;
+                  el.style.borderLeft = `3px solid ${color}`;
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = "transparent";
-                  e.target.style.borderLeft = "3px solid transparent";
+                  const el = e.currentTarget;
+                  el.style.backgroundColor = "transparent";
+                  el.style.borderLeft = "3px solid transparent";
                 }}
               >
                 <span className="text-base">{icon}</span>
