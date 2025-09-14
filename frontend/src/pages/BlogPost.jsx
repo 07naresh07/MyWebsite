@@ -339,44 +339,79 @@ const Icons = {
   )
 };
 
-/* ----------------------------- Markdown Converter ----------------------------- */
+/* ----------------------------- Enhanced Markdown Converter ----------------------------- */
 function mdToHtml(md) {
   if (!md) return "";
   let src = String(md).replace(/\r\n?/g, "\n");
 
+  // Enhanced inline formatting
   const inline = (s) =>
     s
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.+?)\*/g, "<em>$1</em>");
+      // Handle images first - ![alt](url) or ![alt](url "title")
+      .replace(/!\[([^\]]*)\]\(([^)]+)(?:\s+"([^"]*)")?\)/g, '<img src="$2" alt="$1" title="$3" loading="lazy" />')
+      // Handle links - [text](url) or [text](url "title")
+      .replace(/\[([^\]]+)\]\(([^)]+)(?:\s+"([^"]*)")?\)/g, '<a href="$2" title="$3">$1</a>')
+      // Handle inline code
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      // Handle bold text
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<strong>$1</strong>')
+      // Handle italic text
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/_(.+?)_/g, '<em>$1</em>')
+      // Handle strikethrough
+      .replace(/~~(.+?)~~/g, '<del>$1</del>')
+      // Handle highlighting/mark
+      .replace(/==(.+?)==/g, '<mark>$1</mark>');
 
+  // Handle code blocks first (to avoid processing them as other elements)
+  src = src.replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>');
+
+  // Split into lines for processing
   src = src
     .split("\n")
     .map((line) => {
+      // Handle headers
       if (/^######\s+/.test(line)) return line.replace(/^######\s+(.+)$/, "<h6>$1</h6>");
       if (/^#####\s+/.test(line)) return line.replace(/^#####\s+(.+)$/, "<h5>$1</h5>");
       if (/^####\s+/.test(line)) return line.replace(/^####\s+(.+)$/, "<h4>$1</h4>");
       if (/^###\s+/.test(line)) return line.replace(/^###\s+(.+)$/, "<h3>$1</h3>");
       if (/^##\s+/.test(line)) return line.replace(/^##\s+(.+)$/, "<h2>$1</h2>");
       if (/^#\s+/.test(line)) return line.replace(/^#\s+(.+)$/, "<h1>$1</h1>");
+      
+      // Handle blockquotes
+      if (/^>\s+/.test(line)) return line.replace(/^>\s+(.+)$/, "<blockquote>$1</blockquote>");
+      
+      // Handle horizontal rules
+      if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) return "<hr>";
+      
       return line;
     })
     .join("\n");
 
+  // Split into blocks for paragraph processing
   const blocks = src.split(/\n{2,}/);
   const htmlBlocks = blocks.map((block) => {
-    const hasHtml = /<\/?(div|h[1-6]|ul|ol|li|pre|blockquote|table|p|img|code|span)/i.test(block);
+    if (!block.trim()) return "";
+    
+    // Skip if already HTML
+    const hasHtml = /<\/?(div|h[1-6]|ul|ol|li|pre|blockquote|table|p|img|code|span|hr)/i.test(block);
+    if (hasHtml) return block;
+    
     const lines = block.split("\n");
-    const isUL = lines.length > 0 && lines.every((l) => /^\s*[-*]\s+/.test(l));
-    const isOL = lines.length > 0 && lines.every((l) => /^\s*\d+\.\s+/.test(l));
-
+    
+    // Handle unordered lists (-, *, +)
+    const isUL = lines.length > 0 && lines.every((l) => /^\s*[-*+]\s+/.test(l));
     if (isUL) {
       const items = lines
-        .map((l) => l.replace(/^\s*[-*]\s+/, ""))
+        .map((l) => l.replace(/^\s*[-*+]\s+/, ""))
         .map((li) => `<li>${inline(li)}</li>`)
         .join("");
       return `<ul>${items}</ul>`;
     }
+    
+    // Handle ordered lists (1., 2., etc.)
+    const isOL = lines.length > 0 && lines.every((l) => /^\s*\d+\.\s+/.test(l));
     if (isOL) {
       const items = lines
         .map((l) => l.replace(/^\s*\d+\.\s+/, ""))
@@ -385,11 +420,30 @@ function mdToHtml(md) {
       return `<ol>${items}</ol>`;
     }
 
-    if (hasHtml) return block;
+    // Handle table detection (basic)
+    if (lines.some(l => l.includes("|"))) {
+      const tableLines = lines.filter(l => l.includes("|"));
+      if (tableLines.length >= 2) {
+        let tableHtml = "<table>";
+        tableLines.forEach((line, index) => {
+          if (index === 1 && line.match(/^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/)) {
+            return; // Skip separator line
+          }
+          const cells = line.split("|").map(cell => cell.trim()).filter(cell => cell !== "");
+          const tag = index === 0 ? "th" : "td";
+          const row = cells.map(cell => `<${tag}>${inline(cell)}</${tag}>`).join("");
+          tableHtml += `<tr>${row}</tr>`;
+        });
+        tableHtml += "</table>";
+        return tableHtml;
+      }
+    }
+
+    // Regular paragraph
     return `<p>${inline(block).replace(/\n/g, "<br/>")}</p>`;
   });
 
-  return htmlBlocks.join("");
+  return htmlBlocks.filter(block => block.trim()).join("");
 }
 
 function pickBodyRaw(src) {
@@ -405,21 +459,25 @@ function pickBodyRaw(src) {
 function stripCopyHighlights(html) {
   try {
     const doc = new DOMParser().parseFromString(html || "", "text/html");
-    doc.querySelectorAll("mark").forEach((el) => {
+    
+    // Only remove specific copy-related highlights, not all styling
+    doc.querySelectorAll("mark[data-copy-highlight]").forEach((el) => {
       const parent = el.parentNode;
       if (!parent) return;
       while (el.firstChild) parent.insertBefore(el.firstChild, el);
       el.remove();
     });
+    
+    // Only remove copy-related background colors, preserve intentional styling
     doc.querySelectorAll("[style]").forEach((el) => {
       const style = el.getAttribute("style") || "";
       const cleaned = style
-        .replace(/background(?:-color)?\s*:\s*[^;]+;?/gi, "")
-        .replace(/color\s*:\s*[^;]+;?/gi, "")
+        .replace(/background(?:-color)?\s*:\s*rgba?\(255,\s*255,\s*0[^)]*\);?/gi, "")  // Only yellow highlights
         .replace(/\s*;\s*$/g, "");
       if (cleaned.trim()) el.setAttribute("style", cleaned);
-      else el.removeAttribute("style");
+      else if (cleaned !== style) el.removeAttribute("style");
     });
+    
     return doc.body.innerHTML;
   } catch {
     return html || "";
@@ -1582,7 +1640,7 @@ export default function BlogPost() {
         )}
       </main>
 
-      {/* Enhanced styles with better mobile support and fixed text selection */}
+      {/* Enhanced styles with better content rendering support */}
       <style jsx>{`
         .article-content {
           transition: all 0.3s ease;
@@ -1603,38 +1661,67 @@ export default function BlogPost() {
           color: ${themeColors.text} !important;
         }
         
+        /* Enhanced image gallery support */
         .article-content img { 
           max-width: 100%; 
           height: auto; 
-          border-radius: 0.5rem;
-          margin: 1.5rem 0;
+          border-radius: 0.75rem;
+          margin: 2rem auto;
+          display: block;
           transition: all 0.3s ease;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+          position: relative;
+          z-index: 1;
         }
         
         .article-content img:hover {
-          transform: scale(1.02);
-          box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+          transform: scale(1.03) translateY(-2px);
+          box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+          z-index: 2;
+        }
+        
+        /* Support for multiple images in sequence */
+        .article-content img + img {
+          margin-top: 1rem;
+        }
+        
+        /* Image gallery grid */
+        .article-content p > img:only-child {
+          margin: 2rem auto;
+        }
+        
+        .article-content p:has(> img) + p:has(> img) img {
+          margin-top: 1rem;
         }
         
         .article-content table { 
           width: 100%; 
           border-collapse: collapse; 
-          margin: 1.5rem 0;
-          border-radius: 0.5rem;
+          margin: 2rem 0;
+          border-radius: 0.75rem;
           overflow: hidden;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+          background-color: ${themeColors.background} !important;
         }
         
         .article-content th,
         .article-content td {
-          padding: 0.75rem;
-          border-bottom: 1px solid ${themeColors.border};
+          padding: 1rem 0.75rem;
+          border-bottom: 1px solid ${themeColors.border} !important;
+          text-align: left;
         }
         
         .article-content th {
-          background-color: ${themeColors.accent}15;
-          font-weight: 600;
+          background-color: ${themeColors.accent}15 !important;
+          font-weight: 700;
           color: ${themeColors.text} !important;
+          font-size: 0.9em;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        
+        .article-content tr:hover {
+          background-color: ${themeColors.accent}08 !important;
         }
         
         .article-content pre { 
@@ -1643,26 +1730,49 @@ export default function BlogPost() {
           color: ${themeColors.text} !important;
           padding: 1.5rem;
           border-radius: 0.75rem;
-          margin: 1.5rem 0;
+          margin: 2rem 0;
           border-left: 4px solid ${themeColors.accent};
-          box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+          font-family: 'Fira Code', 'Monaco', 'Consolas', monospace !important;
+          font-size: 0.9em;
+          line-height: 1.6;
         }
         
         .article-content code {
           background-color: ${themeColors.code} !important;
           color: ${themeColors.text} !important;
-          padding: 0.25rem 0.5rem;
-          border-radius: 0.25rem;
-          font-size: 0.9em;
+          padding: 0.3rem 0.6rem;
+          border-radius: 0.4rem;
+          font-size: 0.88em;
+          font-family: 'Fira Code', 'Monaco', 'Consolas', monospace !important;
+          font-weight: 500;
+        }
+        
+        .article-content pre code {
+          background: none !important;
+          padding: 0;
+          border-radius: 0;
         }
         
         .article-content blockquote {
           border-left: 4px solid ${themeColors.accent};
-          margin: 1.5rem 0;
-          padding: 1rem 1.5rem;
-          background-color: ${themeColors.accent}10;
-          border-radius: 0 0.5rem 0.5rem 0;
+          margin: 2rem 0;
+          padding: 1.5rem 2rem;
+          background-color: ${themeColors.accent}08;
+          border-radius: 0 0.75rem 0.75rem 0;
           font-style: italic;
+          position: relative;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        }
+        
+        .article-content blockquote::before {
+          content: '"';
+          font-size: 4rem;
+          color: ${themeColors.accent}40;
+          position: absolute;
+          top: -0.5rem;
+          left: 1rem;
+          font-family: Georgia, serif;
         }
         
         .article-content h1,
@@ -1672,22 +1782,30 @@ export default function BlogPost() {
         .article-content h5,
         .article-content h6 {
           color: ${themeColors.text} !important;
-          margin: 2rem 0 1rem 0;
+          margin: 3rem 0 1.5rem 0;
           font-weight: 700;
           line-height: 1.3;
-          scroll-margin-top: 5rem;
+          scroll-margin-top: 6rem;
+          position: relative;
         }
         
-        .article-content h1 { font-size: 2.5rem; }
+        .article-content h1 { font-size: 2.5rem; margin-top: 4rem; }
         .article-content h2 { 
           font-size: 2rem; 
           border-bottom: 2px solid ${themeColors.border};
-          padding-bottom: 0.5rem;
+          padding-bottom: 0.75rem;
+          margin-bottom: 2rem;
         }
         .article-content h3 { font-size: 1.75rem; }
         .article-content h4 { font-size: 1.5rem; }
         .article-content h5 { font-size: 1.25rem; }
         .article-content h6 { font-size: 1.1rem; }
+        
+        .article-content h1:first-child,
+        .article-content h2:first-child,
+        .article-content h3:first-child {
+          margin-top: 0;
+        }
         
         .article-content p {
           margin-bottom: ${paragraphSpacing}em;
@@ -1695,6 +1813,7 @@ export default function BlogPost() {
           color: ${themeColors.text} !important;
           text-align: justify;
           hyphens: auto;
+          word-wrap: break-word;
         }
         
         .article-content ul,
@@ -1703,24 +1822,92 @@ export default function BlogPost() {
           padding-left: 2rem;
         }
         
-        .article-content li {
-          margin-bottom: 0.5rem;
+        .article-content ul {
+          list-style-type: none;
+          position: relative;
+        }
+        
+        .article-content ul li {
+          position: relative;
+          margin-bottom: 0.75rem;
+          padding-left: 1.5rem;
           color: ${themeColors.text} !important;
+          line-height: 1.6;
+        }
+        
+        .article-content ul li::before {
+          content: '•';
+          color: inherit; /* Inherit color from parent/list item instead of forcing accent color */
+          font-size: 1.2em;
+          font-weight: bold;
+          position: absolute;
+          left: 0;
+          top: 0;
+        }
+        
+        /* Only apply accent color to bullets if no specific color is set */
+        .article-content ul:not([style*="color"]) li:not([style*="color"]) li::before {
+          color: ${themeColors.accent};
+        }
+        
+        .article-content ol li {
+          margin-bottom: 0.75rem;
+          color: ${themeColors.text} !important;
+          line-height: 1.6;
+        }
+        
+        .article-content ol {
+          counter-reset: custom-counter;
+        }
+        
+        .article-content ol li {
+          counter-increment: custom-counter;
+          position: relative;
+          padding-left: 1rem;
+        }
+        
+        .article-content ol li::marker {
+          color: ${themeColors.accent};
+          font-weight: bold;
         }
         
         .article-content a {
           color: ${themeColors.accent} !important;
           text-decoration: underline;
           text-decoration-color: ${themeColors.accent}40;
-          text-underline-offset: 2px;
+          text-underline-offset: 3px;
+          text-decoration-thickness: 2px;
           transition: all 0.2s ease;
+          font-weight: 500;
         }
         
         .article-content a:hover {
           text-decoration-color: ${themeColors.accent};
           background-color: ${themeColors.accent}15;
-          padding: 0.1rem 0.2rem;
-          border-radius: 0.25rem;
+          padding: 0.2rem 0.4rem;
+          border-radius: 0.4rem;
+          transform: translateY(-1px);
+        }
+        
+        .article-content hr {
+          border: none;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, ${themeColors.accent}40, transparent);
+          margin: 3rem 0;
+        }
+        
+        .article-content mark {
+          background-color: ${themeColors.accent}25 !important;
+          color: ${themeColors.text} !important;
+          padding: 0.2rem 0.4rem;
+          border-radius: 0.3rem;
+          font-weight: 500;
+        }
+        
+        .article-content del {
+          color: ${themeColors.secondary} !important;
+          text-decoration: line-through;
+          opacity: 0.7;
         }
         
         .line-clamp-2 {
@@ -1799,7 +1986,7 @@ function EnhancedTOC({ tableOfContents, activeHeading, onClose, themeColors }) {
                 backgroundColor: `${themeColors.accent}10`
               }}
             >
-              ✕
+              <Icons.X size={16} />
             </button>
           </div>
         </div>
