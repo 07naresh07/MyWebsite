@@ -1094,6 +1094,7 @@ export default function ProjectsAdd() {
     else setDateError("");
   }, [form.startYM, form.endYM]);
 
+  // FIXED handleSubmit function
   const handleSubmit = useCallback(async (e) => {
     e?.preventDefault();
     setForbidden(false);
@@ -1130,12 +1131,9 @@ export default function ProjectsAdd() {
         startDate: form.startYM || "",
         endDate: form.endYM ? form.endYM : null,
         status: form.status,
+        // FIXED: Always include links property - set to null when URL is removed
+        links: siteUrl ? { url: siteUrl } : null,
       };
-
-      // Include `links` only if a valid URL was provided (URL optional for add & edit)
-      if (siteUrl) {
-        payload.links = { url: siteUrl };
-      }
 
       if (!payload.name) throw new Error("Name is required");
 

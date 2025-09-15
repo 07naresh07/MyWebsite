@@ -7,7 +7,7 @@ import { useOwnerMode } from "../lib/owner.js";
 
 /* -------------------- Enhanced Font Loading -------------------- */
 const fontLink = document.createElement('link');
-fontLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap';
+fontLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@400;500;600;700;800&family=Geist:wght@300;400;500;600;700&display=swap';
 fontLink.rel = 'stylesheet';
 document.head.appendChild(fontLink);
 
@@ -110,67 +110,76 @@ const LEVEL_RANK = Object.fromEntries(LEVEL_ORDER.map((l, i) => [l.toLowerCase()
 
 const LEVEL_COLORS = {
   "PhD": { 
-    bg: "from-violet-600 via-purple-600 to-indigo-700", 
-    text: "text-violet-100", 
-    border: "border-violet-400",
-    shadow: "shadow-violet-500/25",
-    glow: "shadow-violet-500/50"
+    bg: "from-purple-600 via-violet-600 to-indigo-600", 
+    text: "text-purple-100", 
+    border: "border-purple-400",
+    shadow: "shadow-purple-500/30",
+    glow: "shadow-purple-500/60",
+    accent: "bg-purple-500"
   },
   "MPhil": { 
-    bg: "from-indigo-600 via-blue-600 to-purple-700", 
+    bg: "from-indigo-600 via-blue-600 to-cyan-600", 
     text: "text-indigo-100", 
     border: "border-indigo-400",
-    shadow: "shadow-indigo-500/25",
-    glow: "shadow-indigo-500/50"
+    shadow: "shadow-indigo-500/30",
+    glow: "shadow-indigo-500/60",
+    accent: "bg-indigo-500"
   },
   "Master": { 
-    bg: "from-blue-600 via-cyan-600 to-indigo-700", 
+    bg: "from-blue-600 via-sky-600 to-cyan-600", 
     text: "text-blue-100", 
     border: "border-blue-400",
-    shadow: "shadow-blue-500/25",
-    glow: "shadow-blue-500/50"
+    shadow: "shadow-blue-500/30",
+    glow: "shadow-blue-500/60",
+    accent: "bg-blue-500"
   },
   "Bachelor": { 
-    bg: "from-emerald-600 via-teal-600 to-cyan-700", 
+    bg: "from-emerald-600 via-green-600 to-teal-600", 
     text: "text-emerald-100", 
     border: "border-emerald-400",
-    shadow: "shadow-emerald-500/25",
-    glow: "shadow-emerald-500/50"
+    shadow: "shadow-emerald-500/30",
+    glow: "shadow-emerald-500/60",
+    accent: "bg-emerald-500"
   },
   "Diploma/Certificate": { 
     bg: "from-amber-600 via-orange-600 to-red-600", 
     text: "text-amber-100", 
     border: "border-amber-400",
-    shadow: "shadow-amber-500/25",
-    glow: "shadow-amber-500/50"
+    shadow: "shadow-amber-500/30",
+    glow: "shadow-amber-500/60",
+    accent: "bg-amber-500"
   },
   "High School": { 
-    bg: "from-green-600 via-emerald-600 to-teal-600", 
-    text: "text-green-100", 
-    border: "border-green-400",
-    shadow: "shadow-green-500/25",
-    glow: "shadow-green-500/50"
-  },
-  "Secondary School": { 
     bg: "from-lime-600 via-green-600 to-emerald-600", 
     text: "text-lime-100", 
     border: "border-lime-400",
-    shadow: "shadow-lime-500/25",
-    glow: "shadow-lime-500/50"
+    shadow: "shadow-lime-500/30",
+    glow: "shadow-lime-500/60",
+    accent: "bg-lime-500"
   },
-  "Primary School": { 
-    bg: "from-yellow-500 via-amber-600 to-orange-600", 
+  "Secondary School": { 
+    bg: "from-yellow-600 via-lime-600 to-green-600", 
     text: "text-yellow-100", 
     border: "border-yellow-400",
-    shadow: "shadow-yellow-500/25",
-    glow: "shadow-yellow-500/50"
+    shadow: "shadow-yellow-500/30",
+    glow: "shadow-yellow-500/60",
+    accent: "bg-yellow-500"
+  },
+  "Primary School": { 
+    bg: "from-orange-500 via-red-500 to-pink-500", 
+    text: "text-orange-100", 
+    border: "border-orange-400",
+    shadow: "shadow-orange-500/30",
+    glow: "shadow-orange-500/60",
+    accent: "bg-orange-500"
   },
   "Other": { 
     bg: "from-slate-600 via-gray-700 to-zinc-700", 
     text: "text-slate-100", 
     border: "border-slate-400",
-    shadow: "shadow-slate-500/25",
-    glow: "shadow-slate-500/50"
+    shadow: "shadow-slate-500/30",
+    glow: "shadow-slate-500/60",
+    accent: "bg-slate-500"
   }
 };
 
@@ -336,18 +345,22 @@ const Icons = {
       <path strokeWidth="2.5" strokeLinecap="round" d="M12 2v20M8 4l-4 4 4 4M16 12l4 4-4 4"/>
     </svg>
   ),
-  bento: (cls="w-5 h-5") => (
+  grid: (cls="w-5 h-5") => (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      <rect x="3" y="3" width="8" height="8" rx="2" strokeWidth="2"/>
-      <rect x="13" y="3" width="8" height="8" rx="2" strokeWidth="2"/>
-      <rect x="3" y="13" width="8" height="8" rx="2" strokeWidth="2"/>
-      <rect x="13" y="13" width="8" height="8" rx="2" strokeWidth="2"/>
+      <rect x="3" y="3" width="7" height="7" rx="1" strokeWidth="2"/>
+      <rect x="14" y="3" width="7" height="7" rx="1" strokeWidth="2"/>
+      <rect x="3" y="14" width="7" height="7" rx="1" strokeWidth="2"/>
+      <rect x="14" y="14" width="7" height="7" rx="1" strokeWidth="2"/>
     </svg>
   ),
-  card: (cls="w-5 h-5") => (
+  list: (cls="w-5 h-5") => (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      <rect x="4" y="4" width="16" height="16" rx="3" strokeWidth="2"/>
-      <path strokeWidth="2" d="M4 10h16M10 14h4"/>
+      <line x1="8" y1="6" x2="21" y2="6" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="8" y1="12" x2="21" y2="12" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="8" y1="18" x2="21" y2="18" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="3" y1="6" x2="3.01" y2="6" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="3" y1="12" x2="3.01" y2="12" strokeWidth="2" strokeLinecap="round"/>
+      <line x1="3" y1="18" x2="3.01" y2="18" strokeWidth="2" strokeLinecap="round"/>
     </svg>
   ),
   stats: (cls="w-5 h-5") => (
@@ -419,6 +432,23 @@ const Icons = {
       <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
+  clock: (cls="w-4 h-4") => (
+    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <circle cx="12" cy="12" r="10" strokeWidth="2"/>
+      <path d="M12 6v6l4 2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  star: (cls="w-4 h-4") => (
+    <svg className={cls} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+    </svg>
+  ),
+  building: (cls="w-4 h-4") => (
+    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <path strokeWidth="2" d="M6 22V4a2 2 0 012-2h8a2 2 0 012 2v18ZM6 12H4a2 2 0 00-2 2v8h20v-8a2 2 0 00-2-2h-2"/>
+      <path strokeWidth="2" d="M18 9h4v13M10 6h4M10 10h4M10 14h4M10 18h4"/>
+    </svg>
+  ),
 };
 
 /* -------------------- Enhanced Stats Dashboard -------------------- */
@@ -440,80 +470,86 @@ function EducationStats({ items, darkMode }) {
   }, [items]);
 
   return (
-    <div className="relative mb-12 group">
-      <div className={`relative p-8 rounded-3xl backdrop-blur-xl border transition-all duration-500 hover:scale-[1.02] ${
+    <div className="relative mb-16 group">
+      <div className={`relative overflow-hidden rounded-3xl border backdrop-blur-xl transition-all duration-700 hover:scale-105 ${
         darkMode 
-          ? "bg-slate-900/80 border-slate-700/50 shadow-2xl shadow-slate-900/25" 
-          : "bg-white/90 border-white/60 shadow-2xl shadow-indigo-500/10"
+          ? "bg-slate-900/70 border-slate-700/50 shadow-2xl shadow-slate-900/50" 
+          : "bg-white/80 border-white/80 shadow-2xl shadow-gray-900/10"
       }`}>
         {/* Animated background gradient */}
-        <div className={`absolute inset-0 rounded-3xl opacity-60 transition-opacity duration-500 group-hover:opacity-80 ${
-          darkMode 
-            ? "bg-gradient-to-br from-violet-900/20 via-blue-900/20 to-cyan-900/20" 
-            : "bg-gradient-to-br from-violet-500/10 via-blue-500/10 to-cyan-500/10"
-        }`} />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-pink-500/5 opacity-60 group-hover:opacity-80 transition-opacity duration-700" />
         
-        <div className="relative">
-          <div className="text-center mb-8">
-            <h2 className={`text-2xl font-bold font-['Playfair_Display'] ${
-              darkMode ? "text-white" : "text-gray-900"
+        <div className="relative p-8 lg:p-12">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-3 mb-4">
+              <div className="p-3 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
+                {Icons.stats("w-6 h-6 text-white")}
+              </div>
+              <h2 className={`text-3xl lg:text-4xl font-bold font-['Playfair_Display'] ${
+                darkMode ? "text-white" : "text-gray-900"
+              }`}>
+                Academic Overview
+              </h2>
+            </div>
+            <p className={`text-lg font-medium font-['Geist'] ${
+              darkMode ? "text-slate-300" : "text-gray-600"
             }`}>
-              Education Overview
-            </h2>
-            <p className={`text-sm font-medium ${
-              darkMode ? "text-slate-400" : "text-gray-600"
-            }`}>
-              Your academic journey at a glance
+              Your educational journey at a glance
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 lg:gap-8">
             {[
               { 
-                icon: Icons.calendar, 
-                label: "Total Study Time", 
-                value: stats.totalStudyLabel, 
-                gradient: "from-blue-500 via-cyan-500 to-teal-500",
-                bgGradient: darkMode ? "from-blue-900/20 to-cyan-900/20" : "from-blue-50 to-cyan-50"
+                icon: Icons.clock, 
+                label: "Total Duration", 
+                value: stats.totalStudyLabel,
+                description: "Years of education",
+                gradient: "from-blue-500 to-cyan-500",
+                bgGradient: darkMode ? "from-blue-500/10 to-cyan-500/10" : "from-blue-50 to-cyan-50"
               },
               { 
                 icon: Icons.trophy, 
-                label: "Highest Degree", 
-                value: stats.highestLevel, 
-                gradient: "from-violet-500 via-purple-500 to-indigo-500",
-                bgGradient: darkMode ? "from-violet-900/20 to-indigo-900/20" : "from-violet-50 to-indigo-50"
+                label: "Highest Level", 
+                value: stats.highestLevel,
+                description: "Academic achievement",
+                gradient: "from-purple-500 to-pink-500",
+                bgGradient: darkMode ? "from-purple-500/10 to-pink-500/10" : "from-purple-50 to-pink-50"
               },
               { 
                 icon: Icons.book, 
-                label: "Ongoing Studies", 
-                value: stats.currentCount, 
-                gradient: "from-emerald-500 via-green-500 to-teal-500",
-                bgGradient: darkMode ? "from-emerald-900/20 to-teal-900/20" : "from-emerald-50 to-teal-50"
+                label: "Currently Studying", 
+                value: stats.currentCount,
+                description: "Ongoing programs",
+                gradient: "from-emerald-500 to-green-500",
+                bgGradient: darkMode ? "from-emerald-500/10 to-green-500/10" : "from-emerald-50 to-green-50"
               },
               { 
                 icon: Icons.certificate, 
                 label: "Completed", 
-                value: stats.completedCount, 
-                gradient: "from-amber-500 via-orange-500 to-red-500",
-                bgGradient: darkMode ? "from-amber-900/20 to-red-900/20" : "from-amber-50 to-red-50"
+                value: stats.completedCount,
+                description: "Finished programs",
+                gradient: "from-amber-500 to-orange-500",
+                bgGradient: darkMode ? "from-amber-500/10 to-orange-500/10" : "from-amber-50 to-orange-50"
               },
               { 
-                icon: Icons.school, 
+                icon: Icons.building, 
                 label: "Institutions", 
-                value: stats.institutionsCount, 
-                gradient: "from-pink-500 via-rose-500 to-red-500",
-                bgGradient: darkMode ? "from-pink-900/20 to-red-900/20" : "from-pink-50 to-red-50"
+                value: stats.institutionsCount,
+                description: "Schools attended",
+                gradient: "from-rose-500 to-red-500",
+                bgGradient: darkMode ? "from-rose-500/10 to-red-500/10" : "from-rose-50 to-red-50"
               },
             ].map((stat, idx) => (
               <div 
                 key={idx} 
-                className={`group/stat relative overflow-hidden rounded-2xl backdrop-blur-sm border transition-all duration-500 hover:scale-110 hover:-translate-y-2 ${
+                className={`group/stat relative overflow-hidden rounded-2xl border backdrop-blur-sm transition-all duration-500 hover:scale-110 hover:-translate-y-3 ${
                   darkMode 
-                    ? "bg-slate-800/60 border-slate-700/50 hover:border-slate-600" 
-                    : "bg-white/90 border-white/60 hover:border-gray-200"
+                    ? "bg-slate-800/50 border-slate-700/50 hover:border-slate-600/70" 
+                    : "bg-white/70 border-white/70 hover:border-gray-200"
                 } p-6 cursor-pointer hover:shadow-2xl`}
                 style={{
-                  animationDelay: `${idx * 100}ms`
+                  animationDelay: `${idx * 150}ms`
                 }}
               >
                 {/* Background gradient overlay */}
@@ -523,11 +559,11 @@ function EducationStats({ items, darkMode }) {
                 <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${stat.gradient} opacity-0 group-hover/stat:opacity-20 blur-xl transition-all duration-500`} />
                 
                 <div className="relative flex flex-col items-center text-center space-y-4">
-                  <div className={`p-3 rounded-2xl bg-gradient-to-br ${stat.gradient} text-white shadow-lg group-hover/stat:shadow-2xl transition-all duration-500 group-hover/stat:scale-110`}>
+                  <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.gradient} text-white shadow-lg group-hover/stat:shadow-2xl transition-all duration-500 group-hover/stat:scale-110`}>
                     {stat.icon("w-6 h-6")}
                   </div>
                   
-                  <div className={`text-3xl font-bold font-['Space_Grotesk'] transition-all duration-500 ${
+                  <div className={`text-3xl font-bold font-['Outfit'] transition-all duration-500 ${
                     darkMode 
                       ? "text-white group-hover/stat:text-white" 
                       : "text-gray-900 group-hover/stat:text-gray-800"
@@ -535,12 +571,21 @@ function EducationStats({ items, darkMode }) {
                     {stat.value}
                   </div>
                   
-                  <div className={`text-xs font-semibold uppercase tracking-wider transition-all duration-500 ${
-                    darkMode 
-                      ? "text-slate-400 group-hover/stat:text-slate-300" 
-                      : "text-gray-600 group-hover/stat:text-gray-700"
-                  }`}>
-                    {stat.label}
+                  <div>
+                    <div className={`text-sm font-semibold font-['Geist'] uppercase tracking-wider transition-all duration-500 ${
+                      darkMode 
+                        ? "text-slate-300 group-hover/stat:text-slate-200" 
+                        : "text-gray-700 group-hover/stat:text-gray-800"
+                    }`}>
+                      {stat.label}
+                    </div>
+                    <div className={`text-xs font-medium mt-1 transition-all duration-500 ${
+                      darkMode 
+                        ? "text-slate-400 group-hover/stat:text-slate-300" 
+                        : "text-gray-500 group-hover/stat:text-gray-600"
+                    }`}>
+                      {stat.description}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -557,12 +602,12 @@ function TimelineView({ items, isOwner, onDelete, nav, darkMode }) {
   return (
     <div className="relative">
       {/* Enhanced timeline line with gradient and glow */}
-      <div className="absolute left-8 top-0 bottom-0 w-1 rounded-full overflow-hidden">
-        <div className={`absolute inset-0 bg-gradient-to-b from-violet-500 via-blue-500 via-cyan-500 to-emerald-500 ${
-          darkMode ? "opacity-80" : "opacity-90"
+      <div className="absolute left-6 top-0 bottom-0 w-0.5 rounded-full overflow-hidden">
+        <div className={`absolute inset-0 bg-gradient-to-b from-blue-500 via-purple-500 via-pink-500 to-red-500 ${
+          darkMode ? "opacity-70" : "opacity-80"
         }`} />
-        <div className={`absolute inset-0 bg-gradient-to-b from-violet-400 via-blue-400 via-cyan-400 to-emerald-400 blur-sm ${
-          darkMode ? "opacity-60" : "opacity-40"
+        <div className={`absolute inset-0 bg-gradient-to-b from-blue-400 via-purple-400 via-pink-400 to-red-400 blur-sm ${
+          darkMode ? "opacity-40" : "opacity-30"
         }`} />
       </div>
       
@@ -575,7 +620,6 @@ function TimelineView({ items, isOwner, onDelete, nav, darkMode }) {
         const startLabel = formatYM(it, "start", true);
         const endLabel = getYM(it, "end").y == null ? "Present" : formatYM(it, "end", true);
         const dur = humanDurationObj(it);
-        const detailsHtml = renderDetailsHTML(it);
         const levelDisplay = displayLevelName(it);
         const levelColor = LEVEL_COLORS[levelDisplay] || LEVEL_COLORS["Other"];
         const gpa = String(it.gpa ?? it.grade ?? "").trim();
@@ -589,83 +633,85 @@ function TimelineView({ items, isOwner, onDelete, nav, darkMode }) {
         return (
           <Reveal key={String(id)}>
             <div 
-              className="relative flex items-start mb-16 group/timeline animate-fadeInUp"
+              className="relative flex items-start mb-12 group/timeline animate-fadeInUp"
               style={{
-                animationDelay: `${idx * 200}ms`,
+                animationDelay: `${idx * 150}ms`,
               }}
             >
               {/* Enhanced timeline dot with pulsing animation for ongoing */}
-              <div className="absolute left-4 top-8">
-                <div className={`relative w-8 h-8 rounded-full border-4 ${
+              <div className="absolute left-3 top-6 z-10">
+                <div className={`relative w-6 h-6 rounded-full border-3 ${
                   darkMode ? "border-slate-900" : "border-white"
-                } shadow-xl z-20 overflow-hidden`}>
+                } shadow-lg overflow-hidden`}>
                   <div className={`absolute inset-0 bg-gradient-to-br ${levelColor.bg} ${
                     isOngoing ? "animate-pulse" : ""
                   }`} />
                   {isOngoing && (
-                    <div className={`absolute inset-0 bg-gradient-to-br ${levelColor.bg} animate-ping opacity-75`} />
+                    <div className={`absolute inset-0 bg-gradient-to-br ${levelColor.bg} animate-ping opacity-60`} />
                   )}
                 </div>
                 {/* Glowing ring effect */}
-                <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${levelColor.bg} opacity-30 blur-md scale-150 ${
+                <div className={`absolute inset-0 rounded-full bg-gradient-to-br ${levelColor.bg} opacity-20 blur-md scale-125 ${
                   isOngoing ? "animate-pulse" : ""
                 }`} />
               </div>
               
               {/* Enhanced content card */}
-              <div className={`ml-24 flex-1 rounded-3xl border-2 transition-all duration-700 hover:scale-[1.02] hover:-translate-y-2 backdrop-blur-xl ${
+              <div className={`ml-16 flex-1 rounded-2xl border backdrop-blur-xl transition-all duration-500 hover:scale-102 hover:-translate-y-1 ${
                 darkMode 
-                  ? "bg-slate-800/90 border-slate-700/50 hover:border-slate-600 shadow-2xl shadow-slate-900/25" 
-                  : "bg-white/95 border-gray-200/50 hover:border-indigo-300 shadow-2xl shadow-indigo-500/10"
-              } group-hover/timeline:shadow-3xl overflow-hidden relative`}>
+                  ? "bg-slate-800/90 border-slate-700/60 hover:border-slate-600 shadow-xl shadow-slate-900/30" 
+                  : "bg-white/95 border-white/90 hover:border-gray-200 shadow-xl shadow-gray-900/8"
+              } group-hover/timeline:shadow-2xl overflow-hidden relative`}>
                 
                 {/* Animated gradient overlay */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${levelColor.bg} opacity-0 group-hover/timeline:opacity-5 transition-opacity duration-700`} />
+                <div className={`absolute inset-0 bg-gradient-to-br ${levelColor.bg} opacity-0 group-hover/timeline:opacity-3 transition-opacity duration-500`} />
                 
-                <div className="relative p-8">
+                <div className="relative p-6">
                   {/* Header section */}
-                  <div className="flex justify-between items-start mb-6">
+                  <div className="flex justify-between items-start mb-5">
                     <div className="flex-1">
                       {/* Level and status badges */}
-                      <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center gap-2 mb-4">
                         {levelDisplay && (
-                          <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-gradient-to-r ${levelColor.bg} text-white shadow-lg ${levelColor.shadow} transition-all duration-500 hover:shadow-xl hover:scale-105`}>
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r ${levelColor.bg} text-white shadow-md transition-all duration-300 hover:shadow-lg hover:scale-105`}>
                             {levelDisplay}
                           </span>
                         )}
                         {isOngoing && (
-                          <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-gradient-to-r from-emerald-500 to-green-500 text-white animate-pulse shadow-lg shadow-emerald-500/25">
-                            <span className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></span>
-                            Ongoing
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-emerald-500 to-green-500 text-white animate-pulse shadow-md shadow-emerald-500/30">
+                            <span className="w-1.5 h-1.5 bg-white rounded-full mr-1.5 animate-pulse"></span>
+                            Active
                           </span>
                         )}
                         {gpa && (
-                          <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/25">
-                            {Icons.trophy("w-4 h-4 mr-1")}
-                            GPA: {gpa}
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/30">
+                            {Icons.star("w-3 h-3 mr-1")}
+                            {gpa}
                           </span>
                         )}
                       </div>
                       
                       {/* School name with enhanced typography */}
-                      <h3 className={`text-3xl font-bold font-['Playfair_Display'] mb-3 leading-tight transition-all duration-500 group-hover/timeline:scale-105 ${
+                      <h3 className={`text-2xl font-bold font-['Playfair_Display'] mb-3 leading-tight transition-all duration-300 group-hover/timeline:scale-102 ${
                         darkMode 
-                          ? "text-white group-hover/timeline:text-violet-200" 
-                          : "text-gray-900 group-hover/timeline:text-indigo-700"
+                          ? "text-white group-hover/timeline:text-purple-200" 
+                          : "text-gray-900 group-hover/timeline:text-purple-700"
                       }`}>
                         {school}
                       </h3>
                       
-                      {/* Degree and field */}
+                      {/* Degree and field - FIXED: Removed "in" word */}
                       {(degree || field) && (
-                        <div className="mb-4">
-                          <p className={`text-xl font-semibold font-['Space_Grotesk'] ${
-                            darkMode ? "text-slate-200" : "text-gray-800"
-                          }`}>
-                            {degree}
-                          </p>
+                        <div className="mb-4 space-y-1">
+                          {degree && (
+                            <p className={`text-base font-semibold font-['Outfit'] ${
+                              darkMode ? "text-slate-200" : "text-gray-800"
+                            }`}>
+                              {degree}
+                            </p>
+                          )}
                           {field && (
-                            <p className={`text-lg font-medium ${
+                            <p className={`text-sm font-medium font-['Geist'] ${
                               darkMode ? "text-slate-300" : "text-gray-700"
                             }`}>
                               {field}
@@ -677,59 +723,59 @@ function TimelineView({ items, isOwner, onDelete, nav, darkMode }) {
                     
                     {/* Enhanced action buttons */}
                     {isOwner && (
-                      <div className="flex gap-3 opacity-0 group-hover/timeline:opacity-100 transition-all duration-500 transform translate-x-4 group-hover/timeline:translate-x-0">
+                      <div className="flex gap-2 opacity-0 group-hover/timeline:opacity-100 transition-all duration-300 transform translate-x-2 group-hover/timeline:translate-x-0">
                         <button
                           onClick={() => nav(editPath)}
-                          className={`p-3 rounded-2xl backdrop-blur-sm transition-all duration-300 hover:scale-110 shadow-lg ${
+                          className={`p-2 rounded-xl backdrop-blur-sm transition-all duration-200 hover:scale-110 shadow-md ${
                             darkMode 
                               ? "bg-slate-700/80 hover:bg-slate-600/80 text-slate-200 hover:text-white" 
                               : "bg-white/90 hover:bg-gray-50 text-gray-700 hover:text-gray-900"
-                          } hover:shadow-xl`}
+                          } hover:shadow-lg`}
                           type="button"
                         >
-                          {Icons.pencil("w-5 h-5")}
+                          {Icons.pencil("w-4 h-4")}
                         </button>
                         <button
                           onClick={() => onDelete(id)}
-                          className="p-3 rounded-2xl bg-red-500/20 backdrop-blur-sm hover:bg-red-500/30 text-red-600 dark:text-red-400 transition-all duration-300 hover:scale-110 shadow-lg hover:shadow-xl"
+                          className="p-2 rounded-xl bg-red-500/20 backdrop-blur-sm hover:bg-red-500/30 text-red-600 dark:text-red-400 transition-all duration-200 hover:scale-110 shadow-md hover:shadow-lg"
                           type="button"
                         >
-                          {Icons.trash("w-5 h-5")}
+                          {Icons.trash("w-4 h-4")}
                         </button>
                       </div>
                     )}
                   </div>
 
                   {/* Meta information with enhanced styling */}
-                  <div className={`flex flex-wrap items-center gap-6 text-sm mb-6 ${
-                    darkMode ? "text-slate-300" : "text-gray-700"
+                  <div className={`flex flex-wrap items-center gap-4 text-xs mb-5 ${
+                    darkMode ? "text-slate-400" : "text-gray-600"
                   }`}>
                     <span className="flex items-center gap-2 font-medium">
-                      {Icons.calendar("w-5 h-5 text-blue-500")}
-                      <span className="font-['JetBrains_Mono']">{startLabel} — {endLabel}</span>
+                      {Icons.calendar("w-4 h-4 text-blue-500")}
+                      <span className="font-['JetBrains_Mono'] text-sm">{startLabel} — {endLabel}</span>
                     </span>
                     {dur && (
                       <span className="flex items-center gap-2 font-medium">
-                        <span className="w-5 h-5 text-green-500">⏱️</span>
-                        <span className="font-['JetBrains_Mono']">{dur}</span>
+                        {Icons.clock("w-4 h-4 text-emerald-500")}
+                        <span className="font-['JetBrains_Mono'] text-sm">{dur}</span>
                       </span>
                     )}
                     {loc && (
                       <span className="flex items-center gap-2 font-medium">
-                        {Icons.location("w-5 h-5 text-red-500")}
-                        {loc}
+                        {Icons.location("w-4 h-4 text-red-500")}
+                        <span className="text-sm">{loc}</span>
                       </span>
                     )}
                   </div>
 
                   {/* Description with enhanced styling */}
                   {description && (
-                    <div className={`mb-6 p-5 rounded-2xl border transition-all duration-500 hover:scale-[1.02] ${
+                    <div className={`mb-5 p-4 rounded-xl border transition-all duration-300 hover:scale-102 ${
                       darkMode 
-                        ? "bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border-blue-800/50" 
-                        : "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200/50"
+                        ? "bg-gradient-to-r from-blue-900/15 to-purple-900/15 border-blue-800/40" 
+                        : "bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200/40"
                     }`}>
-                      <p className={`text-base font-medium italic leading-relaxed ${
+                      <p className={`text-sm font-medium italic leading-relaxed font-['Geist'] ${
                         darkMode ? "text-blue-200" : "text-blue-800"
                       }`}>
                         "{description}"
@@ -739,28 +785,28 @@ function TimelineView({ items, isOwner, onDelete, nav, darkMode }) {
 
                   {/* Thesis with enhanced styling */}
                   {thesis && (
-                    <div className={`mb-6 p-5 rounded-2xl border transition-all duration-500 hover:scale-[1.02] ${
+                    <div className={`p-4 rounded-xl border transition-all duration-300 hover:scale-102 ${
                       darkMode 
-                        ? "bg-gradient-to-r from-purple-900/30 to-pink-900/30 border-purple-800/50" 
-                        : "bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200/50"
+                        ? "bg-gradient-to-r from-purple-900/15 to-pink-900/15 border-purple-800/40" 
+                        : "bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200/40"
                     }`}>
                       <div className="flex items-center gap-2 mb-3">
-                        <span className="text-2xl">📝</span>
-                        <h4 className={`text-lg font-bold font-['Space_Grotesk'] ${
+                        <div className="p-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500">
+                          {Icons.book("w-4 h-4 text-white")}
+                        </div>
+                        <h4 className={`text-sm font-bold font-['Outfit'] ${
                           darkMode ? "text-purple-200" : "text-purple-800"
                         }`}>
                           Research & Thesis
                         </h4>
                       </div>
-                      <p className={`text-base leading-relaxed ${
+                      <p className={`text-sm leading-relaxed font-['Geist'] ${
                         darkMode ? "text-purple-100" : "text-purple-700"
                       }`}>
                         {thesis}
                       </p>
                     </div>
                   )}
-
-
                 </div>
               </div>
             </div>
@@ -892,145 +938,147 @@ export default function Education() {
   return (
     <div className={`min-h-screen transition-all duration-700 font-['Inter'] ${
       darkMode 
-        ? "bg-gradient-to-br from-slate-950 via-gray-900 to-slate-950 text-white" 
-        : "bg-gradient-to-br from-violet-50 via-blue-50 via-indigo-50 to-purple-50 text-gray-900"
+        ? "bg-gradient-to-br from-slate-950 via-slate-900 to-gray-950 text-white" 
+        : "bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 text-gray-900"
     }`}>
       {/* Enhanced background effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className={`absolute top-0 -left-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob ${
-          darkMode ? "bg-violet-900" : "bg-violet-300"
+        <div className={`absolute -top-20 -left-20 w-96 h-96 rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-blob ${
+          darkMode ? "bg-blue-900" : "bg-blue-300"
         }`} />
-        <div className={`absolute top-0 -right-4 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000 ${
-          darkMode ? "bg-cyan-900" : "bg-cyan-300"
+        <div className={`absolute -top-20 -right-20 w-96 h-96 rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-blob animation-delay-2000 ${
+          darkMode ? "bg-purple-900" : "bg-purple-300"
         }`} />
-        <div className={`absolute -bottom-8 left-20 w-72 h-72 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000 ${
+        <div className={`absolute -bottom-20 left-1/2 transform -translate-x-1/2 w-96 h-96 rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-blob animation-delay-4000 ${
           darkMode ? "bg-pink-900" : "bg-pink-300"
         }`} />
       </div>
 
       <div className="relative container mx-auto py-16 px-6 pb-32">
-        {/* Enhanced Header */}
+        {/* FIXED: Properly Sized Header */}
         <div className="mb-16 text-center">
           <div className="inline-block group">
-            <div className="flex items-center justify-center gap-4 mb-6">
-              <div className={`p-4 rounded-3xl bg-gradient-to-br from-violet-600 to-purple-600 shadow-2xl transform transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 ${
-                darkMode ? "shadow-violet-900/50" : "shadow-violet-500/25"
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className={`p-2 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 shadow-lg transform transition-all duration-700 group-hover:scale-110 group-hover:rotate-12 ${
+                darkMode ? "shadow-blue-900/50" : "shadow-blue-500/30"
               }`}>
-                {Icons.school("w-10 h-10 text-white")}
+                {Icons.school("w-6 h-6 text-white")}
               </div>
-              <h1 className={`text-5xl md:text-6xl lg:text-7xl font-black font-['Playfair_Display'] tracking-tight transition-all duration-500 group-hover:scale-105 ${
+              <h1 className={`text-2xl md:text-3xl lg:text-5xl font-bold font-['Playfair_Display'] tracking-tight transition-all duration-700 group-hover:scale-105 ${
                 darkMode 
-                  ? "bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent" 
-                  : "bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent"
+                  ? "bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent" 
+                  : "bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent"
               }`}>
-                Academic Journey
+                Education
               </h1>
-              <div className={`p-4 rounded-3xl bg-gradient-to-br from-indigo-600 to-blue-600 shadow-2xl transform transition-all duration-500 group-hover:scale-110 group-hover:-rotate-12 ${
-                darkMode ? "shadow-indigo-900/50" : "shadow-indigo-500/25"
+              <div className={`p-2 rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 shadow-lg transform transition-all duration-700 group-hover:scale-110 group-hover:-rotate-12 ${
+                darkMode ? "shadow-purple-900/50" : "shadow-purple-500/30"
               }`}>
-                {Icons.sparkles("w-10 h-10 text-white")}
+                {Icons.sparkles("w-6 h-6 text-white")}
               </div>
             </div>
-            <p className={`text-lg md:text-xl font-medium font-['Space_Grotesk'] transition-all duration-500 ${
+            <p className={`text-sm md:text-base font-medium font-['Geist'] transition-all duration-700 ${
               darkMode ? "text-slate-300 group-hover:text-slate-200" : "text-gray-600 group-hover:text-gray-700"
             }`}>
-              Exploring knowledge • Achieving excellence • Shaping the future
+              Building knowledge • Achieving excellence • Shaping tomorrow
             </p>
           </div>
         </div>
 
         {/* Enhanced Controls */}
-        <div className={`mb-12 p-6 md:p-8 rounded-3xl backdrop-blur-xl border-2 transition-all duration-500 hover:scale-[1.02] ${
+        <div className={`mb-16 p-8 rounded-3xl backdrop-blur-xl border transition-all duration-500 hover:scale-105 ${
           darkMode 
-            ? "bg-slate-800/60 border-slate-700/50 shadow-2xl shadow-slate-900/25" 
-            : "bg-white/80 border-white/50 shadow-2xl shadow-indigo-500/10"
+            ? "bg-slate-800/60 border-slate-700/50 shadow-2xl shadow-slate-900/50" 
+            : "bg-white/80 border-white/80 shadow-2xl shadow-gray-900/10"
         }`}>
-          <div className="flex flex-wrap items-center gap-4 justify-center md:justify-start">
+          <div className="flex flex-wrap items-center gap-6 justify-center lg:justify-between">
             {/* Enhanced Filter */}
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className={`px-4 md:px-6 py-3 md:py-4 rounded-2xl border-2 font-semibold text-sm md:text-base transition-all duration-300 focus:scale-105 ${
-                darkMode 
-                  ? "bg-slate-900/80 border-slate-700 text-white hover:border-violet-500 focus:border-violet-400" 
-                  : "bg-white/90 border-gray-200 text-gray-900 hover:border-indigo-400 focus:border-indigo-500"
-              } focus:outline-none focus:ring-4 focus:ring-violet-500/20 shadow-lg`}
-            >
-              <option value="all">🎓 All Records</option>
-              <option value="current">📚 Currently Studying</option>
-              <option value="completed">✅ Completed</option>
-            </select>
+            <div className="flex flex-wrap items-center gap-4">
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className={`px-6 py-4 rounded-2xl border-2 font-semibold text-base transition-all duration-300 focus:scale-105 ${
+                  darkMode 
+                    ? "bg-slate-900/80 border-slate-700 text-white hover:border-blue-500 focus:border-blue-400" 
+                    : "bg-white/90 border-gray-200 text-gray-900 hover:border-blue-400 focus:border-blue-500"
+                } focus:outline-none focus:ring-4 focus:ring-blue-500/20 shadow-lg font-['Geist']`}
+              >
+                <option value="all">All Records</option>
+                <option value="current">Currently Studying</option>
+                <option value="completed">Completed</option>
+              </select>
 
-            {/* Enhanced Sort */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className={`px-4 md:px-6 py-3 md:py-4 rounded-2xl border-2 font-semibold text-sm md:text-base transition-all duration-300 focus:scale-105 ${
-                darkMode 
-                  ? "bg-slate-900/80 border-slate-700 text-white hover:border-violet-500 focus:border-violet-400" 
-                  : "bg-white/90 border-gray-200 text-gray-900 hover:border-indigo-400 focus:border-indigo-500"
-              } focus:outline-none focus:ring-4 focus:ring-violet-500/20 shadow-lg`}
-            >
-              <option value="date">📅 By Date</option>
-              <option value="school">🏫 By School</option>
-              <option value="level">🏆 By Level</option>
-            </select>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className={`px-6 py-4 rounded-2xl border-2 font-semibold text-base transition-all duration-300 focus:scale-105 ${
+                  darkMode 
+                    ? "bg-slate-900/80 border-slate-700 text-white hover:border-blue-500 focus:border-blue-400" 
+                    : "bg-white/90 border-gray-200 text-gray-900 hover:border-blue-400 focus:border-blue-500"
+                } focus:outline-none focus:ring-4 focus:ring-blue-500/20 shadow-lg font-['Geist']`}
+              >
+                <option value="date">Sort by Date</option>
+                <option value="school">Sort by School</option>
+                <option value="level">Sort by Level</option>
+              </select>
+            </div>
 
             {/* Enhanced View toggles */}
-            <div className="flex gap-2 md:gap-3">
+            <div className="flex gap-3">
               {[
                 { value: "timeline", icon: Icons.timeline, label: "Timeline" },
-                { value: "bento", icon: Icons.bento, label: "Cards" },
-                { value: "card", icon: Icons.card, label: "Compact" },
+                { value: "bento", icon: Icons.grid, label: "Grid" },
+                { value: "card", icon: Icons.list, label: "List" },
               ].map((view) => (
                 <button
                   key={view.value}
                   onClick={() => setLayout(view.value)}
-                  className={`px-3 md:px-6 py-3 md:py-4 rounded-2xl border-2 font-semibold text-sm md:text-base transition-all duration-300 flex items-center gap-2 md:gap-3 hover:scale-105 shadow-lg ${
+                  className={`px-6 py-4 rounded-2xl border-2 font-semibold text-base transition-all duration-300 flex items-center gap-3 hover:scale-105 shadow-lg font-['Geist'] ${
                     layout === view.value
-                      ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white border-transparent shadow-violet-500/25"
+                      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent shadow-blue-500/30"
                       : darkMode
-                        ? "bg-slate-900/80 border-slate-700 text-slate-200 hover:border-violet-500 hover:text-white"
-                        : "bg-white/90 border-gray-200 text-gray-700 hover:border-indigo-400 hover:text-gray-900"
+                        ? "bg-slate-900/80 border-slate-700 text-slate-200 hover:border-blue-500 hover:text-white"
+                        : "bg-white/90 border-gray-200 text-gray-700 hover:border-blue-400 hover:text-gray-900"
                   }`}
                   type="button"
                 >
                   {view.icon()}
-                  <span className="hidden sm:inline font-['Space_Grotesk']">{view.label}</span>
+                  <span className="hidden sm:inline">{view.label}</span>
                 </button>
               ))}
             </div>
 
-            {/* Enhanced Stats toggle */}
-            <button
-              onClick={() => setShowStats(v => !v)}
-              className={`px-4 md:px-6 py-3 md:py-4 rounded-2xl border-2 font-semibold text-sm md:text-base transition-all duration-300 flex items-center gap-2 md:gap-3 hover:scale-105 shadow-lg ${
-                darkMode 
-                  ? "bg-slate-900/80 border-slate-700 text-slate-200 hover:border-violet-500 hover:text-white" 
-                  : "bg-white/90 border-gray-200 text-gray-700 hover:border-indigo-400 hover:text-gray-900"
-              }`}
-              type="button"
-            >
-              {Icons.stats()}
-              <span className="hidden sm:inline font-['Space_Grotesk']">{showStats ? "Hide" : "Show"} Stats</span>
-            </button>
+            {/* Enhanced Stats and Theme toggles */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowStats(v => !v)}
+                className={`px-6 py-4 rounded-2xl border-2 font-semibold text-base transition-all duration-300 flex items-center gap-3 hover:scale-105 shadow-lg font-['Geist'] ${
+                  darkMode 
+                    ? "bg-slate-900/80 border-slate-700 text-slate-200 hover:border-blue-500 hover:text-white" 
+                    : "bg-white/90 border-gray-200 text-gray-700 hover:border-blue-400 hover:text-gray-900"
+                }`}
+                type="button"
+              >
+                {Icons.stats()}
+                <span className="hidden sm:inline">{showStats ? "Hide" : "Show"} Stats</span>
+              </button>
 
-            {/* Enhanced Theme toggle */}
-            <button
-              onClick={() => setDarkMode(v => !v)}
-              className="p-3 md:p-4 rounded-2xl bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-110 group"
-              type="button"
-            >
-              <div className="transform transition-transform duration-500 group-hover:rotate-180">
-                {darkMode ? Icons.brightness("w-5 h-5") : Icons.moon("w-5 h-5")}
-              </div>
-            </button>
+              <button
+                onClick={() => setDarkMode(v => !v)}
+                className="p-4 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-110 group"
+                type="button"
+              >
+                <div className="transform transition-transform duration-500 group-hover:rotate-180">
+                  {darkMode ? Icons.brightness("w-6 h-6") : Icons.moon("w-6 h-6")}
+                </div>
+              </button>
+            </div>
           </div>
 
-          <div className={`mt-6 text-sm md:text-base font-semibold font-['JetBrains_Mono'] ${
+          <div className={`mt-6 text-base font-semibold font-['JetBrains_Mono'] ${
             darkMode ? "text-slate-300" : "text-gray-700"
           }`}>
-            Found {filteredItems.length} of {items.length} education record{items.length === 1 ? "" : "s"}
+            Showing {filteredItems.length} of {items.length} education record{items.length === 1 ? "" : "s"}
           </div>
         </div>
 
@@ -1041,7 +1089,7 @@ export default function Education() {
 
         {/* Error */}
         {err && (
-          <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400">
+          <div className="mb-8 p-6 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 font-['Geist']">
             {err}
           </div>
         )}
@@ -1068,19 +1116,19 @@ export default function Education() {
             ))}
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="text-center py-24">
-            <div className={`inline-block p-12 rounded-3xl backdrop-blur-xl ${
+          <div className="text-center py-32">
+            <div className={`inline-block p-16 rounded-3xl backdrop-blur-xl ${
               darkMode 
                 ? "bg-slate-800/60 border border-slate-700/50" 
                 : "bg-white/80 border border-white/50"
             } shadow-2xl`}>
-              {Icons.school("w-24 h-24 mx-auto mb-6 text-gray-400")}
-              <h3 className={`text-2xl md:text-3xl font-bold font-['Playfair_Display'] mb-4 ${
+              {Icons.school("w-32 h-32 mx-auto mb-8 text-gray-400")}
+              <h3 className={`text-3xl font-bold font-['Playfair_Display'] mb-6 ${
                 darkMode ? "text-white" : "text-gray-900"
               }`}>
                 {items.length === 0 ? "No Education Records" : "No Matches Found"}
               </h3>
-              <p className={`text-base md:text-lg ${
+              <p className={`text-xl font-['Geist'] ${
                 darkMode ? "text-slate-300" : "text-gray-600"
               }`}>
                 {items.length === 0 
@@ -1098,7 +1146,7 @@ export default function Education() {
             darkMode={darkMode}
           />
         ) : layout === "bento" ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-8 lg:gap-10 md:grid-cols-2 lg:grid-cols-3">
             {filteredItems.map((it, idx) => {
               const id = it.id ?? `edu-${idx}`;
               const school = it.school || it.institution || "—";
@@ -1108,7 +1156,6 @@ export default function Education() {
               const startLabel = formatYM(it, "start");
               const endLabel = getYM(it, "end").y == null ? "Present" : formatYM(it, "end");
               const dur = humanDurationObj(it);
-              const detailsHtml = renderDetailsHTML(it);
               const levelDisplay = displayLevelName(it);
               const levelColor = LEVEL_COLORS[levelDisplay] || LEVEL_COLORS["Other"];
               const gpa = String(it.gpa ?? it.grade ?? "").trim();
@@ -1117,47 +1164,58 @@ export default function Education() {
               const editPath = isCertificate(it) 
                 ? `/certificates/edit/${encodeURIComponent(id)}`
                 : `/education/edit/${encodeURIComponent(id)}`;
+              const isOngoing = getYM(it, "end").y == null;
 
               return (
                 <Reveal key={String(id)}>
-                  <div className={`group relative h-full rounded-3xl border-2 p-6 transition-all duration-500 hover:scale-105 hover:-translate-y-2 backdrop-blur-xl ${
+                  <div className={`group relative h-full rounded-3xl border p-8 transition-all duration-700 hover:scale-105 hover:-translate-y-3 backdrop-blur-xl ${
                     darkMode 
-                      ? "bg-slate-800/90 border-slate-700/50 hover:border-slate-600 shadow-2xl shadow-slate-900/25" 
-                      : "bg-white/95 border-gray-200/50 hover:border-indigo-300 shadow-2xl shadow-indigo-500/10"
+                      ? "bg-slate-800/80 border-slate-700/50 hover:border-slate-600 shadow-2xl shadow-slate-900/40" 
+                      : "bg-white/90 border-white/80 hover:border-gray-200 shadow-2xl shadow-gray-900/10"
                   } animate-fadeInUp overflow-hidden`}
                     style={{
                       animationDelay: `${idx * 150}ms`,
                     }}
                   >
                     {/* Gradient overlay on hover */}
-                    <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${levelColor.bg} opacity-0 group-hover:opacity-5 transition-opacity duration-500`} />
+                    <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${levelColor.bg} opacity-0 group-hover:opacity-5 transition-opacity duration-700`} />
                     
                     {/* Content */}
                     <div className="relative h-full flex flex-col">
-                      {/* Level badge */}
-                      {levelDisplay && (
-                        <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r ${levelColor.bg} text-white mb-4 shadow-lg self-start`}>
-                          {levelDisplay}
-                        </div>
-                      )}
+                      {/* Level badge and status */}
+                      <div className="flex items-center justify-between mb-6">
+                        {levelDisplay && (
+                          <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-gradient-to-r ${levelColor.bg} text-white shadow-lg`}>
+                            {levelDisplay}
+                          </div>
+                        )}
+                        {isOngoing && (
+                          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-emerald-500 to-green-500 text-white animate-pulse">
+                            <span className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></span>
+                            Active
+                          </div>
+                        )}
+                      </div>
 
                       {/* School name */}
-                      <h3 className={`text-xl font-bold font-['Playfair_Display'] mb-3 line-clamp-2 transition-colors duration-300 ${
-                        darkMode ? "text-white group-hover:text-violet-200" : "text-gray-900 group-hover:text-indigo-700"
+                      <h3 className={`text-2xl font-bold font-['Playfair_Display'] mb-4 line-clamp-2 transition-colors duration-500 ${
+                        darkMode ? "text-white group-hover:text-purple-200" : "text-gray-900 group-hover:text-purple-700"
                       }`}>
                         {school}
                       </h3>
 
-                      {/* Degree & Field */}
+                      {/* Degree & Field - FIXED: Removed "in" word */}
                       {(degree || field) && (
-                        <div className="mb-4">
-                          <p className={`text-sm font-semibold font-['Space_Grotesk'] ${
-                            darkMode ? "text-slate-200" : "text-gray-800"
-                          }`}>
-                            {degree}
-                          </p>
+                        <div className="mb-6 space-y-2">
+                          {degree && (
+                            <p className={`text-lg font-semibold font-['Outfit'] ${
+                              darkMode ? "text-slate-200" : "text-gray-800"
+                            }`}>
+                              {degree}
+                            </p>
+                          )}
                           {field && (
-                            <p className={`text-sm font-medium ${
+                            <p className={`text-base font-medium font-['Geist'] ${
                               darkMode ? "text-slate-300" : "text-gray-700"
                             }`}>
                               {field}
@@ -1166,9 +1224,34 @@ export default function Education() {
                         </div>
                       )}
 
+                      {/* Thesis */}
+                      {thesis && (
+                        <div className={`mb-4 p-3 rounded-xl border transition-all duration-300 hover:scale-102 ${
+                          darkMode 
+                            ? "bg-purple-900/20 border-purple-800/40" 
+                            : "bg-purple-50 border-purple-200/40"
+                        }`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="p-1 rounded bg-gradient-to-r from-purple-500 to-pink-500">
+                              {Icons.book("w-3 h-3 text-white")}
+                            </div>
+                            <span className={`text-xs font-semibold ${
+                              darkMode ? "text-purple-200" : "text-purple-800"
+                            }`}>
+                              Research
+                            </span>
+                          </div>
+                          <p className={`text-sm leading-relaxed font-['Geist'] line-clamp-2 ${
+                            darkMode ? "text-purple-100" : "text-purple-700"
+                          }`}>
+                            {thesis}
+                          </p>
+                        </div>
+                      )}
+
                       {/* Description */}
                       {description && (
-                        <p className={`text-sm leading-relaxed italic line-clamp-3 mb-4 ${
+                        <p className={`text-sm leading-relaxed italic line-clamp-3 mb-6 font-['Geist'] ${
                           darkMode ? "text-slate-300" : "text-gray-700"
                         }`}>
                           "{description}"
@@ -1176,25 +1259,26 @@ export default function Education() {
                       )}
 
                       {/* Meta info - pushed to bottom */}
-                      <div className="mt-auto space-y-3">
+                      <div className="mt-auto space-y-4">
                         {/* Date & Duration */}
-                        <div className={`flex items-center gap-2 text-xs font-medium ${
+                        <div className={`flex items-center gap-3 text-sm font-medium font-['JetBrains_Mono'] ${
                           darkMode ? "text-slate-400" : "text-gray-600"
                         }`}>
-                          {Icons.calendar("w-3 h-3 text-blue-500")}
-                          <span className="font-['JetBrains_Mono']">{startLabel} — {endLabel}</span>
-                          {dur && <span className="text-green-500">({dur})</span>}
+                          {Icons.calendar("w-4 h-4 text-blue-500")}
+                          <span>{startLabel} — {endLabel}</span>
+                          {dur && <span className="text-emerald-500">({dur})</span>}
                         </div>
 
                         {/* GPA, Location */}
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-3">
                           {gpa && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                            <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                              {Icons.star("w-3 h-3 mr-1")}
                               GPA: {gpa}
                             </span>
                           )}
                           {loc && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
+                            <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-medium ${
                               darkMode ? "bg-slate-700/50 text-slate-300" : "bg-gray-100 text-gray-700"
                             }`}>
                               {Icons.location("w-3 h-3")}
@@ -1206,10 +1290,10 @@ export default function Education() {
 
                       {/* Actions */}
                       {isOwner && (
-                        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
+                        <div className="absolute top-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-x-4 group-hover:translate-x-0">
                           <button
                             onClick={() => nav(editPath)}
-                            className={`p-2 rounded-xl backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 ${
+                            className={`p-3 rounded-xl backdrop-blur-sm shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 ${
                               darkMode ? "bg-slate-700/80 text-slate-200" : "bg-white/90 text-gray-700"
                             }`}
                             type="button"
@@ -1218,7 +1302,7 @@ export default function Education() {
                           </button>
                           <button
                             onClick={() => onDelete(id)}
-                            className="p-2 rounded-xl bg-red-500/20 backdrop-blur-sm text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-all duration-300 hover:scale-110 shadow-lg"
+                            className="p-3 rounded-xl bg-red-500/20 backdrop-blur-sm text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-all duration-300 hover:scale-110 shadow-lg"
                             type="button"
                           >
                             {Icons.trash()}
@@ -1232,8 +1316,8 @@ export default function Education() {
             })}
           </div>
         ) : (
-          /* Compact Card View */
-          <div className="space-y-4">
+          /* Compact Card View - FIXED: Removed "in" word */
+          <div className="space-y-6">
             {filteredItems.map((it, idx) => {
               const id = it.id ?? `edu-${idx}`;
               const school = it.school || it.institution || "—";
@@ -1244,6 +1328,8 @@ export default function Education() {
               const levelDisplay = displayLevelName(it);
               const levelColor = LEVEL_COLORS[levelDisplay] || LEVEL_COLORS["Other"];
               const gpa = String(it.gpa ?? it.grade ?? "").trim();
+              const thesis = String(it.thesis ?? "").trim();
+              const isOngoing = getYM(it, "end").y == null;
               const editPath = isCertificate(it) 
                 ? `/certificates/edit/${encodeURIComponent(id)}`
                 : `/education/edit/${encodeURIComponent(id)}`;
@@ -1251,53 +1337,80 @@ export default function Education() {
               return (
                 <div 
                   key={String(id)} 
-                  className={`group flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg backdrop-blur-sm ${
+                  className={`group flex items-center gap-6 p-6 rounded-2xl border-2 transition-all duration-500 hover:scale-105 hover:shadow-xl backdrop-blur-sm ${
                     darkMode 
                       ? "bg-slate-800/60 border-slate-700/50 hover:border-slate-600" 
-                      : "bg-white/80 border-gray-200/50 hover:border-indigo-300"
+                      : "bg-white/80 border-white/80 hover:border-gray-200"
                   } animate-fadeInUp`}
                   style={{
                     animationDelay: `${idx * 100}ms`,
                   }}
                 >
                   {/* Level indicator */}
-                  <div className={`w-2 h-16 rounded-full bg-gradient-to-b ${levelColor.bg} flex-shrink-0`} />
+                  <div className={`w-2 h-20 rounded-full bg-gradient-to-b ${levelColor.bg} flex-shrink-0 ${
+                    isOngoing ? "animate-pulse" : ""
+                  }`} />
                   
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className={`font-bold font-['Space_Grotesk'] text-lg truncate ${
+                    <div className="flex items-center gap-4 mb-2">
+                      <h3 className={`font-bold font-['Outfit'] text-xl truncate ${
                         darkMode ? "text-white" : "text-gray-900"
                       }`}>
                         {school}
                       </h3>
                       {levelDisplay && (
-                        <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold bg-gradient-to-r ${levelColor.bg} text-white flex-shrink-0`}>
+                        <span className={`px-3 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r ${levelColor.bg} text-white flex-shrink-0`}>
                           {levelDisplay}
                         </span>
                       )}
+                      {isOngoing && (
+                        <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r from-emerald-500 to-green-500 text-white animate-pulse flex-shrink-0">
+                          Active
+                        </span>
+                      )}
                       {gpa && (
-                        <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold flex-shrink-0 ${
+                        <span className={`px-3 py-1 rounded-lg text-xs font-semibold flex-shrink-0 ${
                           darkMode ? "bg-amber-900/30 text-amber-300" : "bg-amber-100 text-amber-700"
                         }`}>
                           GPA: {gpa}
                         </span>
                       )}
                     </div>
-                    <p className={`text-sm truncate ${
+                    <p className={`text-base truncate font-['Geist'] ${
                       darkMode ? "text-slate-200" : "text-gray-700"
                     }`}>
                       {degree} {field && degree && "•"} {field} • 
-                      <span className="font-['JetBrains_Mono'] ml-1">{startLabel} — {endLabel}</span>
+                      <span className="font-['JetBrains_Mono'] ml-2">{startLabel} — {endLabel}</span>
                     </p>
+                    {/* Thesis in compact view */}
+                    {thesis && (
+                      <div className="mt-2">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="p-0.5 rounded bg-gradient-to-r from-purple-500 to-pink-500">
+                            {Icons.book("w-3 h-3 text-white")}
+                          </div>
+                          <span className={`text-xs font-semibold ${
+                            darkMode ? "text-purple-300" : "text-purple-700"
+                          }`}>
+                            Research
+                          </span>
+                        </div>
+                        <p className={`text-sm truncate font-['Geist'] ${
+                          darkMode ? "text-purple-200" : "text-purple-600"
+                        }`}>
+                          {thesis}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions */}
                   {isOwner && (
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex-shrink-0">
+                    <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-all duration-500 flex-shrink-0">
                       <button
                         onClick={() => nav(editPath)}
-                        className={`p-2 rounded-xl transition-colors duration-200 ${
+                        className={`p-3 rounded-xl transition-all duration-300 hover:scale-110 ${
                           darkMode ? "bg-slate-700 hover:bg-slate-600" : "bg-gray-100 hover:bg-gray-200"
                         }`}
                         type="button"
@@ -1306,7 +1419,7 @@ export default function Education() {
                       </button>
                       <button
                         onClick={() => onDelete(id)}
-                        className={`p-2 rounded-xl text-red-600 dark:text-red-400 transition-colors duration-200 ${
+                        className={`p-3 rounded-xl text-red-600 dark:text-red-400 transition-all duration-300 hover:scale-110 ${
                           darkMode ? "bg-red-900/30 hover:bg-red-900/50" : "bg-red-100 hover:bg-red-200"
                         }`}
                         type="button"
@@ -1325,17 +1438,17 @@ export default function Education() {
         {isOwner && (
           <button
             onClick={() => nav("/education/new")}
-            className="fixed bottom-8 right-8 p-4 md:p-5 rounded-full bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-500 group z-50"
+            className="fixed bottom-8 right-8 p-5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-500 group z-50"
             type="button"
           >
             <div className="relative">
-              {Icons.plus("w-6 h-6 md:w-7 md:h-7")}
-              <span className="absolute -top-1 -right-1 flex h-3 w-3 md:h-4 md:w-4">
+              {Icons.plus("w-7 h-7")}
+              <span className="absolute -top-1 -right-1 flex h-4 w-4">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 md:h-4 md:w-4 bg-white"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-white"></span>
               </span>
             </div>
-            <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0 shadow-xl">
+            <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 px-4 py-3 rounded-xl bg-gray-900 text-white text-sm font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0 shadow-xl font-['Geist']">
               Add Education Record
             </span>
           </button>
@@ -1351,7 +1464,7 @@ export default function Education() {
           100% { transform: translate(0px, 0px) scale(1); }
         }
         .animate-blob {
-          animation: blob 7s infinite;
+          animation: blob 8s infinite;
         }
         .animation-delay-2000 {
           animation-delay: 2s;
@@ -1371,6 +1484,18 @@ export default function Education() {
         }
         .animate-fadeInUp {
           animation: fadeInUp 0.8s ease-out forwards;
+        }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        .line-clamp-3 {
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
         }
       `}</style>
     </div>
