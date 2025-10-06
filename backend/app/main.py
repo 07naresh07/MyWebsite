@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, UploadFile, File, Form, Depends, HTTPExcep
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
 from typing import Optional
 import os
 import re
@@ -16,6 +17,8 @@ from .routes import (
     posts, projects, profile, experience, education, skills, languages,
     certificates_gallery, contact, proxy, health, upload, home
 )
+# ⬇️ Import BIM router AND its safe validation handler
+from .routes.bim import router as bim_router, bim_validation_exception_handler
 
 def orjson_dumps(v, *, default):
     return orjson.dumps(v, default=default).decode()
@@ -73,7 +76,7 @@ async def _root():
     return PlainTextResponse("ok")
 # --------------------------------------------------------------------
 
-# Exception handler: dev-friendly JSON
+# Exception handler: dev-friendly JSON (catch-all)
 @app.exception_handler(Exception)
 async def all_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
@@ -81,7 +84,10 @@ async def all_exception_handler(request: Request, exc: Exception):
         content={"error": "Internal Server Error", "path": str(request.url.path), "detail": str(exc)},
     )
 
-# Include routes
+# ⬇️ Register the BIM-safe 422 handler (prevents binary dumps on multipart errors)
+app.add_exception_handler(RequestValidationError, bim_validation_exception_handler)
+
+# ----------------------------- Include routes -----------------------
 app.include_router(health.router)
 app.include_router(posts.router)
 app.include_router(projects.router)
@@ -92,9 +98,15 @@ app.include_router(skills.router)
 app.include_router(languages.router)
 app.include_router(certificates_gallery.router)
 app.include_router(contact.router)
-app.include_router(proxy.router)
 app.include_router(upload.router)
 app.include_router(home.router)
+
+# ⬇️ Register BIM BEFORE any catch-all proxy so /api/bim isn't shadowed
+app.include_router(bim_router)
+
+# ⬇️ Keep proxy LAST (catch-all patterns go here)
+app.include_router(proxy.router)
+# --------------------------------------------------------------------
 
 def _mask_dsn(dsn: str) -> str:
     # postgresql://user:pass@host:port/db -> mask pass
@@ -133,6 +145,13 @@ async def _startup():
     global DB_INIT_TASK
     DB_INIT_TASK = asyncio.create_task(_init_pool_background())
 
+    # ⬇️ DEBUG: print registered routes so you can see /api/bim is present
+    for r in app.routes:
+        try:
+            print("ROUTE", getattr(r, "methods", ""), r.path)
+        except Exception:
+            pass
+
 # Optional: readiness that reflects DB status (still cheap)
 @app.get("/api/health/ready", response_class=PlainTextResponse)
 async def _ready():
@@ -163,4 +182,4 @@ async def auth_me(user = Depends(get_current_user)):
     return {"ok": True, "claims": claims}
 
 app.include_router(auth_router)
-app.include_router(home.router)
+# (Removed the duplicate: app.include_router(home.router))

@@ -3,7 +3,7 @@ import { NavLink, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
   Home, User, Briefcase, GraduationCap, FolderOpen,
-  BookOpen, Award, Mail, Menu, X
+  BookOpen, Award, Mail, Menu, X, Layers // ⬅️ added Layers
 } from "lucide-react";
 import OwnerToggle from "./OwnerToggle.jsx";
 import { getToggleVisible, setToggleVisible, setOwnerFlag } from "../lib/owner.js";
@@ -151,6 +151,10 @@ export default function Navbar() {
     { to: "/experience", icon: Briefcase, label: "Experience", color: "#45b7d1" },
     { to: "/education", icon: GraduationCap, label: "Education", color: "#96ceb4" },
     { to: "/projects", icon: FolderOpen, label: "Projects", color: "#feca57" },
+
+    // ⬇️ NEW: BIM in navbar
+    { to: "/bim", icon: Layers, label: "BIM", color: "#43e97b" },
+
     { to: "/blog", icon: BookOpen, label: "Blog", color: "#ff9ff3" },
     { to: "/certificates", icon: Award, label: "Certificates", color: "#54a0ff" },
     { to: "/contact", icon: Mail, label: "Contact", color: "#5f27cd" }
