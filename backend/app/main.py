@@ -1,3 +1,4 @@
+# app/main.py
 from fastapi import FastAPI, Request, UploadFile, File, Form, Depends, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -17,8 +18,6 @@ from .routes import (
     posts, projects, profile, experience, education, skills, languages,
     certificates_gallery, contact, proxy, health, upload, home
 )
-# ⬇️ Import BIM router AND its safe validation handler
-from .routes.bim import router as bim_router, bim_validation_exception_handler
 
 def orjson_dumps(v, *, default):
     return orjson.dumps(v, default=default).decode()
@@ -26,21 +25,18 @@ def orjson_dumps(v, *, default):
 app = FastAPI(default_response_class=JSONResponse)
 
 # ----------------------------- CORS ---------------------------------
-# Accept ALLOWED_ORIGINS as comma-separated list or python list
 _raw = settings.allowed_origins
 if isinstance(_raw, str):
     _iter = _raw.split(",")
 else:
     _iter = _raw or []
 
-# Normalize: strip spaces, drop trailing slashes, ignore empties
 _allowed = {
     o.strip().rstrip("/")
     for o in _iter
     if isinstance(o, str) and o.strip()
 }
 
-# Optional regex (e.g., allow all Vercel previews: https://.*\.vercel\.app)
 _allowed_regex = getattr(settings, "allowed_origin_regex", None)
 
 cors_common = dict(
@@ -70,7 +66,6 @@ os.makedirs(webroot, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=webroot), name="uploads")
 
 # ----------------------------- Root route ---------------------------
-# Fast, DB-free route so Render's health check doesn't block on DB
 @app.api_route("/", methods=["GET", "HEAD"])
 async def _root():
     return PlainTextResponse("ok")
@@ -84,8 +79,20 @@ async def all_exception_handler(request: Request, exc: Exception):
         content={"error": "Internal Server Error", "path": str(request.url.path), "detail": str(exc)},
     )
 
-# ⬇️ Register the BIM-safe 422 handler (prevents binary dumps on multipart errors)
-app.add_exception_handler(RequestValidationError, bim_validation_exception_handler)
+# ---------------------- Try to import & register BIM -----------------
+# If anything goes wrong here (file missing, case mismatch, syntax error),
+# we log it but keep the app running so you can see why BIM is missing.
+bim_loaded = False
+try:
+    from .routes.bim import router as bim_router, bim_validation_exception_handler
+    app.add_exception_handler(RequestValidationError, bim_validation_exception_handler)
+    # Register BIM BEFORE proxy so /api/bim isn't shadowed
+    app.include_router(bim_router)
+    bim_loaded = True
+    print("[API] BIM router included ✅")
+except Exception as e:
+    bim_loaded = False
+    print("[API] BIM router NOT included ❌ ->", repr(e))
 
 # ----------------------------- Include routes -----------------------
 app.include_router(health.router)
@@ -101,22 +108,17 @@ app.include_router(contact.router)
 app.include_router(upload.router)
 app.include_router(home.router)
 
-# ⬇️ Register BIM BEFORE any catch-all proxy so /api/bim isn't shadowed
-app.include_router(bim_router)
-
-# ⬇️ Keep proxy LAST (catch-all patterns go here)
+# Keep proxy LAST (catch-all patterns go here)
 app.include_router(proxy.router)
 # --------------------------------------------------------------------
 
 def _mask_dsn(dsn: str) -> str:
-    # postgresql://user:pass@host:port/db -> mask pass
     return re.sub(r"://([^:@/]+):([^@]+)@", r"://\1:***@", dsn or "")
 
 # ===== Non-blocking DB initialization =====
 DB_INIT_TASK = None
 
 async def _init_pool_background():
-    """Initialize DB pool without blocking server port binding."""
     attempts = 20
     delay_sec = 3
     for i in range(1, attempts + 1):
@@ -132,7 +134,6 @@ async def _init_pool_background():
 
 @app.on_event("startup")
 async def _startup():
-    # Log the DSN the server is ACTUALLY using (masked)
     masked = _mask_dsn(settings.database_url or "")
     print(f"[API] DATABASE_URL = {masked}")
     print(f"[API] DB_SSL_INSECURE = {os.getenv('DB_SSL_INSECURE','0')}")
@@ -140,12 +141,12 @@ async def _startup():
     if _allowed_regex:
         print(f"[API] Allowed Origin Regex: {_allowed_regex}")
     print(f"[API] Token lifetime (minutes): {settings.token_minutes}")
+    print(f"[API] BIM loaded: {bim_loaded}")
 
-    # Kick off DB init in the background so the app can bind $PORT immediately
     global DB_INIT_TASK
     DB_INIT_TASK = asyncio.create_task(_init_pool_background())
 
-    # ⬇️ DEBUG: print registered routes so you can see /api/bim is present
+    # Print registered routes (helpful in logs)
     for r in app.routes:
         try:
             print("ROUTE", getattr(r, "methods", ""), r.path)
@@ -155,14 +156,20 @@ async def _startup():
 # Optional: readiness that reflects DB status (still cheap)
 @app.get("/api/health/ready", response_class=PlainTextResponse)
 async def _ready():
-    # If your pool object exposes a ping, use that; otherwise just report presence
     try:
         if pool is None:
             return PlainTextResponse("starting", status_code=503)
-        # You can add a lightweight ping here if your pool supports it
         return PlainTextResponse("ok")
     except Exception as e:
         return PlainTextResponse("error: {}".format(e), status_code=503)
+
+# Tiny introspection endpoint to see routes live in AWS
+@app.get("/api/_routes", response_class=JSONResponse)
+async def _routes():
+    return [
+        {"methods": sorted(list(getattr(r, "methods", set()))), "path": getattr(r, "path", "")}
+        for r in app.routes
+    ]
 
 # -------- Auth endpoints (owner) --------
 auth_router = APIRouter()
@@ -177,9 +184,7 @@ async def auth_owner(pass_: str = Form(...)):
 
 @auth_router.get("/api/auth/me")
 async def auth_me(user = Depends(get_current_user)):
-    # mirror C# by returning claims-like structure
     claims = [{"Type": k, "Value": str(v)} for k, v in user.items()]
     return {"ok": True, "claims": claims}
 
 app.include_router(auth_router)
-# (Removed the duplicate: app.include_router(home.router))
