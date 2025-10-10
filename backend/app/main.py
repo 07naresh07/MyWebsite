@@ -9,6 +9,7 @@ import os
 import re
 import asyncio
 import orjson
+import traceback
 
 from .config import settings
 from .db import init_pool, pool
@@ -18,6 +19,7 @@ from .routes import (
     posts, projects, profile, experience, education, skills, languages,
     certificates_gallery, contact, proxy, health, upload, home
 )
+
 
 def orjson_dumps(v, *, default):
     return orjson.dumps(v, default=default).decode()
@@ -67,7 +69,7 @@ if _allowed_regex:
 else:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=sorted(list(_allowed)),
+        allow_origins=sorted(list(_allowed)) or ["*"],  # fallback to * if nothing configured
         **cors_common,
     )
 # --------------------------------------------------------------------
@@ -105,12 +107,27 @@ try:
     from .routes.bim import router as bim_router, bim_validation_exception_handler
     # Let BIM customize RequestValidationError (e.g., orjson-friendly)
     app.add_exception_handler(RequestValidationError, bim_validation_exception_handler)
-    app.include_router(bim_router)  # NOTE: prefix should be /api/bim in the router itself
+    # 🔑 Mount EXACTLY ONCE — router already has prefix="/api/bim"
+    app.include_router(bim_router)
     bim_loaded = True
     print("[API] BIM router included ✅")
 except Exception as e:
     bim_loaded = False
     print("[API] BIM router NOT included ❌ ->", repr(e))
+    print("[API] BIM import traceback:\n" + traceback.format_exc())
+    # 🛟 Fallback shim so /api/bim/* tells you WHY it's missing (and shows in /docs)
+    shim = APIRouter(prefix="/api/bim", tags=["bim(shim)"])
+
+    @shim.get("/health", response_class=PlainTextResponse, summary="BIM health (shim)")
+    async def _bim_health_missing():
+        return PlainTextResponse("bim router not loaded in this build", status_code=503)
+
+    @shim.get("/", response_class=JSONResponse, summary="BIM root (shim)")
+    @shim.get("", response_class=JSONResponse, summary="BIM root (shim)")
+    async def _bim_root_missing():
+        return JSONResponse({"error": "bim router not loaded"}, status_code=503)
+
+    app.include_router(shim)
 
 # ----------------------------- Include routes -----------------------
 # Specific routers
@@ -132,7 +149,7 @@ app.include_router(proxy.router)
 # --------------------------------------------------------------------
 
 def _mask_dsn(dsn: str) -> str:
-    return re.sub(r"://([^:@/]+):([^@]+)@", r"://\1:***@", dsn or "")
+    return re.sub(r"://([^:@/]+):([^@]+)@", r"://\:***@", dsn or "")
 
 # ===== Non-blocking DB initialization =====
 DB_INIT_TASK = None
