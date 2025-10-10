@@ -17,7 +17,7 @@ from .auth import create_owner_token, get_current_user, require_owner
 
 from .routes import (
     posts, projects, profile, experience, education, skills, languages,
-    certificates_gallery, contact, proxy, health, upload, home, bim
+    certificates_gallery, contact, proxy, health, upload, home,
 )
 
 
