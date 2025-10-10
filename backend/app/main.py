@@ -17,7 +17,7 @@ from .auth import create_owner_token, get_current_user, require_owner
 
 from .routes import (
     posts, projects, profile, experience, education, skills, languages,
-    certificates_gallery, contact, proxy, health, upload, home
+    certificates_gallery, contact, proxy, health, upload, home, bim
 )
 
 
@@ -111,11 +111,11 @@ try:
     app.include_router(bim_router)
     bim_loaded = True
     print("[API] BIM router included ✅")
+
 except Exception as e:
     bim_loaded = False
     print("[API] BIM router NOT included ❌ ->", repr(e))
     print("[API] BIM import traceback:\n" + traceback.format_exc())
-    # 🛟 Fallback shim so /api/bim/* tells you WHY it's missing (and shows in /docs)
     shim = APIRouter(prefix="/api/bim", tags=["bim(shim)"])
 
     @shim.get("/health", response_class=PlainTextResponse, summary="BIM health (shim)")
