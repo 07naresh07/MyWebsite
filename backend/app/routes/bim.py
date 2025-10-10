@@ -2,12 +2,12 @@
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException, UploadFile, File, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.exception_handlers import request_validation_exception_handler as default_validation_handler
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from pathlib import Path
-import uuid, shutil, asyncio, base64, os  # <- added os (for optional logging)
+import uuid, shutil, asyncio, base64, os
 import orjson
 
 from .. import db
@@ -15,6 +15,7 @@ from ..config import settings
 
 router = APIRouter(prefix="/api/bim", tags=["bim"])
 
+# ------------------------- helpers / handlers -------------------------
 def _safe_jsonable(val):
     if isinstance(val, (bytes, bytearray)):
         return {"__bytes_b64__": base64.b64encode(val).decode("ascii")}
@@ -30,26 +31,43 @@ async def bim_validation_exception_handler(request: Request, exc: RequestValidat
     return await default_validation_handler(request, exc)
 
 async def _get_pool(timeout_sec: float = 5.0):
-    deadline = asyncio.get_event_loop().time() + timeout_sec
+    """Get (or init) the asyncpg pool. Works with db.get_pool() or db.pool variable."""
+    loop = asyncio.get_event_loop()
+    deadline = loop.time() + timeout_sec
     last_err = None
     while True:
         p = None
+        # 1) preferred helper
         if hasattr(db, "get_pool") and callable(db.get_pool):
-            try: p = db.get_pool()
-            except Exception as e: last_err, p = e, None
-        if p is None and hasattr(db, "pool") and callable(db.pool):
-            try: p = db.pool()
-            except Exception as e: last_err, p = e, None
+            try:
+                p = db.get_pool()
+            except Exception as e:
+                last_err, p = e, None
+        # 2) direct variable (your main imports `pool` as a variable)
+        if p is None and hasattr(db, "pool"):
+            try:
+                # accept either a variable pool or a callable returning a pool
+                p = db.pool() if callable(db.pool) else db.pool
+            except Exception as e:
+                last_err, p = e, None
+
         if p is not None and hasattr(p, "acquire"):
             return p
+
+        # 3) try init if possible
         if hasattr(db, "init_pool") and callable(db.init_pool) and getattr(settings, "database_url", None):
-            try: await db.init_pool(settings.database_url)
-            except Exception as e: last_err = e
-        if asyncio.get_event_loop().time() >= deadline:
+            try:
+                await db.init_pool(settings.database_url)
+            except Exception as e:
+                last_err = e
+
+        if loop.time() >= deadline:
             break
         await asyncio.sleep(0.1)
+
     raise HTTPException(status_code=503, detail=f"Database not ready: {last_err or 'initializing'}")
 
+# ------------------------------ models --------------------------------
 class BimBlock(BaseModel):
     type: Literal["text", "image", "code", "h1", "h2"]
     value: str
@@ -85,6 +103,7 @@ def _normalize_block(b: BimBlock) -> dict:
 def _normalize_blocks(blocks: List[BimBlock]) -> List[dict]:
     return [_normalize_block(b) for b in blocks]
 
+# ------------------------------- SQL ---------------------------------
 LIST_SQL = """
 select
   e.id, e.title, e.created_at,
@@ -120,11 +139,10 @@ group by e.id;
 """
 
 INSERT_ENTRY_SQL = "insert into public.bim_entries (title, tags) values ($1, $2) returning id, title, created_at, tags;"
-
-# ↓↓↓ changed: add a RETURNING form we can use in the helper
-INSERT_BLOCK_SQL          = "insert into public.bim_blocks (entry_id, idx, type, value, language) values ($1, $2, $3, $4, $5);"
-INSERT_BLOCK_SQL_RETURNING = "insert into public.bim_blocks (entry_id, idx, type, value, language) values ($1, $2, $3, $4, $5) returning id;"
-
+INSERT_BLOCK_SQL_RETURNING = (
+    "insert into public.bim_blocks (entry_id, idx, type, value, language) "
+    "values ($1, $2, $3, $4, $5) returning id;"
+)
 DELETE_BLOCKS_SQL = "delete from public.bim_blocks where entry_id = $1;"
 DELETE_ENTRY_SQL  = "delete from public.bim_entries where id = $1;"
 UPDATE_ENTRY_SQL  = "update public.bim_entries set title = $2, tags = $3 where id = $1 returning id;"
@@ -135,6 +153,7 @@ def _row_to_dict_with_parsed_blocks(row) -> dict:
         d["blocks"] = orjson.loads(d["blocks"])
     return d
 
+# ----------------------------- uploads --------------------------------
 DEFAULT_UPLOAD_ROOT = Path(__file__).resolve().parents[1] / "uploads"
 UPLOAD_DIR = Path(settings.web_root or DEFAULT_UPLOAD_ROOT)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -152,16 +171,11 @@ async def upload_image(
     ctype = (up.content_type or "").lower()
     ext = Path(up.filename or "").suffix.lower()
     if ext not in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
-        if ctype == "image/jpeg":
-            ext = ".jpg"
-        elif ctype == "image/png":
-            ext = ".png"
-        elif ctype == "image/gif":
-            ext = ".gif"
-        elif ctype == "image/webp":
-            ext = ".webp"
-        else:
-            ext = ".png"
+        if   ctype == "image/jpeg": ext = ".jpg"
+        elif ctype == "image/png":  ext = ".png"
+        elif ctype == "image/gif":  ext = ".gif"
+        elif ctype == "image/webp": ext = ".webp"
+        else:                       ext = ".png"
 
     name = f"{uuid.uuid4().hex}{ext}"
     dest = UPLOAD_DIR / name
@@ -174,7 +188,7 @@ async def upload_image(
 
     return {"url": f"/uploads/{name}", "filename": name, "content_type": ctype}
 
-# ---------- Robust insert with auto-heal -------------------------------------
+# ------------------------ robust insert / seq fix ---------------------
 from asyncpg import exceptions as pgexc
 
 FIND_ATTACHED_SEQ_SQL = """
@@ -195,11 +209,9 @@ RESET_SEQ_TO_MAX_SQL = """
 SELECT setval($1, (SELECT COALESCE(MAX(id),0)+1 FROM public.bim_blocks), false);
 """
 
-# optional debug switch: set env LOG_BIM_SEQ=1 to see ids chosen
 LOG_BIM_SEQ = os.getenv("LOG_BIM_SEQ", "0") == "1"
 
 async def _insert_block_with_retry(conn, entry_id, i, b):
-    # 1) normal insert (RETURNING id to see what PG picked)
     try:
         row = await conn.fetchrow(INSERT_BLOCK_SQL_RETURNING, entry_id, i, b["type"], b["value"], b["language"])
         if LOG_BIM_SEQ:
@@ -211,7 +223,6 @@ async def _insert_block_with_retry(conn, entry_id, i, b):
         if LOG_BIM_SEQ:
             print("[bim] duplicate on first try; attempting seq reset")
 
-    # 2) bump the actual attached sequence and retry once
     seqname = await conn.fetchval(FIND_ATTACHED_SEQ_SQL)
     if seqname:
         await conn.execute(RESET_SEQ_TO_MAX_SQL, seqname)
@@ -226,12 +237,12 @@ async def _insert_block_with_retry(conn, entry_id, i, b):
             if LOG_BIM_SEQ:
                 print("[bim] duplicate even after reset; falling back")
 
-    # 3) last resort: advisory xact lock + explicit id (race-safe)
     await conn.execute("SELECT pg_advisory_xact_lock(hashtext('public.bim_blocks.id'));")
-    # small cushion: jump next id a little if needed
-    next_id_row = await conn.fetchrow("SELECT GREATEST(COALESCE(MAX(id),0)+1, (SELECT last_value FROM public.bim_blocks_id_seq)+1) AS nid FROM public.bim_blocks;")
+    next_id_row = await conn.fetchrow(
+        "SELECT GREATEST(COALESCE(MAX(id),0)+1, (SELECT last_value FROM public.bim_blocks_id_seq)+1) AS nid "
+        "FROM public.bim_blocks;"
+    )
     next_id = int(next_id_row["nid"])
-    # try a small jump forward if we still collide for any reason
     for bump in (0, 10, 100):
         try:
             nid = next_id + bump
@@ -247,19 +258,41 @@ async def _insert_block_with_retry(conn, entry_id, i, b):
             if 'bim_blocks_pkey' not in str(e3):
                 raise
             continue
-    # if we somehow still failed (very unlikely), raise the last error
     raise HTTPException(status_code=500, detail="Could not allocate unique id for bim_blocks")
 
-# ------------------------------- CRUD ----------------------------------------
-@router.get("", response_model=List[dict])
-@router.get("/", response_model=List[dict])
+# ------------------------------- API ---------------------------------
+# Root/ping at the prefix to prevent 404 on /api/bim or /api/bim/
+@router.get("", summary="BIM root - list entries (alias)")
+@router.get("/", summary="BIM root - list entries")
 async def list_entries():
     pool = await _get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(LIST_SQL)
         return [_row_to_dict_with_parsed_blocks(r) for r in rows]
 
-@router.get("/{entry_id}", response_model=dict)
+# HEAD / OPTIONS for safer health/preflight at the prefix
+@router.head("/")
+@router.head("")
+async def bim_head():
+    return PlainTextResponse("", status_code=200)
+
+@router.options("/")
+@router.options("")
+async def bim_options():
+    # CORS middleware will add headers; respond 200 to satisfy preflight
+    return PlainTextResponse("", status_code=200)
+
+# Tiny diagnostic
+@router.get("/_meta")
+async def bim_meta():
+    try:
+        pool = await _get_pool()
+        ok = pool is not None
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True}
+
+@router.get("/{entry_id}")
 async def get_entry(entry_id: int):
     pool = await _get_pool()
     async with pool.acquire() as conn:
@@ -268,8 +301,8 @@ async def get_entry(entry_id: int):
             raise HTTPException(status_code=404, detail="Not found")
         return _row_to_dict_with_parsed_blocks(row)
 
-@router.post("", response_model=dict, status_code=201)
-@router.post("/", response_model=dict, status_code=201)
+@router.post("", status_code=201)
+@router.post("/", status_code=201)
 async def create_entry(payload: BimCreate):
     if not payload.blocks:
         raise HTTPException(status_code=400, detail="At least one block required")
@@ -283,8 +316,8 @@ async def create_entry(payload: BimCreate):
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
         return _row_to_dict_with_parsed_blocks(row)
 
-@router.put("/{entry_id}", response_model=dict)
-@router.put("/{entry_id}/", response_model=dict)
+@router.put("/{entry_id}")
+@router.put("/{entry_id}/")
 async def update_entry(entry_id: int, payload: BimUpdate):
     if payload.title is None or payload.blocks is None:
         raise HTTPException(status_code=400, detail="PUT requires 'title' and 'blocks'")
@@ -309,8 +342,8 @@ async def update_entry(entry_id: int, payload: BimUpdate):
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
         return _row_to_dict_with_parsed_blocks(row)
 
-@router.patch("/{entry_id}", response_model=dict)
-@router.patch("/{entry_id}/", response_model=dict)
+@router.patch("/{entry_id}")
+@router.patch("/{entry_id}/")
 async def patch_entry(entry_id: int, payload: BimUpdate):
     pool = await _get_pool()
     async with pool.acquire() as conn:

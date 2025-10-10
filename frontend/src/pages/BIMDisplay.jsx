@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   BookOpen, Trash2, Edit3, Plus, Eye, Star,
   ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw,
-  Search, SortAsc, X, AlertTriangle, Type, Bookmark
+  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, Info
 } from "lucide-react";
 import { useOwnerMode } from "../lib/owner.js";
 
@@ -30,6 +30,40 @@ async function fetchJSON(path, options = {}) {
   if (res.status === 204) return null;
   return res.json();
 }
+
+/* ---------- Dark Mode Persistence ---------- */
+const DARK_MODE_KEY = "bim:darkMode";
+const LOCKED_ENTRIES_KEY = "bim:lockedEntries";
+
+const loadDarkMode = () => {
+  try {
+    const saved = localStorage.getItem(DARK_MODE_KEY);
+    return saved === "true";
+  } catch {
+    return false;
+  }
+};
+
+const saveDarkMode = (value) => {
+  try {
+    localStorage.setItem(DARK_MODE_KEY, String(value));
+  } catch {}
+};
+
+const loadLockedEntries = () => {
+  try {
+    const saved = localStorage.getItem(LOCKED_ENTRIES_KEY);
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
+const saveLockedEntries = (lockedSet) => {
+  try {
+    localStorage.setItem(LOCKED_ENTRIES_KEY, JSON.stringify([...lockedSet]));
+  } catch {}
+};
 
 /* ---------- Delete Confirmation Modal ---------- */
 function DeleteConfirmationModal({ item, onConfirm, onCancel, darkMode }) {
@@ -135,6 +169,81 @@ function DeleteConfirmationModal({ item, onConfirm, onCancel, darkMode }) {
               </span>
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Keyboard Shortcuts Info Modal ---------- */
+function KeyboardShortcutsModal({ onClose, darkMode }) {
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className={`rounded-2xl shadow-2xl max-w-md w-full ${
+          darkMode ? "bg-slate-800 border-2 border-blue-500" : "bg-white border-2 border-blue-500"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-4 flex items-center justify-between rounded-t-xl">
+          <div className="flex items-center gap-3">
+            <Info size={28} />
+            <h2 className="text-xl font-bold">Keyboard Shortcuts & Tips</h2>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className={`p-6 space-y-4 ${darkMode ? "text-slate-200" : "text-slate-800"}`}>
+          <div>
+            <h3 className="font-bold mb-2 text-blue-600 dark:text-blue-400">⌨️ Keyboard Shortcuts</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span>Edit entry (in view mode)</span>
+                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>E</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Close modal</span>
+                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>Esc</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Previous image</span>
+                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>←</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Next image</span>
+                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>→</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Zoom (image fullscreen)</span>
+                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>Scroll</kbd>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Quick zoom (image)</span>
+                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>Double Click</kbd>
+              </div>
+            </div>
+          </div>
+          
+          <div className={`pt-4 border-t ${darkMode ? "border-slate-700" : "border-slate-200"}`}>
+            <h3 className="font-bold mb-2 text-amber-600 dark:text-amber-400">🔒 Lock Feature</h3>
+            <p className="text-sm leading-relaxed mb-2">
+              Lock entries to keep them private. Locked entries are visible in the list but only you can view the content. You can unlock them anytime from the view modal.
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+              ✨ Locks persist across page refreshes and are saved locally.
+            </p>
+          </div>
+        </div>
+
+        <div className={`px-6 py-4 border-t ${darkMode ? "border-slate-700" : "border-slate-200"}`}>
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+          >
+            Got it!
+          </button>
         </div>
       </div>
     </div>
@@ -327,7 +436,7 @@ function FullScreenImageViewer({ images = [], initialIndex = 0, onClose }) {
 
       <div
         ref={containerRef}
-        className="relative max-w-[95vw] max-h-[95vh] overflow-hidden touch-none"
+        className="relative w-full h-full flex items-center justify-center overflow-hidden touch-none px-4 py-4"
         onClick={(e) => e.stopPropagation()}
         onWheel={onWheel}
         onDoubleClick={onDoubleClick}
@@ -344,10 +453,12 @@ function FullScreenImageViewer({ images = [], initialIndex = 0, onClose }) {
           style={{
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
             transformOrigin: "center center",
-            maxWidth: "95vw",
-            maxHeight: "95vh",
+            maxWidth: "90vw",
+            maxHeight: "90vh",
+            width: "auto",
+            height: "auto",
             objectFit: "contain",
-            cursor: scale > 1 ? "grab" : "default",
+            cursor: scale > 1 ? (dragState.current.dragging ? "grabbing" : "grab") : "default",
             userSelect: "none"
           }}
         />
@@ -439,7 +550,7 @@ function ImageCarousel({ images = [], isPreview = false, onFullScreen }) {
         <img
           src={safeImages[currentIndex].value}
           alt=""
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain bg-slate-50"
           loading="lazy"
         />
 
@@ -528,7 +639,7 @@ function extractMainTitle(blocks = []) {
 }
 
 /* ---------- Preview ---------- */
-function BlockPreview({ blocks = [], darkMode = false, onFullScreen }) {
+function BlockPreview({ blocks = [], darkMode = false }) {
   if (!blocks.length) {
     return (
       <div
@@ -576,34 +687,15 @@ function BlockPreview({ blocks = [], darkMode = false, onFullScreen }) {
           );
         }
 
-        if (block?.type === "image-group") {
+        if (block?.type === "image-group" || block?.type === "image") {
           return (
-            <div key={`pv-ig-${idx}`}>
-              <ImageCarousel
-                images={block.images}
-                isPreview
-                onFullScreen={onFullScreen ? (index) => onFullScreen(block.images, index) : null}
-              />
-            </div>
-          );
-        }
-
-        if (block?.type === "image") {
-          return (
-            <div
-              key={`pv-im-${idx}`}
-              className={`relative w-full h-32 rounded-lg overflow-hidden border group cursor-pointer ${darkMode ? "border-slate-600" : "border-slate-200"}`}
-              onDoubleClick={() => onFullScreen && onFullScreen([block], 0)}
-            >
-              <img src={block.value} alt="" className="w-full h-full object-cover" loading="lazy" />
-              <button
-                type="button"
-                onClick={() => onFullScreen && onFullScreen([block], 0)}
-                className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                title="View full screen"
-              >
-                <Maximize2 size={16} />
-              </button>
+            <div key={`pv-img-${idx}`} className={`relative w-full h-20 rounded-lg overflow-hidden border ${darkMode ? "border-slate-600 bg-slate-700" : "border-slate-200 bg-slate-50"}`}>
+              <div className="w-full h-full flex items-center justify-center">
+                <Eye size={32} className={`${darkMode ? "text-slate-500" : "text-slate-300"}`} />
+                <span className={`ml-2 text-sm font-semibold ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
+                  {block?.type === "image-group" ? `${block.images.length} Images` : "Image"}
+                </span>
+              </div>
             </div>
           );
         }
@@ -632,10 +724,10 @@ function BlockPreview({ blocks = [], darkMode = false, onFullScreen }) {
 }
 
 /* ---------- Full View Modal with Reading Features ---------- */
-function FullViewModal({ item, onClose, owner, onEdit }) {
+function FullViewModal({ item, onClose, owner, onEdit, onToggleLock }) {
   const [expandedCodeBlocks, setExpandedCodeBlocks] = useState(new Set());
   const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(loadDarkMode());
   const [fullScreenImages, setFullScreenImages] = useState(null);
   const [fullScreenIndex, setFullScreenIndex] = useState(0);
   
@@ -649,6 +741,10 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
   const [bookmarkedSections, setBookmarkedSections] = useState(new Set());
 
   const contentRef = useRef(null);
+
+  useEffect(() => {
+    saveDarkMode(darkMode);
+  }, [darkMode]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -708,71 +804,6 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
     }
   };
 
-  /* --------- Dark mode contrast fixer (from original script) --------- */
-  const parseRGB = (s) => {
-    const m = s.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-    if (!m) return null;
-    return { r: +m[1], g: +m[2], b: +m[3] };
-  };
-
-  const luminance = ({ r, g, b }) => {
-    const srgb = [r, g, b].map(v => v / 255).map(c =>
-      c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
-    );
-    return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
-  };
-
-  const fixDarkModeContrast = useCallback((enable) => {
-    const root = contentRef.current;
-    if (!root) return;
-
-    // Restore previously adjusted elements when turning OFF dark mode
-    const adjusted = root.querySelectorAll("[data-rtx-original-color]");
-    if (!enable) {
-      adjusted.forEach(el => {
-        const orig = el.getAttribute("data-rtx-original-color");
-        if (orig === "__unset__") el.style.removeProperty("color");
-        else el.style.color = orig;
-        el.removeAttribute("data-rtx-original-color");
-      });
-      return;
-    }
-
-    // When turning ON dark mode: scan and adjust dark colors
-    const candidates = root.querySelectorAll(".rich-text-content, .rich-text-content *");
-    candidates.forEach(el => {
-      // skip code blocks; they already have high-contrast styling
-      if (el.closest("pre, code")) return;
-
-      // CRITICAL: Skip elements with inline styles - these are user-formatted
-      const inlineColor = el.style.color?.trim();
-      const hasInlineColor = inlineColor && inlineColor !== "";
-      if (hasInlineColor) return; // Don't touch user's intentional colors
-
-      const cs = getComputedStyle(el);
-      const rgb = parseRGB(cs.color);
-      if (!rgb) return;
-
-      const lum = luminance(rgb);
-      // threshold: treat very dark text as unreadable in dark mode
-      if (lum < 0.28) {
-        // store original only once
-        if (!el.hasAttribute("data-rtx-original-color")) {
-          el.setAttribute("data-rtx-original-color", "__unset__");
-        }
-        // readable light gray that respects dark theme
-        el.style.color = "#e5e7eb"; // Tailwind slate-200
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    // Only apply dark mode contrast fix when not in sepia mode
-    if (!sepiaMode) {
-      fixDarkModeContrast(darkMode);
-    }
-  }, [darkMode, sepiaMode, item, fontSize, lineHeight, fontFamily, fixDarkModeContrast]);
-
   return (
     <>
       {fullScreenImages && (
@@ -780,11 +811,11 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
       )}
 
       <div
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 ${darkMode ? "dark" : ""}`}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4`}
         onClick={onClose}
       >
         <div
-          className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden ${
+          className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden ${
             sepiaMode 
               ? "bg-[#f4e8d4]"
               : darkMode 
@@ -795,13 +826,36 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
           role="dialog"
           aria-modal="true"
         >
-          <div className={`sticky top-0 ${
+          <div className={`flex-shrink-0 ${
             sepiaMode
               ? "bg-gradient-to-r from-amber-700 to-amber-800"
               : "bg-gradient-to-r from-blue-600 to-cyan-600"
           } text-white px-6 py-4 flex items-center justify-between z-10`}>
-            <h1 className="text-3xl font-bold">{displayTitle}</h1>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              {item.locked && (
+                <div className="flex-shrink-0 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                  <Lock size={16} />
+                  <span className="text-xs font-bold">LOCKED</span>
+                </div>
+              )}
+              <h1 className="text-3xl font-bold truncate">{displayTitle}</h1>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {owner && item.locked && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm('Unlock this entry? It will be viewable by everyone.')) {
+                      onToggleLock?.(item.id);
+                    }
+                  }}
+                  className="p-2 bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors"
+                  title="Unlock this entry"
+                >
+                  <Unlock size={20} />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={(e) => {
@@ -820,31 +874,43 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
                 title="Close"
                 aria-label="Close"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X size={24} />
               </button>
             </div>
           </div>
 
           {/* Reading Settings Panel */}
           {showReadingPanel && (
-            <div className={`px-6 py-4 border-b ${
+            <div className={`flex-shrink-0 px-6 py-4 border-b ${
               sepiaMode
                 ? "bg-[#e8dcc8] border-amber-700"
                 : darkMode 
                 ? "bg-slate-800 border-slate-700" 
                 : "bg-slate-50 border-slate-200"
             }`}>
-              <h3 className={`text-sm font-bold mb-3 ${
-                sepiaMode
-                  ? "text-[#3d2817]"
-                  : darkMode 
-                  ? "text-slate-200" 
-                  : "text-slate-700"
-              }`}>
-                📖 Reading Settings
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`text-sm font-bold ${
+                  sepiaMode
+                    ? "text-[#3d2817]"
+                    : darkMode 
+                    ? "text-slate-200" 
+                    : "text-slate-700"
+                }`}>
+                  📖 Reading Settings
+                </h3>
+                {owner && item.locked && (
+                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold ${
+                    sepiaMode
+                      ? "bg-amber-200 text-amber-900"
+                      : darkMode
+                      ? "bg-amber-900/30 text-amber-400"
+                      : "bg-amber-100 text-amber-700"
+                  }`}>
+                    <Lock size={12} />
+                    <span>Entry is locked</span>
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={`text-xs font-semibold block mb-1 ${
@@ -955,42 +1021,40 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
           )}
 
           <style>{`
-            /* 
-              IMPORTANT: Inline styles naturally have higher specificity than classes
-              So any element with style="color:..." will override these defaults
-            */
-            
-            /* Default text colors for dark mode */
-            .dark-mode-content .rich-text-content {
-              color: #e5e7eb;
+            /* Sepia mode text colors */
+            .sepia-mode-content {
+              color: #5c4033 !important;
+            }
+            .sepia-mode-content h1,
+            .sepia-mode-content h2 {
+              color: #3d2817 !important;
             }
             
-            /* Default text colors for light mode */
-            .light-mode-content .rich-text-content {
-              color: #1e293b;
+            /* Dark mode text colors - using important to override inline styles */
+            .dark-mode-content {
+              color: #f1f5f9 !important;
             }
-            
-            /* Default text colors for sepia mode */
-            .sepia-mode .rich-text-content {
-              color: #5c4033;
-            }
-            
-            /* Headers in sepia mode */
-            .sepia-mode h1,
-            .sepia-mode h2 {
-              color: #3d2817;
-            }
-            
-            /* Headers in dark mode */
             .dark-mode-content h1,
             .dark-mode-content h2 {
-              color: #f1f5f9;
+              color: #f1f5f9 !important;
+            }
+            .dark-mode-content .rich-text-content {
+              color: #f1f5f9 !important;
+            }
+            .dark-mode-content .rich-text-content * {
+              color: inherit !important;
             }
             
-            /* Headers in light mode */
+            /* Light mode text colors */
+            .light-mode-content {
+              color: #1e293b !important;
+            }
             .light-mode-content h1,
             .light-mode-content h2 {
-              color: #0f172a;
+              color: #0f172a !important;
+            }
+            .light-mode-content .rich-text-content {
+              color: #1e293b !important;
             }
             
             /* List and paragraph formatting */
@@ -1008,26 +1072,81 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
             .rich-text-content em { font-style: italic; }
             .rich-text-content u { text-decoration: underline; }
             
-            /* 
-              No rules needed for inline styles - they automatically win!
-              User's colors, backgrounds, fonts, and sizes are preserved.
-            */
+            /* Dynamic line height application */
+            .reading-content-container * {
+              line-height: inherit !important;
+            }
+            .reading-content-container p,
+            .reading-content-container div,
+            .reading-content-container span,
+            .reading-content-container li {
+              line-height: inherit !important;
+            }
+            
+            /* Smooth scrolling */
+            .reading-content-container {
+              scroll-behavior: smooth;
+            }
+            
+            /* Ensure scrollbar is always visible to prevent layout shift */
+            .reading-content-container::-webkit-scrollbar {
+              width: 12px;
+            }
+            
+            .reading-content-container::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            
+            .reading-content-container::-webkit-scrollbar-thumb {
+              background: rgba(100, 116, 139, 0.3);
+              border-radius: 6px;
+            }
+            
+            .reading-content-container::-webkit-scrollbar-thumb:hover {
+              background: rgba(100, 116, 139, 0.5);
+            }
           `}</style>
 
           <div
             ref={contentRef}
-            className={`overflow-y-auto max-h-[calc(90vh-80px)] p-8 pb-24 ${
+            className={`flex-1 overflow-y-auto overflow-x-hidden p-8 pb-24 reading-content-container ${
               sepiaMode 
-                ? "bg-[#f4e8d4] sepia-mode" 
+                ? "bg-[#f4e8d4] sepia-mode-content" 
                 : darkMode 
                 ? "bg-slate-900 dark-mode-content" 
                 : "bg-white light-mode-content"
             } ${readingMode ? "max-w-3xl mx-auto" : ""} ${getFontFamilyClass()}`}
             style={{
               fontSize: `${fontSize}px`,
-              lineHeight: lineHeight
+              lineHeight: lineHeight,
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch'
             }}
           >
+            {owner && item.locked && (
+              <div className={`mb-6 p-4 rounded-lg border-2 ${
+                sepiaMode
+                  ? "bg-amber-100 border-amber-500"
+                  : darkMode
+                  ? "bg-amber-900/20 border-amber-600"
+                  : "bg-amber-50 border-amber-400"
+              }`}>
+                <div className="flex items-start gap-3">
+                  <Lock size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className={`text-sm ${
+                    sepiaMode
+                      ? "text-[#5c4033]"
+                      : darkMode
+                      ? "text-amber-200"
+                      : "text-amber-900"
+                  }`}>
+                    <p className="font-semibold mb-1">🔒 This entry is locked</p>
+                    <p>Only you (the owner) can view this content. Other users will see it in the list but cannot open it. Click the "Unlock" button below to make it public.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="max-w-none space-y-6">
               {groupedBlocks.length ? (
                 groupedBlocks.map((block, idx) => {
@@ -1039,13 +1158,11 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
                         {bookmarkedSections.has(idx) && (
                           <Bookmark size={20} className="absolute -left-8 top-1 text-amber-500 fill-amber-500" />
                         )}
-                        <h2
-                          className={`text-3xl font-extrabold mb-3 mt-4 pb-2 border-b-2 ${
+                        <h2 className={`text-3xl font-extrabold mb-3 mt-4 pb-2 border-b-2 ${
                             sepiaMode 
                               ? "border-amber-700" 
                               : "border-blue-400"
-                          }`}
-                        >
+                          }`}>
                           {renderHTMLContent(block.value)}
                         </h2>
                         <button
@@ -1062,10 +1179,7 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
 
                   if (block?.type === "text") {
                     return (
-                      <div
-                        key={`p-${idx}`}
-                        className="leading-relaxed"
-                      >
+                      <div key={`p-${idx}`} className="leading-relaxed">
                         {renderHTMLContent(block.value)}
                       </div>
                     );
@@ -1090,12 +1204,14 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
                         className="my-6 relative group cursor-pointer"
                         onDoubleClick={() => openFullScreen([block], 0)}
                       >
-                        <img
-                          src={block.value}
-                          alt=""
-                          className="w-full h-auto rounded-lg border border-slate-200 shadow-sm"
-                          loading="lazy"
-                        />
+                        <div className={`rounded-lg border overflow-hidden ${darkMode ? "border-slate-700 bg-slate-800" : "border-slate-200 bg-slate-50"}`}>
+                          <img
+                            src={block.value}
+                            alt=""
+                            className="w-full h-auto max-h-[600px] object-contain mx-auto"
+                            loading="lazy"
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={() => openFullScreen([block], 0)}
@@ -1192,7 +1308,7 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
           </div>
 
           <div
-            className={`sticky bottom-0 px-6 py-4 border-t flex items-center justify-between ${
+            className={`flex-shrink-0 px-6 py-4 border-t flex items-center justify-between ${
               sepiaMode
                 ? "bg-[#e8dcc8] border-amber-700"
                 : darkMode 
@@ -1229,22 +1345,56 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
 
             <div className="flex items-center gap-3">
               {owner && (
-                <button
-                  type="button"
-                  onClick={() => onEdit?.(item.id)}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                    sepiaMode
-                      ? "bg-amber-200 text-amber-900 hover:bg-amber-300"
-                      : darkMode 
-                      ? "bg-blue-900/50 text-blue-300 hover:bg-blue-900/70" 
-                      : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                  }`}
-                  title="Edit (E)"
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <Edit3 size={16} /> Edit
-                  </span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (item.locked) {
+                        if (window.confirm('Unlock this entry? It will be viewable by everyone.')) {
+                          onToggleLock?.(item.id);
+                        }
+                      } else {
+                        if (window.confirm('Lock this entry? Only you will be able to view it.')) {
+                          onToggleLock?.(item.id);
+                        }
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+                      sepiaMode
+                        ? item.locked 
+                          ? "bg-amber-500 text-white hover:bg-amber-600"
+                          : "bg-amber-200 text-amber-900 hover:bg-amber-300"
+                        : darkMode 
+                        ? item.locked
+                          ? "bg-amber-600 text-white hover:bg-amber-700"
+                          : "bg-slate-700 text-slate-200 hover:bg-slate-600"
+                        : item.locked
+                        ? "bg-amber-500 text-white hover:bg-amber-600"
+                        : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                    }`}
+                    title={item.locked ? "Unlock entry" : "Lock entry"}
+                  >
+                    {item.locked ? <Unlock size={16} /> : <Lock size={16} />}
+                    {item.locked ? "Unlock" : "Lock"}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => onEdit?.(item.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      sepiaMode
+                        ? "bg-amber-200 text-amber-900 hover:bg-amber-300"
+                        : darkMode 
+                        ? "bg-blue-900/50 text-blue-300 hover:bg-blue-900/70" 
+                        : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                    }`}
+                    title="Edit (E)"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Edit3 size={16} /> Edit
+                    </span>
+                  </button>
+                </>
               )}
 
               <button
@@ -1293,10 +1443,10 @@ export default function BIMDisplay() {
   const [busyId, setBusyId] = useState("");
   const [favorites, setFavorites] = useState(new Set());
   const [viewingItem, setViewingItem] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
-  const [fullScreenImages, setFullScreenImages] = useState(null);
-  const [fullScreenIndex, setFullScreenIndex] = useState(0);
+  const [darkMode, setDarkMode] = useState(loadDarkMode());
   const [deleteConfirmItem, setDeleteConfirmItem] = useState(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [lockedEntries, setLockedEntries] = useState(loadLockedEntries());
   
   // Smart Features
   const [searchQuery, setSearchQuery] = useState("");
@@ -1306,11 +1456,37 @@ export default function BIMDisplay() {
   const nav = useNavigate();
   const location = useLocation();
 
+  // Save dark mode preference
+  useEffect(() => {
+    saveDarkMode(darkMode);
+  }, [darkMode]);
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
       const data = await fetchJSON("/api/bim");
-      setItems(Array.isArray(data) ? data : []);
+      const itemsArray = Array.isArray(data) ? data : [];
+      
+      // Merge backend locked status with localStorage locked entries
+      const localLocked = loadLockedEntries();
+      const mergedItems = itemsArray.map(item => {
+        // Backend locked status OR localStorage locked status
+        const isLocked = item.locked || localLocked.has(String(item.id));
+        return { ...item, locked: isLocked };
+      });
+      
+      // Update localStorage to match merged state
+      const allLockedIds = new Set(
+        mergedItems.filter(item => item.locked).map(item => String(item.id))
+      );
+      setLockedEntries(allLockedIds);
+      saveLockedEntries(allLockedIds);
+      
+      if (allLockedIds.size > 0) {
+        console.log(`🔒 Loaded ${allLockedIds.size} locked entries:`, [...allLockedIds]);
+      }
+      
+      setItems(mergedItems);
       setErr("");
     } catch (e) {
       setErr(e?.message || "Failed to load BIM entries");
@@ -1361,6 +1537,15 @@ export default function BIMDisplay() {
       setBusyId(String(deleteConfirmItem.id));
       await fetchJSON(`/api/bim/${deleteConfirmItem.id}`, { method: "DELETE", headers: { ...ownerHeaders() } });
       setItems((prev) => prev.filter((p) => String(p?.id) !== String(deleteConfirmItem.id)));
+      
+      // Clean up from locked entries localStorage
+      setLockedEntries(prev => {
+        const next = new Set(prev);
+        next.delete(String(deleteConfirmItem.id));
+        saveLockedEntries(next);
+        return next;
+      });
+      
       setDeleteConfirmItem(null);
     } catch (e) {
       alert(e?.message || "Delete failed");
@@ -1384,6 +1569,68 @@ export default function BIMDisplay() {
     });
   };
 
+  const toggleLock = async (id) => {
+    if (!owner) return;
+    try {
+      const item = items.find(i => i.id === id);
+      const newLockedState = !item.locked;
+      
+      // Update backend
+      await fetchJSON(`/api/bim/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...ownerHeaders()
+        },
+        body: JSON.stringify({ locked: newLockedState })
+      });
+      
+      // Update local state
+      setItems(prev => prev.map(item => 
+        item.id === id ? { ...item, locked: newLockedState } : item
+      ));
+      
+      // Update localStorage
+      setLockedEntries(prev => {
+        const next = new Set(prev);
+        const itemId = String(id);
+        if (newLockedState) {
+          next.add(itemId);
+          console.log(`🔒 Entry ${id} locked and saved to localStorage`);
+        } else {
+          next.delete(itemId);
+          console.log(`🔓 Entry ${id} unlocked and removed from localStorage`);
+        }
+        saveLockedEntries(next);
+        return next;
+      });
+    } catch (e) {
+      // If backend fails, still update localStorage
+      const item = items.find(i => i.id === id);
+      const newLockedState = !item.locked;
+      
+      setItems(prev => prev.map(item => 
+        item.id === id ? { ...item, locked: newLockedState } : item
+      ));
+      
+      setLockedEntries(prev => {
+        const next = new Set(prev);
+        const itemId = String(id);
+        if (newLockedState) {
+          next.add(itemId);
+          console.log(`🔒 Entry ${id} locked (localStorage only - backend unavailable)`);
+        } else {
+          next.delete(itemId);
+          console.log(`🔓 Entry ${id} unlocked (localStorage only - backend unavailable)`);
+        }
+        saveLockedEntries(next);
+        return next;
+      });
+      
+      console.warn("Backend lock update failed, using localStorage only:", e?.message);
+    }
+  };
+
   const openFullScreen = (images, index) => {
     setFullScreenImages(images);
     setFullScreenIndex(index);
@@ -1398,7 +1645,14 @@ export default function BIMDisplay() {
   const goEdit = (id) => { if (owner) nav(`/bim/edit/${encodeURIComponent(id)}`); };
   const goView = (id) => {
     const item = items.find((i) => i.id === id);
-    if (item) setViewingItem(item);
+    if (item) {
+      // Check if locked and user is not owner
+      if (item.locked && !owner) {
+        alert("🔒 This entry is locked and can only be viewed by the owner.");
+        return;
+      }
+      setViewingItem(item);
+    }
   };
 
   // Filter and sort items
@@ -1435,17 +1689,21 @@ export default function BIMDisplay() {
   }, [items, searchQuery, filterFavorites, favorites, sortBy]);
 
   return (
-    <div className={`min-h-screen ${darkMode ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50"}`}>
-      {fullScreenImages && (
-        <FullScreenImageViewer images={fullScreenImages} initialIndex={fullScreenIndex} onClose={closeFullScreen} />
-      )}
-
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50"}`}>
       {viewingItem && (
         <FullViewModal
           item={viewingItem}
           onClose={() => setViewingItem(null)}
           owner={owner}
           onEdit={(id) => { setViewingItem(null); goEdit(id); }}
+          onToggleLock={(id) => {
+            toggleLock(id);
+            // Update the viewing item to reflect the new lock status
+            setViewingItem(prev => ({
+              ...prev,
+              locked: !prev.locked
+            }));
+          }}
         />
       )}
 
@@ -1454,6 +1712,13 @@ export default function BIMDisplay() {
           item={deleteConfirmItem}
           onConfirm={confirmDelete}
           onCancel={() => setDeleteConfirmItem(null)}
+          darkMode={darkMode}
+        />
+      )}
+
+      {showShortcuts && (
+        <KeyboardShortcutsModal
+          onClose={() => setShowShortcuts(false)}
           darkMode={darkMode}
         />
       )}
@@ -1467,6 +1732,17 @@ export default function BIMDisplay() {
         title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
       >
         {darkMode ? <Sun size={24} /> : <Moon size={24} />}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setShowShortcuts(true)}
+        className={`fixed bottom-24 right-6 z-40 p-4 rounded-full shadow-2xl transition-all hover:scale-110 ${
+          darkMode ? "bg-slate-700 text-blue-400 hover:bg-slate-600" : "bg-white text-slate-700 hover:bg-slate-100"
+        }`}
+        title="Keyboard Shortcuts"
+      >
+        <Info size={24} />
       </button>
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
@@ -1490,7 +1766,7 @@ export default function BIMDisplay() {
 
         {/* Search and Filter Bar */}
         {!loading && items.length > 0 && (
-          <div className={`rounded-xl p-4 shadow-sm ${darkMode ? "bg-slate-800" : "bg-white"}`}>
+          <div className={`rounded-xl p-4 shadow-sm transition-colors ${darkMode ? "bg-slate-800" : "bg-white"}`}>
             <div className="flex flex-wrap gap-3 items-center">
               <div className="flex-1 min-w-[200px] relative">
                 <Search size={20} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? "text-slate-400" : "text-slate-500"}`} />
@@ -1499,7 +1775,7 @@ export default function BIMDisplay() {
                   placeholder="Search entries..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full pl-10 pr-4 py-2 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full pl-10 pr-4 py-2 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
                     darkMode 
                       ? "bg-slate-700 border-slate-600 text-white placeholder-slate-400" 
                       : "bg-white border-slate-200 text-slate-900 placeholder-slate-400"
@@ -1585,6 +1861,7 @@ export default function BIMDisplay() {
             {filteredAndSortedItems.map((e) => {
               const mainTitleInfo = extractMainTitle(e.blocks || []);
               const displayTitle = mainTitleInfo ? mainTitleInfo.title : e.title;
+              const isLocked = e.locked && !owner;
 
               return (
                 <article
@@ -1592,8 +1869,15 @@ export default function BIMDisplay() {
                   className={`group relative rounded-xl border-2 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden ${
                     darkMode ? "bg-slate-800 border-slate-600 hover:border-blue-500" : "bg-white border-slate-200 hover:border-blue-300"
                   }`}
-                  onDoubleClick={() => goView(e.id)}
+                  onDoubleClick={() => !isLocked && goView(e.id)}
                 >
+                  {e.locked && (
+                    <div className="absolute top-3 left-3 z-10 bg-amber-500 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-lg">
+                      <Lock size={14} />
+                      <span className="text-xs font-bold">LOCKED</span>
+                    </div>
+                  )}
+                  
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-4">
                       <h2
@@ -1620,15 +1904,31 @@ export default function BIMDisplay() {
                           <Star size={16} fill={favorites.has(e.id) ? "currentColor" : "none"} />
                         </button>
                         {owner && (
-                          <span className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-bold shadow-sm">
-                            {e.blocks?.length ?? 0} {e.blocks?.length === 1 ? "block" : "blocks"}
-                          </span>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => toggleLock(e.id)}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                e.locked
+                                  ? "bg-amber-100 text-amber-600"
+                                  : darkMode
+                                  ? "bg-slate-700 text-slate-400 hover:text-amber-500"
+                                  : "bg-slate-100 text-slate-400 hover:text-amber-500"
+                              }`}
+                              title={e.locked ? "Unlock entry (persists on refresh)" : "Lock entry (persists on refresh)"}
+                            >
+                              {e.locked ? <Lock size={16} /> : <Unlock size={16} />}
+                            </button>
+                            <span className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-bold shadow-sm">
+                              {e.blocks?.length ?? 0} {e.blocks?.length === 1 ? "block" : "blocks"}
+                            </span>
+                          </>
                         )}
                       </div>
                     </div>
 
                     <div className="mb-4">
-                      <BlockPreview blocks={e.blocks || []} darkMode={darkMode} onFullScreen={openFullScreen} />
+                      <BlockPreview blocks={e.blocks || []} darkMode={darkMode} />
                     </div>
 
                     <div className="flex flex-wrap gap-2 mb-4">
@@ -1638,11 +1938,17 @@ export default function BIMDisplay() {
                           evt.stopPropagation();
                           goView(e.id);
                         }}
-                        className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-semibold transition-colors"
-                        title="View full details"
+                        disabled={isLocked}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                          isLocked
+                            ? "bg-slate-400 text-slate-200 cursor-not-allowed opacity-50"
+                            : "bg-blue-600 text-white hover:bg-blue-700"
+                        }`}
+                        title={isLocked ? "This entry is locked" : "View full details"}
                       >
                         <span className="inline-flex items-center gap-1.5">
-                          <Eye size={16} /> View More
+                          {isLocked ? <Lock size={16} /> : <Eye size={16} />}
+                          {isLocked ? "Locked" : "View More"}
                         </span>
                       </button>
 
