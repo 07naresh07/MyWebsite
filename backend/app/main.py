@@ -22,6 +22,7 @@ from .routes import (
 def orjson_dumps(v, *, default):
     return orjson.dumps(v, default=default).decode()
 
+# Use JSONResponse (you can switch to ORJSONResponse app-wide later)
 app = FastAPI(default_response_class=JSONResponse)
 
 # ----------------------------- CORS ---------------------------------
@@ -36,6 +37,18 @@ _allowed = {
     for o in _iter
     if isinstance(o, str) and o.strip()
 }
+
+# Auto-augment with local dev and Vercel if present (non-breaking)
+vercel_url = os.getenv("VERCEL_URL", "").strip()  # e.g., myapp.vercel.app
+if vercel_url:
+    _allowed.add(f"https://{vercel_url}")
+# Common dev origins (ignored if settings already specify)
+_allowed.update({
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+})
 
 _allowed_regex = getattr(settings, "allowed_origin_regex", None)
 
@@ -54,7 +67,7 @@ if _allowed_regex:
 else:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=list(_allowed),
+        allow_origins=sorted(list(_allowed)),
         **cors_common,
     )
 # --------------------------------------------------------------------
@@ -65,9 +78,15 @@ webroot = os.path.abspath(webroot)
 os.makedirs(webroot, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=webroot), name="uploads")
 
-# ----------------------------- Root route ---------------------------
+# ----------------------------- Root routes & health -----------------
 @app.api_route("/", methods=["GET", "HEAD"])
 async def _root():
+    # App Runner health check friendly
+    return PlainTextResponse("ok")
+
+# Optional: API base ping (helps frontend base-URL tests)
+@app.get("/api", response_class=PlainTextResponse)
+async def _api_root():
     return PlainTextResponse("ok")
 # --------------------------------------------------------------------
 
@@ -80,14 +99,13 @@ async def all_exception_handler(request: Request, exc: Exception):
     )
 
 # ---------------------- Try to import & register BIM -----------------
-# If anything goes wrong here (file missing, case mismatch, syntax error),
-# we log it but keep the app running so you can see why BIM is missing.
+# Keep BIM before any catch-all/proxy so it isn't shadowed.
 bim_loaded = False
 try:
     from .routes.bim import router as bim_router, bim_validation_exception_handler
+    # Let BIM customize RequestValidationError (e.g., orjson-friendly)
     app.add_exception_handler(RequestValidationError, bim_validation_exception_handler)
-    # Register BIM BEFORE proxy so /api/bim isn't shadowed
-    app.include_router(bim_router)
+    app.include_router(bim_router)  # NOTE: prefix should be /api/bim in the router itself
     bim_loaded = True
     print("[API] BIM router included ✅")
 except Exception as e:
@@ -95,6 +113,7 @@ except Exception as e:
     print("[API] BIM router NOT included ❌ ->", repr(e))
 
 # ----------------------------- Include routes -----------------------
+# Specific routers
 app.include_router(health.router)
 app.include_router(posts.router)
 app.include_router(projects.router)
@@ -142,6 +161,7 @@ async def _startup():
         print(f"[API] Allowed Origin Regex: {_allowed_regex}")
     print(f"[API] Token lifetime (minutes): {settings.token_minutes}")
     print(f"[API] BIM loaded: {bim_loaded}")
+    print(f"[API] Docs: /docs  |  Redoc: /redoc  |  Routes dump: /api/_routes")
 
     global DB_INIT_TASK
     DB_INIT_TASK = asyncio.create_task(_init_pool_background())
@@ -153,7 +173,7 @@ async def _startup():
         except Exception:
             pass
 
-# Optional: readiness that reflects DB status (still cheap)
+# -------- Health / introspection --------
 @app.get("/api/health/ready", response_class=PlainTextResponse)
 async def _ready():
     try:
@@ -163,13 +183,16 @@ async def _ready():
     except Exception as e:
         return PlainTextResponse("error: {}".format(e), status_code=503)
 
-# Tiny introspection endpoint to see routes live in AWS
 @app.get("/api/_routes", response_class=JSONResponse)
 async def _routes():
     return [
         {"methods": sorted(list(getattr(r, "methods", set()))), "path": getattr(r, "path", "")}
         for r in app.routes
     ]
+
+@app.get("/api/_meta", response_class=JSONResponse)
+async def _meta():
+    return {"bim_loaded": bim_loaded}
 
 # -------- Auth endpoints (owner) --------
 auth_router = APIRouter()

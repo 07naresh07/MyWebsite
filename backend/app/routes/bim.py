@@ -7,16 +7,14 @@ from fastapi.exception_handlers import request_validation_exception_handler as d
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from pathlib import Path
-import uuid, shutil, asyncio, base64
+import uuid, shutil, asyncio, base64, os  # <- added os (for optional logging)
 import orjson
 
-# Import the module so we can access get_pool()/pool/init_pool
 from .. import db
 from ..config import settings
 
 router = APIRouter(prefix="/api/bim", tags=["bim"])
 
-# ---------------- Exception handling helper (registered in app/main.py) -----
 def _safe_jsonable(val):
     if isinstance(val, (bytes, bytearray)):
         return {"__bytes_b64__": base64.b64encode(val).decode("ascii")}
@@ -31,7 +29,6 @@ async def bim_validation_exception_handler(request: Request, exc: RequestValidat
         return JSONResponse(status_code=422, content={"detail": _safe_jsonable(exc.errors())})
     return await default_validation_handler(request, exc)
 
-# ---- Robust pool getter -----------------------------------------------------
 async def _get_pool(timeout_sec: float = 5.0):
     deadline = asyncio.get_event_loop().time() + timeout_sec
     last_err = None
@@ -53,9 +50,7 @@ async def _get_pool(timeout_sec: float = 5.0):
         await asyncio.sleep(0.1)
     raise HTTPException(status_code=503, detail=f"Database not ready: {last_err or 'initializing'}")
 
-# ---------- Models -----------------------------------------------------------
 class BimBlock(BaseModel):
-    # Accept h1/h2 from UI and keep them as-is
     type: Literal["text", "image", "code", "h1", "h2"]
     value: str
     language: Optional[str] = None
@@ -70,7 +65,6 @@ class BimUpdate(BaseModel):
     blocks: Optional[List[BimBlock]] = None
     tags: Optional[List[str]] = None
 
-# ---------- Normalization helpers -------------------------------------------
 _LANG_MAP = {
     None: None,
     "js": "js", "javascript": "js",
@@ -81,7 +75,6 @@ _LANG_MAP = {
 }
 
 def _normalize_block(b: BimBlock) -> dict:
-    # FIXED: Keep h1, h2, text, image, code types as-is
     t = b.type
     lang = None
     if t == "code":
@@ -92,7 +85,6 @@ def _normalize_block(b: BimBlock) -> dict:
 def _normalize_blocks(blocks: List[BimBlock]) -> List[dict]:
     return [_normalize_block(b) for b in blocks]
 
-# ---------- SQL --------------------------------------------------------------
 LIST_SQL = """
 select
   e.id, e.title, e.created_at,
@@ -128,10 +120,14 @@ group by e.id;
 """
 
 INSERT_ENTRY_SQL = "insert into public.bim_entries (title, tags) values ($1, $2) returning id, title, created_at, tags;"
-INSERT_BLOCK_SQL = "insert into public.bim_blocks (entry_id, idx, type, value, language) values ($1, $2, $3, $4, $5);"
+
+# ↓↓↓ changed: add a RETURNING form we can use in the helper
+INSERT_BLOCK_SQL          = "insert into public.bim_blocks (entry_id, idx, type, value, language) values ($1, $2, $3, $4, $5);"
+INSERT_BLOCK_SQL_RETURNING = "insert into public.bim_blocks (entry_id, idx, type, value, language) values ($1, $2, $3, $4, $5) returning id;"
+
 DELETE_BLOCKS_SQL = "delete from public.bim_blocks where entry_id = $1;"
 DELETE_ENTRY_SQL  = "delete from public.bim_entries where id = $1;"
-UPDATE_ENTRY_SQL = "update public.bim_entries set title = $2, tags = $3 where id = $1 returning id;"
+UPDATE_ENTRY_SQL  = "update public.bim_entries set title = $2, tags = $3 where id = $1 returning id;"
 
 def _row_to_dict_with_parsed_blocks(row) -> dict:
     d = dict(row)
@@ -139,7 +135,6 @@ def _row_to_dict_with_parsed_blocks(row) -> dict:
         d["blocks"] = orjson.loads(d["blocks"])
     return d
 
-# ---- IMAGE UPLOAD FIRST (so it wins over /{entry_id}) -----------------------
 DEFAULT_UPLOAD_ROOT = Path(__file__).resolve().parents[1] / "uploads"
 UPLOAD_DIR = Path(settings.web_root or DEFAULT_UPLOAD_ROOT)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -179,7 +174,83 @@ async def upload_image(
 
     return {"url": f"/uploads/{name}", "filename": name, "content_type": ctype}
 
-# ---------- CRUD Routes ------------------------------------------------------
+# ---------- Robust insert with auto-heal -------------------------------------
+from asyncpg import exceptions as pgexc
+
+FIND_ATTACHED_SEQ_SQL = """
+SELECT n.nspname||'.'||s.relname
+FROM pg_class s
+JOIN pg_namespace n ON n.oid = s.relnamespace
+JOIN pg_depend d    ON d.objid = s.oid
+JOIN pg_class t     ON t.oid = d.refobjid
+JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+WHERE s.relkind = 'S'
+  AND n.nspname = 'public'
+  AND t.relname = 'bim_blocks'
+  AND a.attname = 'id'
+LIMIT 1;
+"""
+
+RESET_SEQ_TO_MAX_SQL = """
+SELECT setval($1, (SELECT COALESCE(MAX(id),0)+1 FROM public.bim_blocks), false);
+"""
+
+# optional debug switch: set env LOG_BIM_SEQ=1 to see ids chosen
+LOG_BIM_SEQ = os.getenv("LOG_BIM_SEQ", "0") == "1"
+
+async def _insert_block_with_retry(conn, entry_id, i, b):
+    # 1) normal insert (RETURNING id to see what PG picked)
+    try:
+        row = await conn.fetchrow(INSERT_BLOCK_SQL_RETURNING, entry_id, i, b["type"], b["value"], b["language"])
+        if LOG_BIM_SEQ:
+            print("[bim] insert ok -> id", row["id"])
+        return
+    except pgexc.UniqueViolationError as e:
+        if 'bim_blocks_pkey' not in str(e):
+            raise
+        if LOG_BIM_SEQ:
+            print("[bim] duplicate on first try; attempting seq reset")
+
+    # 2) bump the actual attached sequence and retry once
+    seqname = await conn.fetchval(FIND_ATTACHED_SEQ_SQL)
+    if seqname:
+        await conn.execute(RESET_SEQ_TO_MAX_SQL, seqname)
+        try:
+            row = await conn.fetchrow(INSERT_BLOCK_SQL_RETURNING, entry_id, i, b["type"], b["value"], b["language"])
+            if LOG_BIM_SEQ:
+                print("[bim] after reset -> id", row["id"])
+            return
+        except pgexc.UniqueViolationError as e2:
+            if 'bim_blocks_pkey' not in str(e2):
+                raise
+            if LOG_BIM_SEQ:
+                print("[bim] duplicate even after reset; falling back")
+
+    # 3) last resort: advisory xact lock + explicit id (race-safe)
+    await conn.execute("SELECT pg_advisory_xact_lock(hashtext('public.bim_blocks.id'));")
+    # small cushion: jump next id a little if needed
+    next_id_row = await conn.fetchrow("SELECT GREATEST(COALESCE(MAX(id),0)+1, (SELECT last_value FROM public.bim_blocks_id_seq)+1) AS nid FROM public.bim_blocks;")
+    next_id = int(next_id_row["nid"])
+    # try a small jump forward if we still collide for any reason
+    for bump in (0, 10, 100):
+        try:
+            nid = next_id + bump
+            await conn.execute(
+                "INSERT INTO public.bim_blocks (id, entry_id, idx, type, value, language) "
+                "VALUES ($1, $2, $3, $4, $5, $6);",
+                nid, entry_id, i, b["type"], b["value"], b["language"]
+            )
+            if LOG_BIM_SEQ:
+                print("[bim] fallback explicit id ->", nid)
+            return
+        except pgexc.UniqueViolationError as e3:
+            if 'bim_blocks_pkey' not in str(e3):
+                raise
+            continue
+    # if we somehow still failed (very unlikely), raise the last error
+    raise HTTPException(status_code=500, detail="Could not allocate unique id for bim_blocks")
+
+# ------------------------------- CRUD ----------------------------------------
 @router.get("", response_model=List[dict])
 @router.get("/", response_model=List[dict])
 async def list_entries():
@@ -208,7 +279,7 @@ async def create_entry(payload: BimCreate):
             e = await conn.fetchrow(INSERT_ENTRY_SQL, payload.title.strip(), payload.tags or [])
             entry_id = e["id"]
             for i, b in enumerate(_normalize_blocks(payload.blocks)):
-                await conn.execute(INSERT_BLOCK_SQL, entry_id, i, b["type"], b["value"], b["language"])
+                await _insert_block_with_retry(conn, entry_id, i, b)
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
         return _row_to_dict_with_parsed_blocks(row)
 
@@ -234,7 +305,7 @@ async def update_entry(entry_id: int, payload: BimUpdate):
             await conn.fetchrow(UPDATE_ENTRY_SQL, entry_id, title, tags)
             await conn.execute(DELETE_BLOCKS_SQL, entry_id)
             for i, b in enumerate(norm):
-                await conn.execute(INSERT_BLOCK_SQL, entry_id, i, b["type"], b["value"], b["language"])
+                await _insert_block_with_retry(conn, entry_id, i, b)
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
         return _row_to_dict_with_parsed_blocks(row)
 
@@ -260,11 +331,10 @@ async def patch_entry(entry_id: int, payload: BimUpdate):
                 norm = _normalize_blocks(payload.blocks)
                 await conn.execute(DELETE_BLOCKS_SQL, entry_id)
                 for i, b in enumerate(norm):
-                    await conn.execute(INSERT_BLOCK_SQL, entry_id, i, b["type"], b["value"], b["language"])
+                    await _insert_block_with_retry(conn, entry_id, i, b)
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
         return _row_to_dict_with_parsed_blocks(row)
 
-# ----- METHOD-OVERRIDE: keep this LAST so it doesn't shadow /upload-image ----
 @router.post("/{entry_id}")
 @router.post("/{entry_id}/")
 async def method_override(entry_id: int, payload: dict, request: Request):

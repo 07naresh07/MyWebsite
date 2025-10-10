@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
-  BookOpen, Trash2, Edit3, Plus, Eye, Copy, Star,
-  ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw
+  BookOpen, Trash2, Edit3, Plus, Eye, Star,
+  ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw,
+  Search, SortAsc, X, AlertTriangle, Type, Bookmark
 } from "lucide-react";
 import { useOwnerMode } from "../lib/owner.js";
 
@@ -30,16 +31,122 @@ async function fetchJSON(path, options = {}) {
   return res.json();
 }
 
-/* ---------- Render HTML Content (for rich text blocks) ---------- */
+/* ---------- Delete Confirmation Modal ---------- */
+function DeleteConfirmationModal({ item, onConfirm, onCancel, darkMode }) {
+  const [confirmText, setConfirmText] = useState("");
+  const [showWarning, setShowWarning] = useState(false);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setShowWarning(true), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const blockCount = item?.blocks?.length || 0;
+  const hasContent = blockCount > 0;
+  const confirmationWord = "DELETE";
+  const isConfirmValid = confirmText.trim().toUpperCase() === confirmationWord;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+      <div
+        className={`rounded-2xl shadow-2xl max-w-md w-full ${
+          darkMode ? "bg-slate-800 border-2 border-red-500" : "bg-white border-2 border-red-500"
+        }`}
+      >
+        <div className="bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-4 flex items-center gap-3 rounded-t-xl">
+          <AlertTriangle size={32} className="flex-shrink-0" />
+          <div>
+            <h2 className="text-xl font-bold">Confirm Deletion</h2>
+            <p className="text-sm text-red-100">This action cannot be undone!</p>
+          </div>
+        </div>
+
+        <div className={`p-6 space-y-4 ${darkMode ? "text-slate-200" : "text-slate-800"}`}>
+          {showWarning && (
+            <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 p-4 rounded animate-pulse">
+              <div className="flex items-start gap-3">
+                <AlertTriangle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-semibold text-red-800 dark:text-red-200 mb-1">
+                    ⚠️ Warning: Permanent Deletion
+                  </p>
+                  <p className="text-red-700 dark:text-red-300">
+                    You are about to permanently delete this entry. This will remove all {blockCount} content block{blockCount !== 1 ? 's' : ''} and cannot be recovered.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="font-semibold mb-2">Entry Details:</p>
+            <div className={`p-3 rounded-lg ${darkMode ? "bg-slate-700" : "bg-slate-100"}`}>
+              <p className="text-sm"><strong>Title:</strong> {item?.title || "Untitled"}</p>
+              <p className="text-sm"><strong>ID:</strong> {item?.id}</p>
+              <p className="text-sm"><strong>Content Blocks:</strong> {blockCount}</p>
+            </div>
+          </div>
+
+          {hasContent && (
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                Type <span className="text-red-600 font-mono">{confirmationWord}</span> to confirm:
+              </label>
+              <input
+                type="text"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="Type DELETE here"
+                className={`w-full px-4 py-2 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                  darkMode 
+                    ? "bg-slate-700 border-slate-600 text-white placeholder-slate-400" 
+                    : "bg-white border-slate-300 text-slate-900 placeholder-slate-400"
+                }`}
+                autoFocus
+              />
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onCancel}
+              className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                darkMode 
+                  ? "bg-slate-700 text-slate-200 hover:bg-slate-600" 
+                  : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+              }`}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={hasContent && !isConfirmValid}
+              className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                hasContent && !isConfirmValid
+                  ? "bg-red-300 text-red-100 cursor-not-allowed opacity-50"
+                  : "bg-red-600 text-white hover:bg-red-700"
+              }`}
+            >
+              <span className="inline-flex items-center justify-center gap-2">
+                <Trash2 size={18} />
+                Delete Permanently
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Render HTML Content ---------- */
 function renderHTMLContent(htmlContent, className = "") {
   if (!htmlContent) return null;
-
-  // If it's plain text (no HTML tags), render normally
   if (!htmlContent.includes("<")) {
     return <div className={className}>{htmlContent}</div>;
   }
-
-  // Render HTML content with proper styling
   return (
     <div
       className={`rich-text-content ${className}`}
@@ -48,19 +155,16 @@ function renderHTMLContent(htmlContent, className = "") {
   );
 }
 
-/* ---------- Full-Screen Image Viewer with Zoom/Pan ---------- */
+/* ---------- Full-Screen Image Viewer ---------- */
 function FullScreenImageViewer({ images = [], initialIndex = 0, onClose }) {
   const safeImages = Array.isArray(images) ? images.filter((im) => im && im.value) : [];
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-
-  // zoom / pan state
   const containerRef = useRef(null);
   const imgRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const dragState = useRef({ dragging: false, startX: 0, startY: 0, startOffsetX: 0, startOffsetY: 0 });
 
-  // Reset zoom/pan whenever image index changes
   useEffect(() => {
     setScale(1);
     setOffset({ x: 0, y: 0 });
@@ -76,7 +180,6 @@ function FullScreenImageViewer({ images = [], initialIndex = 0, onClose }) {
         setCurrentIndex((prev) => (prev === safeImages.length - 1 ? 0 : prev + 1));
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [safeImages.length, onClose]);
@@ -98,20 +201,15 @@ function FullScreenImageViewer({ images = [], initialIndex = 0, onClose }) {
   const zoomAtPoint = (deltaScale, clientX, clientY) => {
     const container = containerRef.current;
     if (!container) return;
-
     const rect = container.getBoundingClientRect();
     const cx = clientX - rect.left - rect.width / 2 - offset.x;
     const cy = clientY - rect.top - rect.height / 2 - offset.y;
-
     const newScale = clamp(scale * deltaScale, 1, 5);
-
-    // Keep point under cursor stable: adjust offset
     const k = newScale / scale;
     const newOffset = {
       x: offset.x - cx * (k - 1),
       y: offset.y - cy * (k - 1),
     };
-
     setScale(newScale);
     setOffset(newOffset);
   };
@@ -124,15 +222,13 @@ function FullScreenImageViewer({ images = [], initialIndex = 0, onClose }) {
 
   const onDoubleClick = (e) => {
     e.stopPropagation();
-    // Cycle 1 → 1.5 → 3 → 1
     const next = scale < 1.25 ? 1.5 : scale < 2.5 ? 3 : 1;
     const deltaScale = next / scale;
     zoomAtPoint(deltaScale, e.clientX, e.clientY);
   };
 
-  // Pointer drag for panning
   const onPointerDown = (e) => {
-    if (scale === 1) return; // no pan if not zoomed
+    if (scale === 1) return;
     const el = e.currentTarget;
     el.setPointerCapture?.(e.pointerId);
     dragState.current = {
@@ -178,14 +274,12 @@ function FullScreenImageViewer({ images = [], initialIndex = 0, onClose }) {
       className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center"
       onClick={onClose}
     >
-      {/* top-left counter */}
       {safeImages.length > 1 && (
         <div className="absolute top-6 left-6 px-4 py-2 bg-black/50 text-white rounded-lg font-semibold select-none">
           {currentIndex + 1} / {safeImages.length}
         </div>
       )}
 
-      {/* top-right controls */}
       <div className="absolute top-6 right-6 flex gap-2 z-10">
         <button
           type="button"
@@ -231,7 +325,6 @@ function FullScreenImageViewer({ images = [], initialIndex = 0, onClose }) {
         </button>
       </div>
 
-      {/* image area */}
       <div
         ref={containerRef}
         className="relative max-w-[95vw] max-h-[95vh] overflow-hidden touch-none"
@@ -419,7 +512,7 @@ function groupConsecutiveImages(blocks = []) {
   return grouped;
 }
 
-/* ---------- first H1 extraction (data-only) ---------- */
+/* ---------- first H1 extraction ---------- */
 function extractMainTitle(blocks = []) {
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
@@ -457,7 +550,7 @@ function BlockPreview({ blocks = [], darkMode = false, onFullScreen }) {
       }`}
     >
       {groupedBlocks.slice(0, 5).map((block, idx) => {
-        if (block?.type === "h1") return null; // Skip h1 in preview
+        if (block?.type === "h1") return null;
 
         if (block?.type === "h2") {
           const textContent = String(block.value || "").replace(/<[^>]*>/g, "").slice(0, 100);
@@ -538,15 +631,23 @@ function BlockPreview({ blocks = [], darkMode = false, onFullScreen }) {
   );
 }
 
-/* ---------- Full View Modal (with dark-mode contrast fix) ---------- */
+/* ---------- Full View Modal with Reading Features ---------- */
 function FullViewModal({ item, onClose, owner, onEdit }) {
   const [expandedCodeBlocks, setExpandedCodeBlocks] = useState(new Set());
   const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
   const [fullScreenImages, setFullScreenImages] = useState(null);
   const [fullScreenIndex, setFullScreenIndex] = useState(0);
+  
+  // Reading Features
+  const [fontSize, setFontSize] = useState(18);
+  const [lineHeight, setLineHeight] = useState(1.7);
+  const [fontFamily, setFontFamily] = useState("default");
+  const [readingMode, setReadingMode] = useState(false);
+  const [sepiaMode, setSepiaMode] = useState(false);
+  const [showReadingPanel, setShowReadingPanel] = useState(false);
+  const [bookmarkedSections, setBookmarkedSections] = useState(new Set());
 
-  // NEW: container ref for the scrollable content (used by contrast fixer)
   const contentRef = useRef(null);
 
   useEffect(() => {
@@ -590,7 +691,24 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
     setFullScreenIndex(0);
   };
 
-  /* --------- Dark mode contrast fixer (only adjusts too-dark colors) --------- */
+  const toggleBookmark = (index) => {
+    setBookmarkedSections(prev => {
+      const next = new Set(prev);
+      next.has(index) ? next.delete(index) : next.add(index);
+      return next;
+    });
+  };
+
+  const getFontFamilyClass = () => {
+    switch(fontFamily) {
+      case 'serif': return 'font-serif';
+      case 'mono': return 'font-mono';
+      case 'sans': return 'font-sans';
+      default: return '';
+    }
+  };
+
+  /* --------- Dark mode contrast fixer (from original script) --------- */
   const parseRGB = (s) => {
     const m = s.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
     if (!m) return null;
@@ -604,7 +722,7 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
     return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
   };
 
-  const fixDarkModeContrast = (enable) => {
+  const fixDarkModeContrast = useCallback((enable) => {
     const root = contentRef.current;
     if (!root) return;
 
@@ -626,6 +744,11 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
       // skip code blocks; they already have high-contrast styling
       if (el.closest("pre, code")) return;
 
+      // CRITICAL: Skip elements with inline styles - these are user-formatted
+      const inlineColor = el.style.color?.trim();
+      const hasInlineColor = inlineColor && inlineColor !== "";
+      if (hasInlineColor) return; // Don't touch user's intentional colors
+
       const cs = getComputedStyle(el);
       const rgb = parseRGB(cs.color);
       if (!rgb) return;
@@ -635,20 +758,20 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
       if (lum < 0.28) {
         // store original only once
         if (!el.hasAttribute("data-rtx-original-color")) {
-          const inlineColor = el.style.color?.trim();
-          el.setAttribute("data-rtx-original-color", inlineColor ? inlineColor : "__unset__");
+          el.setAttribute("data-rtx-original-color", "__unset__");
         }
         // readable light gray that respects dark theme
-        el.style.color = "var(--rtx-darkmode-fg, #e5e7eb)"; // Tailwind slate-200
+        el.style.color = "#e5e7eb"; // Tailwind slate-200
       }
     });
-  };
+  }, []);
 
   useEffect(() => {
-    fixDarkModeContrast(darkMode);
-    // Re-run also when item changes (new content)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [darkMode, item]);
+    // Only apply dark mode contrast fix when not in sepia mode
+    if (!sepiaMode) {
+      fixDarkModeContrast(darkMode);
+    }
+  }, [darkMode, sepiaMode, item, fontSize, lineHeight, fontFamily, fixDarkModeContrast]);
 
   return (
     <>
@@ -659,31 +782,218 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
       <div
         className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 ${darkMode ? "dark" : ""}`}
         onClick={onClose}
-        style={{ "--rtx-darkmode-fg": "#e5e7eb" }} // optional override for adjusted text color
       >
         <div
-          className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden ${darkMode ? "bg-slate-900" : "bg-white"}`}
+          className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden ${
+            sepiaMode 
+              ? "bg-[#f4e8d4]"
+              : darkMode 
+              ? "bg-slate-900" 
+              : "bg-white"
+          }`}
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
         >
-          <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-4 flex items-center justify-between">
+          <div className={`sticky top-0 ${
+            sepiaMode
+              ? "bg-gradient-to-r from-amber-700 to-amber-800"
+              : "bg-gradient-to-r from-blue-600 to-cyan-600"
+          } text-white px-6 py-4 flex items-center justify-between z-10`}>
             <h1 className="text-3xl font-bold">{displayTitle}</h1>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-              title="Close"
-              aria-label="Close"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReadingPanel(!showReadingPanel);
+                }}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                title="Reading Settings"
+              >
+                <Type size={20} />
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                title="Close"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
 
+          {/* Reading Settings Panel */}
+          {showReadingPanel && (
+            <div className={`px-6 py-4 border-b ${
+              sepiaMode
+                ? "bg-[#e8dcc8] border-amber-700"
+                : darkMode 
+                ? "bg-slate-800 border-slate-700" 
+                : "bg-slate-50 border-slate-200"
+            }`}>
+              <h3 className={`text-sm font-bold mb-3 ${
+                sepiaMode
+                  ? "text-[#3d2817]"
+                  : darkMode 
+                  ? "text-slate-200" 
+                  : "text-slate-700"
+              }`}>
+                📖 Reading Settings
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`text-xs font-semibold block mb-1 ${
+                    sepiaMode
+                      ? "text-[#5c4033]"
+                      : darkMode 
+                      ? "text-slate-300" 
+                      : "text-slate-600"
+                  }`}>
+                    Font Size: {fontSize}px
+                  </label>
+                  <input
+                    type="range"
+                    min="14"
+                    max="28"
+                    value={fontSize}
+                    onChange={(e) => setFontSize(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className={`text-xs font-semibold block mb-1 ${
+                    sepiaMode
+                      ? "text-[#5c4033]"
+                      : darkMode 
+                      ? "text-slate-300" 
+                      : "text-slate-600"
+                  }`}>
+                    Line Height: {lineHeight.toFixed(1)}
+                  </label>
+                  <input
+                    type="range"
+                    min="1.3"
+                    max="2.5"
+                    step="0.1"
+                    value={lineHeight}
+                    onChange={(e) => setLineHeight(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className={`text-xs font-semibold block mb-1 ${
+                    sepiaMode
+                      ? "text-[#5c4033]"
+                      : darkMode 
+                      ? "text-slate-300" 
+                      : "text-slate-600"
+                  }`}>
+                    Font Family
+                  </label>
+                  <select
+                    value={fontFamily}
+                    onChange={(e) => setFontFamily(e.target.value)}
+                    className={`w-full px-2 py-1 rounded text-sm ${
+                      sepiaMode
+                        ? "bg-[#f4e8d4] text-[#5c4033] border border-amber-700"
+                        : darkMode 
+                        ? "bg-slate-700 text-slate-200" 
+                        : "bg-white text-slate-800"
+                    }`}
+                  >
+                    <option value="default">Default</option>
+                    <option value="serif">Serif</option>
+                    <option value="sans">Sans-serif</option>
+                    <option value="mono">Monospace</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReadingMode(!readingMode)}
+                  className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
+                    readingMode 
+                      ? sepiaMode
+                        ? "bg-amber-700 text-white"
+                        : "bg-blue-600 text-white"
+                      : sepiaMode
+                      ? "bg-amber-200 text-amber-900"
+                      : darkMode 
+                      ? "bg-slate-700 text-slate-200" 
+                      : "bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  {readingMode ? "Exit" : "Enable"} Focus Mode
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSepiaMode(!sepiaMode);
+                    if (!sepiaMode && darkMode) {
+                      setDarkMode(false);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors flex items-center gap-1 ${
+                    sepiaMode 
+                      ? "bg-amber-700 text-white" 
+                      : darkMode 
+                      ? "bg-slate-700 text-slate-200" 
+                      : "bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  <span className={sepiaMode ? "text-lg" : ""}>☀️</span>
+                  {sepiaMode ? "Exit" : "Enable"} Sepia Mode
+                </button>
+              </div>
+            </div>
+          )}
+
           <style>{`
-            /* Respect inline colors & text styles; do not override colors */
+            /* 
+              IMPORTANT: Inline styles naturally have higher specificity than classes
+              So any element with style="color:..." will override these defaults
+            */
+            
+            /* Default text colors for dark mode */
+            .dark-mode-content .rich-text-content {
+              color: #e5e7eb;
+            }
+            
+            /* Default text colors for light mode */
+            .light-mode-content .rich-text-content {
+              color: #1e293b;
+            }
+            
+            /* Default text colors for sepia mode */
+            .sepia-mode .rich-text-content {
+              color: #5c4033;
+            }
+            
+            /* Headers in sepia mode */
+            .sepia-mode h1,
+            .sepia-mode h2 {
+              color: #3d2817;
+            }
+            
+            /* Headers in dark mode */
+            .dark-mode-content h1,
+            .dark-mode-content h2 {
+              color: #f1f5f9;
+            }
+            
+            /* Headers in light mode */
+            .light-mode-content h1,
+            .light-mode-content h2 {
+              color: #0f172a;
+            }
+            
+            /* List and paragraph formatting */
             .rich-text-content ul,
             .rich-text-content ol {
               margin-left: 1.5rem;
@@ -697,28 +1007,56 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
             .rich-text-content strong { font-weight: 600; }
             .rich-text-content em { font-style: italic; }
             .rich-text-content u { text-decoration: underline; }
-            /* NOTE: do not add a rule that forces <font> color to inherit */
+            
+            /* 
+              No rules needed for inline styles - they automatically win!
+              User's colors, backgrounds, fonts, and sizes are preserved.
+            */
           `}</style>
 
           <div
             ref={contentRef}
-            className={`overflow-y-auto max-h-[calc(90vh-80px)] p-8 pb-24 ${darkMode ? "bg-slate-900" : "bg-white"}`}
+            className={`overflow-y-auto max-h-[calc(90vh-80px)] p-8 pb-24 ${
+              sepiaMode 
+                ? "bg-[#f4e8d4] sepia-mode" 
+                : darkMode 
+                ? "bg-slate-900 dark-mode-content" 
+                : "bg-white light-mode-content"
+            } ${readingMode ? "max-w-3xl mx-auto" : ""} ${getFontFamilyClass()}`}
+            style={{
+              fontSize: `${fontSize}px`,
+              lineHeight: lineHeight
+            }}
           >
             <div className="max-w-none space-y-6">
               {groupedBlocks.length ? (
                 groupedBlocks.map((block, idx) => {
-                  if (block?.type === "h1") return null; // header already shows title
+                  if (block?.type === "h1") return null;
 
                   if (block?.type === "h2") {
                     return (
-                      <h2
-                        key={`h2-${idx}`}
-                        className={`text-3xl font-extrabold mb-3 mt-4 pb-2 border-b-2 border-blue-400 ${
-                          darkMode ? "text-slate-100" : "text-slate-900"
-                        }`}
-                      >
-                        {renderHTMLContent(block.value)}
-                      </h2>
+                      <div key={`h2-${idx}`} className="relative group">
+                        {bookmarkedSections.has(idx) && (
+                          <Bookmark size={20} className="absolute -left-8 top-1 text-amber-500 fill-amber-500" />
+                        )}
+                        <h2
+                          className={`text-3xl font-extrabold mb-3 mt-4 pb-2 border-b-2 ${
+                            sepiaMode 
+                              ? "border-amber-700" 
+                              : "border-blue-400"
+                          }`}
+                        >
+                          {renderHTMLContent(block.value)}
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={() => toggleBookmark(idx)}
+                          className="absolute -right-8 top-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Bookmark section"
+                        >
+                          <Bookmark size={18} className={bookmarkedSections.has(idx) ? "fill-amber-500 text-amber-500" : "text-slate-400"} />
+                        </button>
+                      </div>
                     );
                   }
 
@@ -726,7 +1064,7 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
                     return (
                       <div
                         key={`p-${idx}`}
-                        className={`leading-relaxed text-lg ${darkMode ? "text-slate-200" : "text-slate-800"}`}
+                        className="leading-relaxed"
                       >
                         {renderHTMLContent(block.value)}
                       </div>
@@ -797,7 +1135,10 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
                                 </>
                               ) : (
                                 <>
-                                  <Copy size={14} /> Copy
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  Copy
                                 </>
                               )}
                             </span>
@@ -839,14 +1180,24 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
                   return null;
                 })
               ) : (
-                <p className={`text-center py-8 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>No content available</p>
+                <p className={`text-center py-8 ${
+                  sepiaMode
+                    ? "text-[#8b7355]"
+                    : darkMode 
+                    ? "text-slate-400" 
+                    : "text-slate-500"
+                }`}>No content available</p>
               )}
             </div>
           </div>
 
           <div
             className={`sticky bottom-0 px-6 py-4 border-t flex items-center justify-between ${
-              darkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-200"
+              sepiaMode
+                ? "bg-[#e8dcc8] border-amber-700"
+                : darkMode 
+                ? "bg-slate-800 border-slate-700" 
+                : "bg-slate-50 border-slate-200"
             }`}
           >
             <span className="text-sm">
@@ -854,12 +1205,22 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
                 <>
                   <span
                     className={`font-mono px-2 py-1 rounded border ${
-                      darkMode ? "bg-slate-900 text-slate-300 border-slate-600" : "bg-white text-slate-600 border-slate-200"
+                      sepiaMode
+                        ? "bg-[#f4e8d4] text-[#5c4033] border-amber-700"
+                        : darkMode 
+                        ? "bg-slate-900 text-slate-300 border-slate-600" 
+                        : "bg-white text-slate-600 border-slate-200"
                     }`}
                   >
                     ID: {item.id}
                   </span>
-                  <span className={`ml-3 ${darkMode ? "text-slate-400" : "text-slate-600"}`}>
+                  <span className={`ml-3 ${
+                    sepiaMode
+                      ? "text-[#5c4033]"
+                      : darkMode 
+                      ? "text-slate-400" 
+                      : "text-slate-600"
+                  }`}>
                     {item.blocks?.length || 0} block{item.blocks?.length !== 1 ? "s" : ""}
                   </span>
                 </>
@@ -872,7 +1233,11 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
                   type="button"
                   onClick={() => onEdit?.(item.id)}
                   className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                    darkMode ? "bg-blue-900/50 text-blue-300 hover:bg-blue-900/70" : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                    sepiaMode
+                      ? "bg-amber-200 text-amber-900 hover:bg-amber-300"
+                      : darkMode 
+                      ? "bg-blue-900/50 text-blue-300 hover:bg-blue-900/70" 
+                      : "bg-blue-100 text-blue-700 hover:bg-blue-200"
                   }`}
                   title="Edit (E)"
                 >
@@ -884,9 +1249,16 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
 
               <button
                 type="button"
-                onClick={() => setDarkMode(!darkMode)}
+                onClick={() => {
+                  setDarkMode(!darkMode);
+                  if (!darkMode) setSepiaMode(false);
+                }}
                 className={`p-2 rounded-lg transition-colors ${
-                  darkMode ? "bg-slate-700 text-yellow-400 hover:bg-slate-600" : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                  sepiaMode
+                    ? "bg-amber-200 text-amber-900 hover:bg-amber-300"
+                    : darkMode 
+                    ? "bg-slate-700 text-yellow-400 hover:bg-slate-600" 
+                    : "bg-slate-200 text-slate-700 hover:bg-slate-300"
                 }`}
                 title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
               >
@@ -896,7 +1268,11 @@ function FullViewModal({ item, onClose, owner, onEdit }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors"
+                className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+                  sepiaMode
+                    ? "bg-amber-700 text-white hover:bg-amber-800"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
               >
                 Close
               </button>
@@ -916,11 +1292,17 @@ export default function BIMDisplay() {
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState("");
   const [favorites, setFavorites] = useState(new Set());
-  const [copiedId, setCopiedId] = useState(null);
   const [viewingItem, setViewingItem] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
   const [fullScreenImages, setFullScreenImages] = useState(null);
   const [fullScreenIndex, setFullScreenIndex] = useState(0);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState(null);
+  
+  // Smart Features
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterFavorites, setFilterFavorites] = useState(false);
+  const [sortBy, setSortBy] = useState("recent");
+  
   const nav = useNavigate();
   const location = useLocation();
 
@@ -967,32 +1349,24 @@ export default function BIMDisplay() {
   }, [load, location.pathname, location.state, nav]);
 
   const onDelete = async (id) => {
-    if (!owner || !window.confirm("Delete this entry? This action cannot be undone.")) return;
+    if (!owner) return;
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    setDeleteConfirmItem(item);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmItem) return;
     try {
-      setBusyId(String(id));
-      await fetchJSON(`/api/bim/${id}`, { method: "DELETE", headers: { ...ownerHeaders() } });
-      setItems((prev) => prev.filter((p) => String(p?.id) !== String(id)));
+      setBusyId(String(deleteConfirmItem.id));
+      await fetchJSON(`/api/bim/${deleteConfirmItem.id}`, { method: "DELETE", headers: { ...ownerHeaders() } });
+      setItems((prev) => prev.filter((p) => String(p?.id) !== String(deleteConfirmItem.id)));
+      setDeleteConfirmItem(null);
     } catch (e) {
       alert(e?.message || "Delete failed");
     } finally {
       setBusyId("");
     }
-  };
-
-  const handleCopyContent = (item) => {
-    if (!item?.blocks?.length) return;
-    const text = item.blocks
-      .map((b) => {
-        if (b.type === "text" || b.type === "h1" || b.type === "h2") {
-          return (b.value || "").replace(/<[^>]*>/g, "");
-        }
-        return b.value || "";
-      })
-      .join("\n\n");
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiedId(item.id);
-      setTimeout(() => setCopiedId(null), 2000);
-    });
   };
 
   const handleDuplicate = async (id) => {
@@ -1027,6 +1401,39 @@ export default function BIMDisplay() {
     if (item) setViewingItem(item);
   };
 
+  // Filter and sort items
+  const filteredAndSortedItems = useMemo(() => {
+    let result = [...items];
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(item => {
+        const title = extractMainTitle(item.blocks || [])?.title || item.title || "";
+        const content = item.blocks?.map(b => String(b.value || '').replace(/<[^>]*>/g, '')).join(' ') || "";
+        return title.toLowerCase().includes(query) || content.toLowerCase().includes(query);
+      });
+    }
+
+    // Favorites filter
+    if (filterFavorites) {
+      result = result.filter(item => favorites.has(item.id));
+    }
+
+    // Sort
+    if (sortBy === "title") {
+      result.sort((a, b) => {
+        const titleA = (extractMainTitle(a.blocks || [])?.title || a.title || "").toLowerCase();
+        const titleB = (extractMainTitle(b.blocks || [])?.title || b.title || "").toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+    } else if (sortBy === "blocks") {
+      result.sort((a, b) => (b.blocks?.length || 0) - (a.blocks?.length || 0));
+    }
+
+    return result;
+  }, [items, searchQuery, filterFavorites, favorites, sortBy]);
+
   return (
     <div className={`min-h-screen ${darkMode ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50"}`}>
       {fullScreenImages && (
@@ -1039,6 +1446,15 @@ export default function BIMDisplay() {
           onClose={() => setViewingItem(null)}
           owner={owner}
           onEdit={(id) => { setViewingItem(null); goEdit(id); }}
+        />
+      )}
+
+      {deleteConfirmItem && (
+        <DeleteConfirmationModal
+          item={deleteConfirmItem}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteConfirmItem(null)}
+          darkMode={darkMode}
         />
       )}
 
@@ -1064,13 +1480,81 @@ export default function BIMDisplay() {
               <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                 <BookOpen size={36} />
               </div>
-              <h1 className="text-4xl font-bold tracking-tight">BIM (Building Information Modeling)</h1>
+              <h1 className="text-4xl font-bold tracking-tight">BIM Learning Hub</h1>
             </div>
             <p className="text-center text-blue-100 text-lg italic font-light">
-              "Transforming Civil &amp; Architectural Industry through intelligent digital representation"
+              "Your personal knowledge base for Building Information Modeling"
             </p>
           </div>
         </header>
+
+        {/* Search and Filter Bar */}
+        {!loading && items.length > 0 && (
+          <div className={`rounded-xl p-4 shadow-sm ${darkMode ? "bg-slate-800" : "bg-white"}`}>
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex-1 min-w-[200px] relative">
+                <Search size={20} className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? "text-slate-400" : "text-slate-500"}`} />
+                <input
+                  type="text"
+                  placeholder="Search entries..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`w-full pl-10 pr-4 py-2 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    darkMode 
+                      ? "bg-slate-700 border-slate-600 text-white placeholder-slate-400" 
+                      : "bg-white border-slate-200 text-slate-900 placeholder-slate-400"
+                  }`}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 ${darkMode ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700"}`}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setFilterFavorites(!filterFavorites)}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 ${
+                  filterFavorites 
+                    ? "bg-amber-500 text-white" 
+                    : darkMode ? "bg-slate-700 text-slate-200 hover:bg-slate-600" : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                }`}
+                title="Filter favorites"
+              >
+                <Star size={18} fill={filterFavorites ? "currentColor" : "none"} />
+                Favorites
+              </button>
+
+              <div className="flex items-center gap-2">
+                <SortAsc size={20} className={darkMode ? "text-slate-400" : "text-slate-600"} />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className={`px-3 py-2 rounded-lg font-semibold transition-colors ${
+                    darkMode ? "bg-slate-700 text-slate-200" : "bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  <option value="recent">Recent</option>
+                  <option value="title">Title (A-Z)</option>
+                  <option value="blocks">Content Size</option>
+                </select>
+              </div>
+            </div>
+
+            {(searchQuery || filterFavorites) && (
+              <div className={`mt-3 text-sm ${darkMode ? "text-slate-300" : "text-slate-600"}`}>
+                Showing {filteredAndSortedItems.length} of {items.length} entries
+                {searchQuery && ` matching "${searchQuery}"`}
+                {filterFavorites && ` in favorites`}
+              </div>
+            )}
+          </div>
+        )}
 
         {loading && (
           <div className="flex flex-col items-center justify-center py-32">
@@ -1096,9 +1580,9 @@ export default function BIMDisplay() {
           </div>
         )}
 
-        {!loading && !err && items.length > 0 && (
+        {!loading && !err && filteredAndSortedItems.length > 0 && (
           <div className="space-y-4">
-            {items.map((e) => {
+            {filteredAndSortedItems.map((e) => {
               const mainTitleInfo = extractMainTitle(e.blocks || []);
               const displayTitle = mainTitleInfo ? mainTitleInfo.title : e.title;
 
@@ -1162,26 +1646,6 @@ export default function BIMDisplay() {
                         </span>
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={(evt) => {
-                          evt.stopPropagation();
-                          handleCopyContent(e);
-                        }}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                          copiedId === e.id
-                            ? "bg-green-100 text-green-700"
-                            : darkMode
-                            ? "bg-slate-700 text-slate-200 hover:bg-slate-600"
-                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        }`}
-                        title="Copy content"
-                      >
-                        <span className="inline-flex items-center gap-1.5">
-                          <Copy size={16} /> {copiedId === e.id ? "Copied!" : "Copy"}
-                        </span>
-                      </button>
-
                       {owner && (
                         <>
                           <button
@@ -1212,7 +1676,7 @@ export default function BIMDisplay() {
                             title="Duplicate entry"
                           >
                             <span className="inline-flex items-center gap-1.5">
-                              <Copy size={16} /> Duplicate
+                              <Plus size={16} /> Duplicate
                             </span>
                           </button>
 
@@ -1255,7 +1719,7 @@ export default function BIMDisplay() {
           </div>
         )}
 
-        {!loading && !err && items.length > 0 && owner && (
+        {!loading && !err && filteredAndSortedItems.length > 0 && owner && (
           <div className="flex justify-center">
             <button
               type="button"
@@ -1265,6 +1729,28 @@ export default function BIMDisplay() {
               <span className="inline-flex items-center gap-2">
                 <Plus size={24} /> Create New Entry
               </span>
+            </button>
+          </div>
+        )}
+
+        {!loading && !err && items.length > 0 && filteredAndSortedItems.length === 0 && (
+          <div
+            className={`text-center py-24 rounded-2xl border-2 border-dashed shadow-inner ${
+              darkMode ? "bg-gradient-to-br from-slate-800 to-slate-700 border-slate-600" : "bg-gradient-to-br from-white to-slate-50 border-slate-300"
+            }`}
+          >
+            <Search size={56} className={`mx-auto mb-4 ${darkMode ? "text-slate-600" : "text-slate-300"}`} />
+            <p className={`font-bold text-2xl mb-2 ${darkMode ? "text-slate-200" : "text-slate-700"}`}>No entries match your filters</p>
+            <p className={`${darkMode ? "text-slate-400" : "text-slate-500"}`}>Try adjusting your search or filters</p>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setFilterFavorites(false);
+              }}
+              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition-colors"
+            >
+              Clear Filters
             </button>
           </div>
         )}
@@ -1282,6 +1768,7 @@ export default function BIMDisplay() {
               </div>
             </div>
             <p className={`font-bold text-2xl mb-2 ${darkMode ? "text-slate-200" : "text-slate-700"}`}>No BIM data available</p>
+            <p className={`mb-6 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>Start building your knowledge base today!</p>
             {owner && (
               <button
                 type="button"

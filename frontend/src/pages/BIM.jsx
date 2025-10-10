@@ -98,12 +98,13 @@ function BlockToolbar({
   canMoveDown
 }) {
   return (
-    <div className="absolute -left-16 top-0 flex flex-col gap-1 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5">
+    <div className="absolute -left-16 top-0 flex flex-col gap-1 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-[100]">
       <div 
-        className="p-2 rounded-lg hover:bg-slate-100 transition cursor-move drag-handle" 
+        className="p-2 rounded-lg hover:bg-slate-100 transition cursor-grab active:cursor-grabbing drag-handle" 
         title="Drag to reorder"
+        draggable="true"
       >
-        <GripVertical size={16} className="text-slate-400" />
+        <GripVertical size={16} className="text-slate-400 pointer-events-none" />
       </div>
       
       <button 
@@ -241,10 +242,11 @@ function HeadingBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, 
 function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onMoveToTop, onMoveToBottom, canMoveUp, canMoveDown, isDragging }) {
   const [showFormatBar, setShowFormatBar] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showHighlightPicker, setShowHighlightPicker] = useState(false);
   const editorRef = useRef(null);
   const colorPickerRef = useRef(null);
+  const highlightPickerRef = useRef(null);
 
-  // Initialize content once
   useEffect(() => {
     if (editorRef.current && block.value && editorRef.current.innerHTML !== block.value) {
       editorRef.current.innerHTML = block.value;
@@ -255,6 +257,9 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
     const handleClickOutside = (e) => {
       if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
         setShowColorPicker(false);
+      }
+      if (highlightPickerRef.current && !highlightPickerRef.current.contains(e.target)) {
+        setShowHighlightPicker(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -279,13 +284,89 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
     { hex: '#6B7280', name: 'Gray 500' },
     { hex: '#9CA3AF', name: 'Gray 400' },
     { hex: '#EF4444', name: 'Red' },
-    { hex: '#F59E0B', name: 'Orange' },
-    { hex: '#10B981', name: 'Green' },
+    { hex: '#DC2626', name: 'Red 600' },
+    { hex: '#F59E0B', name: 'Amber' },
+    { hex: '#D97706', name: 'Amber 600' },
+    { hex: '#10B981', name: 'Emerald' },
+    { hex: '#059669', name: 'Emerald 600' },
     { hex: '#3B82F6', name: 'Blue' },
-    { hex: '#8B5CF6', name: 'Purple' },
+    { hex: '#2563EB', name: 'Blue 600' },
+    { hex: '#8B5CF6', name: 'Violet' },
+    { hex: '#7C3AED', name: 'Violet 600' },
     { hex: '#EC4899', name: 'Pink' },
+    { hex: '#DB2777', name: 'Pink 600' },
     { hex: '#14B8A6', name: 'Teal' },
-    { hex: '#F97316', name: 'Orange' }
+    { hex: '#0D9488', name: 'Teal 600' },
+    { hex: '#F97316', name: 'Orange' },
+    { hex: '#EA580C', name: 'Orange 600' },
+    { hex: '#06B6D4', name: 'Cyan' },
+    { hex: '#0891B2', name: 'Cyan 600' },
+    { hex: '#84CC16', name: 'Lime' },
+    { hex: '#65A30D', name: 'Lime 600' }
+  ];
+
+  const highlightColors = [
+    { hex: '#FEF3C7', name: 'Yellow' },
+    { hex: '#FDE68A', name: 'Yellow 300' },
+    { hex: '#FCD34D', name: 'Yellow 400' },
+    { hex: '#FED7AA', name: 'Orange' },
+    { hex: '#FDBA74', name: 'Orange 300' },
+    { hex: '#FB923C', name: 'Orange 400' },
+    { hex: '#FECACA', name: 'Red' },
+    { hex: '#FCA5A5', name: 'Red 300' },
+    { hex: '#F87171', name: 'Red 400' },
+    { hex: '#FBCFE8', name: 'Pink' },
+    { hex: '#F9A8D4', name: 'Pink 300' },
+    { hex: '#F472B6', name: 'Pink 400' },
+    { hex: '#DDD6FE', name: 'Purple' },
+    { hex: '#C4B5FD', name: 'Purple 300' },
+    { hex: '#A78BFA', name: 'Purple 400' },
+    { hex: '#BFDBFE', name: 'Blue' },
+    { hex: '#93C5FD', name: 'Blue 300' },
+    { hex: '#60A5FA', name: 'Blue 400' },
+    { hex: '#BAE6FD', name: 'Sky' },
+    { hex: '#7DD3FC', name: 'Sky 300' },
+    { hex: '#38BDF8', name: 'Sky 400' },
+    { hex: '#A5F3FC', name: 'Cyan' },
+    { hex: '#67E8F9', name: 'Cyan 300' },
+    { hex: '#22D3EE', name: 'Cyan 400' },
+    { hex: '#99F6E4', name: 'Teal' },
+    { hex: '#5EEAD4', name: 'Teal 300' },
+    { hex: '#2DD4BF', name: 'Teal 400' },
+    { hex: '#BBF7D0', name: 'Green' },
+    { hex: '#86EFAC', name: 'Green 300' },
+    { hex: '#4ADE80', name: 'Green 400' },
+    { hex: '#D9F99D', name: 'Lime' },
+    { hex: '#BEF264', name: 'Lime 300' },
+    { hex: '#A3E635', name: 'Lime 400' },
+    { hex: '#E5E7EB', name: 'Gray' },
+    { hex: '#D1D5DB', name: 'Gray 300' },
+    { hex: '#9CA3AF', name: 'Gray 400' }
+  ];
+
+  const fontSizes = Array.from({ length: 33 }, (_, i) => i + 8);
+
+  const fontFamilies = [
+    { value: 'serif', name: 'Serif' },
+    { value: 'Georgia, serif', name: 'Georgia' },
+    { value: '"Times New Roman", serif', name: 'Times New Roman' },
+    { value: 'sans-serif', name: 'Sans Serif' },
+    { value: 'Arial, sans-serif', name: 'Arial' },
+    { value: 'Helvetica, sans-serif', name: 'Helvetica' },
+    { value: 'Verdana, sans-serif', name: 'Verdana' },
+    { value: 'Tahoma, sans-serif', name: 'Tahoma' },
+    { value: '"Trebuchet MS", sans-serif', name: 'Trebuchet MS' },
+    { value: '"Segoe UI", sans-serif', name: 'Segoe UI' },
+    { value: 'monospace', name: 'Monospace' },
+    { value: '"Courier New", monospace', name: 'Courier New' },
+    { value: 'Monaco, monospace', name: 'Monaco' },
+    { value: 'cursive', name: 'Cursive' },
+    { value: '"Comic Sans MS", cursive', name: 'Comic Sans' },
+    { value: '"Brush Script MT", cursive', name: 'Brush Script' },
+    { value: 'Garamond, serif', name: 'Garamond' },
+    { value: '"Palatino Linotype", serif', name: 'Palatino' },
+    { value: '"Book Antiqua", serif', name: 'Book Antiqua' },
+    { value: 'Impact, sans-serif', name: 'Impact' }
   ];
 
   return (
@@ -305,10 +386,8 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
         />
       </div>
 
-      {/* Formatting Toolbar */}
       {showFormatBar && (
-        <div className="mb-2 flex flex-wrap items-center gap-1 p-2 bg-white rounded-lg shadow-lg border border-slate-200 z-10">
-          {/* Text Style */}
+        <div className="mb-2 flex flex-wrap items-center gap-1 p-2 bg-white rounded-lg shadow-lg border border-slate-200 z-[90]">
           <div className="flex gap-1 pr-2 border-r border-slate-200">
             <button
               onMouseDown={(e) => {
@@ -343,9 +422,19 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
             >
               <span className="underline text-slate-700">U</span>
             </button>
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                execCommand('strikeThrough');
+              }}
+              className="p-2 rounded hover:bg-slate-100 transition"
+              title="Strikethrough"
+              type="button"
+            >
+              <span className="line-through text-slate-700">S</span>
+            </button>
           </div>
 
-          {/* Alignment */}
           <div className="flex gap-1 pr-2 border-r border-slate-200">
             <button
               onMouseDown={(e) => {
@@ -401,7 +490,6 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
             </button>
           </div>
 
-          {/* Lists */}
           <div className="flex gap-1 pr-2 border-r border-slate-200">
             <button
               onMouseDown={(e) => {
@@ -431,7 +519,6 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
             </button>
           </div>
 
-          {/* Color Picker */}
           <div className="relative" ref={colorPickerRef}>
             <button
               onMouseDown={(e) => {
@@ -449,9 +536,9 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
             </button>
             
             {showColorPicker && (
-              <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 z-50 min-w-[200px]">
+              <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 z-[100] min-w-[280px]">
                 <div className="text-xs font-semibold text-slate-500 mb-2 px-1">Text Color</div>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-6 gap-2">
                   {colors.map((color) => (
                     <button
                       key={color.hex}
@@ -460,7 +547,7 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
                         execCommand('foreColor', color.hex);
                         setShowColorPicker(false);
                       }}
-                      className="w-10 h-10 rounded-lg border-2 border-slate-200 hover:border-slate-400 hover:scale-110 transition-all shadow-sm hover:shadow-md"
+                      className="w-9 h-9 rounded-lg border-2 border-slate-200 hover:border-slate-400 hover:scale-110 transition-all shadow-sm hover:shadow-md"
                       style={{ backgroundColor: color.hex }}
                       title={color.name}
                       type="button"
@@ -471,26 +558,84 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
             )}
           </div>
 
+          <div className="relative" ref={highlightPickerRef}>
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setShowHighlightPicker(!showHighlightPicker);
+              }}
+              className="p-2 rounded hover:bg-slate-100 transition"
+              title="Highlight"
+              type="button"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+              </svg>
+            </button>
+            
+            {showHighlightPicker && (
+              <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 z-[100] min-w-[320px]">
+                <div className="text-xs font-semibold text-slate-500 mb-2 px-1">Highlight</div>
+                <div className="grid grid-cols-6 gap-2">
+                  {highlightColors.map((color) => (
+                    <button
+                      key={color.hex}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        execCommand('backColor', color.hex);
+                        setShowHighlightPicker(false);
+                      }}
+                      className="w-9 h-9 rounded-lg border-2 border-slate-200 hover:border-slate-400 hover:scale-110 transition-all shadow-sm hover:shadow-md"
+                      style={{ backgroundColor: color.hex }}
+                      title={color.name}
+                      type="button"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Font Family */}
+          <div className="flex gap-1 pr-2 border-r border-slate-200">
+            <select
+              onMouseDown={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                execCommand('fontName', e.target.value);
+              }}
+              className="text-sm px-2 py-1 rounded border border-slate-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
+              defaultValue="serif"
+            >
+              {fontFamilies.map(font => (
+                <option key={font.value} value={font.value}>
+                  {font.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Font Size */}
           <div className="flex gap-1">
             <select
               onMouseDown={(e) => e.stopPropagation()}
               onChange={(e) => {
-                execCommand('fontSize', e.target.value);
+                const size = parseInt(e.target.value);
+                const fontSize = size <= 10 ? '1' : size <= 13 ? '2' : size <= 16 ? '3' : size <= 18 ? '4' : size <= 24 ? '5' : size <= 32 ? '6' : '7';
+                execCommand('fontSize', fontSize);
               }}
-              className="text-sm px-2 py-1 rounded border border-slate-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              defaultValue="3"
+              className="text-sm px-2 py-1 rounded border border-slate-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[70px]"
+              defaultValue="14"
             >
-              <option value="1">Small</option>
-              <option value="3">Normal</option>
-              <option value="5">Large</option>
-              <option value="7">Huge</option>
+              {fontSizes.map(size => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
             </select>
           </div>
         </div>
       )}
 
-      {/* Editor with list styling - bullets inherit text color */}
       <style>{`
         [contenteditable] ul {
           list-style-type: disc;
@@ -517,18 +662,24 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
         [contenteditable] p:last-child {
           margin-bottom: 0;
         }
+        [contenteditable] code {
+          background-color: rgba(135, 131, 120, 0.15);
+          color: #eb5757;
+          border-radius: 3px;
+          font-size: 85%;
+          padding: 0.2em 0.4em;
+          font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+        }
+        [contenteditable] a {
+          color: #2563eb;
+          text-decoration: underline;
+        }
       `}</style>
       <div
         ref={editorRef}
         contentEditable
         suppressContentEditableWarning
         onInput={handleInput}
-        onKeyDown={(e) => {
-          // Allow Enter to create new lines/paragraphs within the block
-          if (e.key === 'Enter' && !e.shiftKey) {
-            // Let browser handle default Enter behavior for creating new paragraphs
-          }
-        }}
         onFocus={() => setShowFormatBar(true)}
         onBlur={(e) => {
           const toolbar = e.currentTarget.parentElement?.querySelector('.shadow-lg');
@@ -536,9 +687,9 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
             setTimeout(() => setShowFormatBar(false), 150);
           }
         }}
-        data-placeholder="Start typing your paragraph..."
-        className="w-full text-lg text-slate-700 leading-relaxed focus:outline-none bg-transparent hover:bg-slate-50/50 rounded-lg px-3 py-2 -mx-3 -my-2 transition focus:bg-slate-50/50 font-normal min-h-[48px] empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
-        style={{ wordBreak: 'break-word' }}
+        data-placeholder="Start typing your paragraph... Use `backticks` for inline code"
+        className="w-full text-lg leading-relaxed focus:outline-none bg-transparent hover:bg-slate-50/50 rounded-lg px-3 py-2 -mx-3 -my-2 transition focus:bg-slate-50/50 font-normal min-h-[48px] empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
+        style={{ wordBreak: 'break-word', color: '#000000', fontFamily: 'serif', fontSize: '14px' }}
       />
     </div>
   );
@@ -549,15 +700,17 @@ function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, on
   const [uploading, setUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState(block.value || "");
   const [imageError, setImageError] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [imageSize, setImageSize] = useState(block.size || "full");
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     setImageUrl(block.value || "");
+    setImageSize(block.size || "full");
     setImageError(false);
-  }, [block.value]);
+  }, [block.value, block.size]);
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
+  const handleFileUpload = async (file) => {
     if (!file) return;
     
     if (!file.type.startsWith("image/")) {
@@ -584,12 +737,44 @@ function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, on
     }
   };
 
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files[0]);
+    }
+  };
+
   const handleEdit = () => {
     fileInputRef.current?.click();
   };
 
   const handleImageError = () => {
     setImageError(true);
+  };
+
+  const handleSizeChange = (size) => {
+    setImageSize(size);
+    onUpdate(index, { ...block, size });
+  };
+
+  const sizeClasses = {
+    small: "max-w-md",
+    medium: "max-w-2xl",
+    large: "max-w-4xl",
+    full: "max-w-full"
   };
 
   if (!imageUrl || imageError) {
@@ -609,12 +794,18 @@ function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, on
             canMoveDown={canMoveDown}
           />
         </div>
-        <div className="border-2 border-dashed border-blue-300 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-16 text-center hover:border-blue-400 hover:shadow-lg transition-all">
+        <div 
+          className={`border-2 border-dashed ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-blue-300 bg-gradient-to-br from-blue-50 to-purple-50'} rounded-2xl p-16 text-center hover:border-blue-400 hover:shadow-lg transition-all`}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+        >
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            onChange={handleFileUpload}
+            onChange={(e) => handleFileUpload(e.target.files?.[0])}
             className="hidden"
           />
           <div className="flex flex-col items-center gap-4">
@@ -623,7 +814,8 @@ function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, on
             </div>
             <div>
               <h4 className="text-lg font-semibold text-slate-700 mb-1">Upload an Image</h4>
-              <p className="text-sm text-slate-500">PNG, JPG, GIF up to 10MB</p>
+              <p className="text-sm text-slate-500">Drag and drop or click to browse</p>
+              <p className="text-xs text-slate-400 mt-1">PNG, JPG, GIF up to 10MB</p>
             </div>
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -654,28 +846,47 @@ function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, on
           canMoveDown={canMoveDown}
         />
       </div>
-      <div className="rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all relative ring-1 ring-slate-200 group">
-        <img 
-          src={imageUrl} 
-          alt="" 
-          className="w-full" 
-          onError={handleImageError}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition" />
-        <button
-          onClick={handleEdit}
-          className="absolute top-4 right-4 px-4 py-2 bg-white/95 backdrop-blur-sm rounded-lg text-sm font-semibold text-slate-700 opacity-0 group-hover:opacity-100 transition-all shadow-lg hover:shadow-xl hover:bg-white"
-        >
-          Change Image
-        </button>
-        {uploading && (
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-              <p className="text-sm font-medium text-slate-700">Uploading...</p>
-            </div>
+      <div className={`mx-auto ${sizeClasses[imageSize]}`}>
+        <div className="rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all relative ring-1 ring-slate-200 group/img">
+          <img 
+            src={imageUrl} 
+            alt="" 
+            className="w-full" 
+            onError={handleImageError}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover/img:opacity-100 transition" />
+          <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover/img:opacity-100 transition-all">
+            <button
+              onClick={handleEdit}
+              className="px-4 py-2 bg-white/95 backdrop-blur-sm rounded-lg text-sm font-semibold text-slate-700 shadow-lg hover:shadow-xl hover:bg-white"
+            >
+              Change
+            </button>
           </div>
-        )}
+          <div className="absolute bottom-4 left-4 flex gap-2 opacity-0 group-hover/img:opacity-100 transition-all">
+            {['small', 'medium', 'large', 'full'].map(size => (
+              <button
+                key={size}
+                onClick={() => handleSizeChange(size)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  imageSize === size 
+                    ? 'bg-blue-600 text-white shadow-lg' 
+                    : 'bg-white/95 text-slate-700 hover:bg-white'
+                }`}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+          {uploading && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                <p className="text-sm font-medium text-slate-700">Uploading...</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -698,15 +909,52 @@ function CodeBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const languageColors = {
-    javascript: "text-yellow-400",
-    typescript: "text-blue-400",
-    python: "text-green-400",
-    html: "text-orange-400",
-    css: "text-pink-400"
+  const languages = [
+    "javascript", "typescript", "python", "java", "csharp", "cpp", "c",
+    "ruby", "go", "rust", "php", "swift", "kotlin", "scala",
+    "html", "css", "sql", "bash", "powershell", "json", "yaml", "xml"
+  ];
+
+  const themes = {
+    dark: {
+      name: "Dark",
+      bg: "bg-slate-900",
+      headerBg: "bg-gradient-to-r from-slate-800 to-slate-700",
+      text: "text-slate-100",
+      border: "border-slate-700"
+    },
+    monokai: {
+      name: "Monokai",
+      bg: "bg-[#272822]",
+      headerBg: "bg-gradient-to-r from-[#1e1f1c] to-[#272822]",
+      text: "text-[#f8f8f2]",
+      border: "border-[#3e3d32]"
+    },
+    github: {
+      name: "GitHub",
+      bg: "bg-[#f6f8fa]",
+      headerBg: "bg-gradient-to-r from-[#e1e4e8] to-[#f6f8fa]",
+      text: "text-[#24292e]",
+      border: "border-[#d1d5da]"
+    },
+    dracula: {
+      name: "Dracula",
+      bg: "bg-[#282a36]",
+      headerBg: "bg-gradient-to-r from-[#21222c] to-[#282a36]",
+      text: "text-[#f8f8f2]",
+      border: "border-[#44475a]"
+    },
+    nord: {
+      name: "Nord",
+      bg: "bg-[#2e3440]",
+      headerBg: "bg-gradient-to-r from-[#3b4252] to-[#2e3440]",
+      text: "text-[#d8dee9]",
+      border: "border-[#4c566a]"
+    }
   };
 
   const currentLang = block.language || "javascript";
+  const currentTheme = themes[block.theme || "dark"];
 
   return (
     <div 
@@ -724,22 +972,35 @@ function CodeBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
           canMoveDown={canMoveDown}
         />
       </div>
-      <div className="rounded-2xl overflow-hidden bg-slate-900 shadow-xl ring-1 ring-slate-700">
-        <div className="px-5 py-3 bg-gradient-to-r from-slate-800 to-slate-700 flex items-center justify-between border-b border-slate-700">
-          <select
-            value={currentLang}
-            onChange={(e) => onUpdate(index, { ...block, language: e.target.value })}
-            className={`text-sm ${languageColors[currentLang]} bg-slate-700/50 rounded-lg px-4 py-2 border-none focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono font-semibold cursor-pointer hover:bg-slate-700 transition`}
-          >
-            <option value="javascript">JavaScript</option>
-            <option value="python">Python</option>
-            <option value="typescript">TypeScript</option>
-            <option value="html">HTML</option>
-            <option value="css">CSS</option>
-          </select>
+      <div className={`rounded-2xl overflow-hidden ${currentTheme.bg} shadow-xl ring-1 ${currentTheme.border}`}>
+        <div className={`px-5 py-3 ${currentTheme.headerBg} flex items-center justify-between border-b ${currentTheme.border}`}>
+          <div className="flex items-center gap-3">
+            <select
+              value={currentLang}
+              onChange={(e) => onUpdate(index, { ...block, language: e.target.value })}
+              className={`text-sm bg-slate-700/50 rounded-lg px-4 py-2 border-none focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono font-semibold cursor-pointer hover:bg-slate-700 transition ${currentTheme.text} min-w-[140px]`}
+            >
+              {languages.map(lang => (
+                <option key={lang} value={lang}>
+                  {lang.charAt(0).toUpperCase() + lang.slice(1)}
+                </option>
+              ))}
+            </select>
+            <select
+              value={block.theme || "dark"}
+              onChange={(e) => onUpdate(index, { ...block, theme: e.target.value })}
+              className={`text-sm bg-slate-700/50 rounded-lg px-4 py-2 border-none focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer hover:bg-slate-700 transition ${currentTheme.text}`}
+            >
+              {Object.entries(themes).map(([key, theme]) => (
+                <option key={key} value={key}>
+                  {theme.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={handleCopy}
-            className="flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:text-white transition bg-slate-700/50 hover:bg-slate-600 rounded-lg font-medium"
+            className={`flex items-center gap-2 px-4 py-2 text-sm transition bg-slate-700/50 hover:bg-slate-600 rounded-lg font-medium ${currentTheme.text}`}
           >
             {copied ? (
               <>
@@ -758,7 +1019,7 @@ function CodeBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
           value={value}
           onChange={handleChange}
           placeholder="// Write your code here..."
-          className="w-full h-64 p-5 bg-slate-900 text-slate-100 font-mono text-sm leading-relaxed focus:outline-none resize-none placeholder-slate-600"
+          className={`w-full h-64 p-5 ${currentTheme.bg} ${currentTheme.text} font-mono text-sm leading-relaxed focus:outline-none resize-none placeholder-slate-600`}
           spellCheck="false"
         />
       </div>
@@ -787,14 +1048,10 @@ export default function BIMEditor() {
         const data = await fetchJSON(`/api/bim/${encodeURIComponent(id)}`);
         const loadedBlocks = Array.isArray(data?.blocks) ? data.blocks : [];
         
-        const blocksWithIds = loadedBlocks.map((block, idx) => {
-          const preservedBlock = {
-            ...block,
-            type: block.type,
-            id: block.id || `${Date.now()}-${idx}`
-          };
-          return preservedBlock;
-        });
+        const blocksWithIds = loadedBlocks.map((block, idx) => ({
+          ...block,
+          id: block.id || `${Date.now()}-${idx}`
+        }));
         
         setBlocks(blocksWithIds);
         setErr("");
@@ -806,20 +1063,19 @@ export default function BIMEditor() {
     })();
   }, [id, isEdit]);
 
-  // Drag and drop setup
   useEffect(() => {
     const handleDragStart = (e) => {
       const dragHandle = e.target.closest('.drag-handle');
       if (!dragHandle) return;
 
-      const blockContainer = e.target.closest('[data-block-index]');
+      const blockContainer = dragHandle.closest('[data-block-index]');
       if (!blockContainer) return;
 
       const index = parseInt(blockContainer.dataset.blockIndex);
       setDraggedIndex(index);
       
       e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/html", blockContainer);
+      e.dataTransfer.setData("text/html", blockContainer.innerHTML);
       
       setTimeout(() => {
         blockContainer.style.opacity = "0.4";
@@ -873,7 +1129,10 @@ export default function BIMEditor() {
       value: "",
       id: Date.now() + Math.random()
     };
-    if (type === "code") newBlock.language = "javascript";
+    if (type === "code") {
+      newBlock.language = "javascript";
+      newBlock.theme = "dark";
+    }
     setBlocks([...blocks, newBlock]);
     setShowAddMenu(false);
   };
@@ -968,7 +1227,12 @@ export default function BIMEditor() {
     const rawTitle = blocks.find(b => b.type === "h1" || b.type === "h2")?.value || "";
     const title = (rawTitle || "").trim() || "Untitled";
 
-    const langMap = { javascript: "js", typescript: "ts", python: "py", html: "html", css: "css" };
+    const langMap = { 
+      javascript: "js", typescript: "ts", python: "py", html: "html", css: "css",
+      java: "java", csharp: "cs", cpp: "cpp", c: "c", ruby: "rb", go: "go",
+      rust: "rs", php: "php", swift: "swift", kotlin: "kt", scala: "scala",
+      sql: "sql", bash: "sh", powershell: "ps1", json: "json", yaml: "yaml", xml: "xml"
+    };
     
     const normalizedBlocks = blocks.map((b) => {
       const base = { 
@@ -978,6 +1242,10 @@ export default function BIMEditor() {
       if (b.type === "code") {
         const uiLang = (b.language || "javascript").toLowerCase();
         base.language = langMap[uiLang] || "js";
+        base.theme = b.theme || "dark";
+      }
+      if (b.type === "image" && b.size) {
+        base.size = b.size;
       }
       return base;
     });
