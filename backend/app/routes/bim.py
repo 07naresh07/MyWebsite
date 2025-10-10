@@ -13,6 +13,9 @@ import orjson
 from .. import db
 from ..config import settings
 
+__all__ = ["router"]
+
+# NOTE: keep this exact prefix so /api/bim and /api/bim/ are handled
 router = APIRouter(prefix="/api/bim", tags=["bim"])
 
 # ------------------------- helpers / handlers -------------------------
@@ -26,6 +29,7 @@ def _safe_jsonable(val):
     return val
 
 async def bim_validation_exception_handler(request: Request, exc: RequestValidationError):
+    # If wired in app/main.py, this limits noisy 422 bodies to this router only
     if request.url.path.startswith("/api/bim"):
         return JSONResponse(status_code=422, content={"detail": _safe_jsonable(exc.errors())})
     return await default_validation_handler(request, exc)
@@ -46,7 +50,6 @@ async def _get_pool(timeout_sec: float = 5.0):
         # 2) direct variable (your main imports `pool` as a variable)
         if p is None and hasattr(db, "pool"):
             try:
-                # accept either a variable pool or a callable returning a pool
                 p = db.pool() if callable(db.pool) else db.pool
             except Exception as e:
                 last_err, p = e, None
@@ -65,6 +68,7 @@ async def _get_pool(timeout_sec: float = 5.0):
             break
         await asyncio.sleep(0.1)
 
+    # Don't raise here for base routes; callers can decide to fallback
     raise HTTPException(status_code=503, detail=f"Database not ready: {last_err or 'initializing'}")
 
 # ------------------------------ models --------------------------------
@@ -147,48 +151,6 @@ DELETE_BLOCKS_SQL = "delete from public.bim_blocks where entry_id = $1;"
 DELETE_ENTRY_SQL  = "delete from public.bim_entries where id = $1;"
 UPDATE_ENTRY_SQL  = "update public.bim_entries set title = $2, tags = $3 where id = $1 returning id;"
 
-def _row_to_dict_with_parsed_blocks(row) -> dict:
-    d = dict(row)
-    if isinstance(d.get("blocks"), str):
-        d["blocks"] = orjson.loads(d["blocks"])
-    return d
-
-# ----------------------------- uploads --------------------------------
-DEFAULT_UPLOAD_ROOT = Path(__file__).resolve().parents[1] / "uploads"
-UPLOAD_DIR = Path(settings.web_root or DEFAULT_UPLOAD_ROOT)
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-@router.post("/upload-image")
-@router.post("/upload-image/")
-async def upload_image(
-    file: UploadFile | None = File(None, alias="file"),
-    image: UploadFile | None = File(None, alias="image")
-):
-    up = file or image
-    if up is None:
-        raise HTTPException(status_code=400, detail="No file provided. Use form field 'file' (or 'image').")
-
-    ctype = (up.content_type or "").lower()
-    ext = Path(up.filename or "").suffix.lower()
-    if ext not in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
-        if   ctype == "image/jpeg": ext = ".jpg"
-        elif ctype == "image/png":  ext = ".png"
-        elif ctype == "image/gif":  ext = ".gif"
-        elif ctype == "image/webp": ext = ".webp"
-        else:                       ext = ".png"
-
-    name = f"{uuid.uuid4().hex}{ext}"
-    dest = UPLOAD_DIR / name
-    try:
-        with dest.open("wb") as out:
-            shutil.copyfileobj(up.file, out)
-    finally:
-        try: up.file.close()
-        except Exception: pass
-
-    return {"url": f"/uploads/{name}", "filename": name, "content_type": ctype}
-
-# ------------------------ robust insert / seq fix ---------------------
 from asyncpg import exceptions as pgexc
 
 FIND_ATTACHED_SEQ_SQL = """
@@ -260,15 +222,76 @@ async def _insert_block_with_retry(conn, entry_id, i, b):
             continue
     raise HTTPException(status_code=500, detail="Could not allocate unique id for bim_blocks")
 
+# ----------------------------- uploads --------------------------------
+DEFAULT_UPLOAD_ROOT = Path(__file__).resolve().parents[1] / "uploads"
+UPLOAD_DIR = Path(settings.web_root or DEFAULT_UPLOAD_ROOT)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+@router.post("/upload-image")
+@router.post("/upload-image/")
+async def upload_image(
+    file: UploadFile | None = File(None, alias="file"),
+    image: UploadFile | None = File(None, alias="image")
+):
+    up = file or image
+    if up is None:
+        raise HTTPException(status_code=400, detail="No file provided. Use form field 'file' (or 'image').")
+
+    ctype = (up.content_type or "").lower()
+    ext = Path(up.filename or "").suffix.lower()
+    if ext not in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
+        if   ctype == "image/jpeg": ext = ".jpg"
+        elif ctype == "image/png":  ext = ".png"
+        elif ctype == "image/gif":  ext = ".gif"
+        elif ctype == "image/webp": ext = ".webp"
+        else:                       ext = ".png"
+
+    name = f"{uuid.uuid4().hex}{ext}"
+    dest = UPLOAD_DIR / name
+    try:
+        with dest.open("wb") as out:
+            shutil.copyfileobj(up.file, out)
+    finally:
+        try: up.file.close()
+        except Exception: pass
+
+    return {"url": f"/uploads/{name}", "filename": name, "content_type": ctype}
+
 # ------------------------------- API ---------------------------------
-# Root/ping at the prefix to prevent 404 on /api/bim or /api/bim/
-@router.get("", summary="BIM root - list entries (alias)")
-@router.get("/", summary="BIM root - list entries")
-async def list_entries():
-    pool = await _get_pool()
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(LIST_SQL)
-        return [_row_to_dict_with_parsed_blocks(r) for r in rows]
+# Helper to parse JSON fields coming from SQL
+
+def _row_to_dict_with_parsed_blocks(row) -> dict:
+    d = dict(row)
+    if isinstance(d.get("blocks"), str):
+        d["blocks"] = orjson.loads(d["blocks"])
+    return d
+
+# ✅ Base routes so /api/bim and /api/bim/ NEVER 404
+@router.get("", summary="BIM root — minimal index (safe if DB down)")
+@router.get("/", summary="BIM root — minimal index (safe if DB down)")
+async def bim_root():
+    """Return the FULL list of BIM entries including blocks (previous behavior).
+    - If the DB is temporarily unavailable, return an **empty list** (same shape)
+      so the frontend doesn't break waiting for an array.
+    """
+    try:
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(LIST_SQL)
+            return [_row_to_dict_with_parsed_blocks(r) for r in rows]
+    except Exception:
+        # Preserve response shape expected by the UI (list/array)
+        return []
+
+@router.get("/health", summary="Readiness for BIM router")
+async def bim_health():
+    try:
+        pool = await _get_pool()
+        async with pool.acquire() as conn:
+            await conn.fetchrow("SELECT 1;")
+        return {"status": "healthy", "db": "ok"}
+    except Exception as e:
+        return {"status": "degraded", "db_error": str(e)}
 
 # HEAD / OPTIONS for safer health/preflight at the prefix
 @router.head("/")
@@ -279,10 +302,9 @@ async def bim_head():
 @router.options("/")
 @router.options("")
 async def bim_options():
-    # CORS middleware will add headers; respond 200 to satisfy preflight
     return PlainTextResponse("", status_code=200)
 
-# Tiny diagnostic
+# Diagnostics
 @router.get("/_meta")
 async def bim_meta():
     try:
@@ -299,7 +321,10 @@ async def get_entry(entry_id: int):
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
         if not row:
             raise HTTPException(status_code=404, detail="Not found")
-        return _row_to_dict_with_parsed_blocks(row)
+        d = dict(row)
+        if isinstance(d.get("blocks"), str):
+            d["blocks"] = orjson.loads(d["blocks"])
+        return d
 
 @router.post("", status_code=201)
 @router.post("/", status_code=201)
@@ -314,7 +339,10 @@ async def create_entry(payload: BimCreate):
             for i, b in enumerate(_normalize_blocks(payload.blocks)):
                 await _insert_block_with_retry(conn, entry_id, i, b)
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
-        return _row_to_dict_with_parsed_blocks(row)
+        d = dict(row)
+        if isinstance(d.get("blocks"), str):
+            d["blocks"] = orjson.loads(d["blocks"])
+        return d
 
 @router.put("/{entry_id}")
 @router.put("/{entry_id}/")
@@ -340,7 +368,10 @@ async def update_entry(entry_id: int, payload: BimUpdate):
             for i, b in enumerate(norm):
                 await _insert_block_with_retry(conn, entry_id, i, b)
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
-        return _row_to_dict_with_parsed_blocks(row)
+        d = dict(row)
+        if isinstance(d.get("blocks"), str):
+            d["blocks"] = orjson.loads(d["blocks"])
+        return d
 
 @router.patch("/{entry_id}")
 @router.patch("/{entry_id}/")
@@ -352,7 +383,7 @@ async def patch_entry(entry_id: int, payload: BimUpdate):
             raise HTTPException(status_code=404, detail="Not found")
 
         new_title = payload.title.strip() if isinstance(payload.title, str) else current["title"]
-        new_tags  = payload.tags if payload.tags is not None else current.get("tags") or []
+        new_tags  = payload.tags if payload.tags is not None else (current.get("tags") or [])
         if isinstance(new_tags, str):
             new_tags = orjson.loads(new_tags)
 
@@ -366,7 +397,10 @@ async def patch_entry(entry_id: int, payload: BimUpdate):
                 for i, b in enumerate(norm):
                     await _insert_block_with_retry(conn, entry_id, i, b)
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
-        return _row_to_dict_with_parsed_blocks(row)
+        d = dict(row)
+        if isinstance(d.get("blocks"), str):
+            d["blocks"] = orjson.loads(d["blocks"])
+        return d
 
 @router.post("/{entry_id}")
 @router.post("/{entry_id}/")
@@ -387,5 +421,6 @@ async def method_override(entry_id: int, payload: dict, request: Request):
 async def delete_entry(entry_id: int):
     pool = await _get_pool()
     async with pool.acquire() as conn:
+        await conn.execute(DELETE_BLOCKS_SQL, entry_id)
         await conn.execute(DELETE_ENTRY_SQL, entry_id)
     return {}
