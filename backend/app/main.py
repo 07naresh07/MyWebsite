@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from typing import Optional
 import os
 import re
+import sys
 import asyncio
 import orjson
 import traceback
@@ -80,6 +81,16 @@ webroot = os.path.abspath(webroot)
 os.makedirs(webroot, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=webroot), name="uploads")
 
+@app.get("/api/_debug/startup")
+async def debug_startup():
+    import sys
+    return {
+        "bim_loaded": bim_loaded,
+        "bim_router_exists": bim_router is not None if 'bim_router' in dir() else False,
+        "python_path": sys.path,
+        "routes_with_bim": [r.path for r in app.routes if "/bim" in r.path],
+        "all_route_paths": [r.path for r in app.routes][:50],  # First 50 routes
+    }
 # ----------------------------- Root routes & health -----------------
 @app.api_route("/", methods=["GET", "HEAD"])
 async def _root():
