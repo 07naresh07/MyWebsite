@@ -45,8 +45,6 @@ const Card = ({ children, className = "", isDark = false, ...props }) => (
 const Reveal = ({ children }) => <div className="animate-fade-in-enhanced">{children}</div>;
 
 /* ------------------------------ Enhanced Theme & UI ------------------------------ */
-const UI_GRADIENT = "from-indigo-600 via-violet-600 to-fuchsia-600";
-const DARK_UI_GRADIENT = "from-indigo-400 via-violet-400 to-fuchsia-400";
 const ENHANCED_GRADIENT = "from-indigo-500 via-purple-500 via-violet-500 to-fuchsia-500";
 const DARK_ENHANCED_GRADIENT = "from-indigo-300 via-purple-300 via-violet-300 to-fuchsia-300";
 
@@ -61,6 +59,18 @@ const MODERN_ICONS = {
   mobility: "🚦",
   personal: "👤",
   inProgress: "🔧",
+};
+
+/* ENHANCED EMOJI CATEGORIES WITH BIM & AI - BETTER ORGANIZED */
+const ENHANCED_EMOJI_CATEGORIES = {
+  Tech: ["🌐", "🧩", "🤖", "⚙️", "🧠", "💡", "🛠️", "💾", "🧰", "💻", "🖥️", "📱", "🔬", "⚡", "🚀"],
+  BIM: ["🏗️", "🏛️", "🏢", "🏭", "📐", "📏", "🧱", "🪜", "🪟", "🚪", "📊", "📈", "🗺️", "🧮", "⚙️"],
+  AI: ["🤖", "🧠", "💡", "⚡", "🔬", "🧪", "🔭", "👁️", "🎯", "🧩", "🔮", "💻", "🖥️", "💾", "🌐"],
+  Infrastructure: ["🚦", "🏗️", "🛰️", "🗺️", "🏙️", "🌉", "🚇", "🚉", "🚆", "🛤️", "🌍", "🏗️", "🌆", "🏢", "🏭"],
+  Science: ["🧪", "📊", "🧮", "🔬", "🧭", "⚡", "🔋", "🔌", "📈", "📉", "🔭", "🧬", "⚗️", "🧫", "🦠"],
+  Nature: ["🌍", "🌏", "🌎", "⛰️", "🏔️", "🌱", "🌤️", "🌧️", "⭐", "🌙", "🌊", "🍃", "🌺", "🌸", "🌼"],
+  Objects: ["🔧", "🗜️", "🔩", "📦", "🧱", "📎", "🖇️", "✏️", "🖊️", "📝", "📚", "📄", "💎", "🎯", "🗂️"],
+  Creative: ["🎨", "🖼️", "🎭", "🎪", "🎵", "🎶", "📸", "🎬", "✨", "🌟", "💫", "🎆", "🎇", "🎉", "🎊"],
 };
 
 const ENHANCED_TAG_COLORS = [
@@ -133,9 +143,6 @@ function isTrendingByTags(tags = []) {
   return /ai|bim|mobility|transport|automation/.test(t);
 }
 
-/**
- * Enhanced HTML sanitization with better dark mode support
- */
 function sanitizePreview(html, { forceDark = false } = {}) {
   try {
     const parser = new DOMParser();
@@ -175,7 +182,7 @@ function sanitizePreview(html, { forceDark = false } = {}) {
     return doc.body.innerHTML;
   } catch { return html || ""; }
 }
-function snippetHtml(html, maxChars = 420) {
+function snippetHtml(html, maxChars = 520) {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(`<div>${html || ""}</div>`, "text/html");
@@ -204,7 +211,54 @@ function snippetHtml(html, maxChars = 420) {
   }
 }
 
-/* ------------------------------ Enhanced Horizontal Row Hook ------------------------------ */
+/* ------------------------------ SIMPLE SCROLL HOOK ------------------------------ */
+function useSimpleScroll() {
+  const scrollRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 10);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
+  };
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    checkScroll();
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const scrollLeft = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: -400, behavior: "smooth" });
+    setTimeout(checkScroll, 300);
+  };
+
+  const scrollRight = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: 400, behavior: "smooth" });
+    setTimeout(checkScroll, 300);
+  };
+
+  const handleWheel = (e) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    e.preventDefault();
+    el.scrollLeft += e.deltaY * 0.5;
+    checkScroll();
+  };
+
+  return { scrollRef, canScrollLeft, canScrollRight, scrollLeft, scrollRight, handleWheel, checkScroll };
+}
+
+/* ------------------------------ Original Horizontal Row Hook for Projects/Posts ------------------------------ */
 function useHRow() {
   const rowRef = useRef(null);
   const drag = useRef({ down: false, x: 0, left: 0, moved: false });
@@ -240,6 +294,13 @@ function useHRow() {
   const onTouchStart = (e) => { const t = e.touches?.[0]; if (t) start(t.pageX); };
   const onTouchMove = (e) => { const t = e.touches?.[0]; if (t) move(t.pageX); };
   const onTouchEnd = end;
+
+  const onWheel = (e) => {
+    const el = rowRef.current;
+    if (!el) return;
+    e.preventDefault();
+    el.scrollLeft += e.deltaY;
+  };
 
   const scrollBy = (dir = 1) => {
     const el = rowRef.current;
@@ -277,7 +338,7 @@ function useHRow() {
   return {
     rowRef, progress, hasOverflow, canClick,
     onMouseDown, onMouseMove, onMouseUp, onMouseLeave,
-    onTouchStart, onTouchMove, onTouchEnd, scrollBy, onKey, onScroll
+    onTouchStart, onTouchMove, onTouchEnd, onWheel, scrollBy, onKey, onScroll
   };
 }
 
@@ -321,13 +382,6 @@ function useTheme() {
     try { window.localStorage.setItem(HOME_THEME_KEY, next ? "dark" : "light"); } catch {}
   };
   return { isDark, toggleTheme };
-}
-
-/* ------------------------------ View Mode ------------------------------ */
-function useViewMode() {
-  const [viewMode, setViewMode] = useState("grid");
-  const toggleViewMode = () => setViewMode((v) => (v === "grid" ? "list" : "grid"));
-  return { viewMode, toggleViewMode };
 }
 
 /* ------------------------------ Enhanced Welcome Editor ------------------------------ */
@@ -390,13 +444,11 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
 
   const handleKeyDown = (e) => {
     if (!isEditing) return;
-    // Shift+Enter => soft break
     if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
       document.execCommand("insertLineBreak", false);
       return;
     }
-    // Undo / Redo keyboard (ensure works on all browsers)
     const isMeta = e.ctrlKey || e.metaKey;
     if (isMeta && e.key.toLowerCase() === 'z') {
       e.preventDefault();
@@ -498,34 +550,21 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
       {isEditing && (
         <div className={`mb-6 p-4 rounded-2xl border shadow-2xl backdrop-blur-md ${panelBg} relative animate-fade-in-enhanced`}>
           <div className="flex flex-wrap items-center gap-2 mb-3">
-            {/* Basic formatting */}
             <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("bold")} className={`px-3 py-2 rounded-xl font-bold text-sm ${btnHover}`}>B</button>
             <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("italic")} className={`px-3 py-2 rounded-xl italic text-sm ${btnHover}`}>I</button>
             <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("underline")} className={`px-3 py-2 rounded-xl underline text-sm ${btnHover}`}>U</button>
-
             <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
-
-            {/* Lists */}
             <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("insertUnorderedList")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>• List</button>
             <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("insertOrderedList")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>1. List</button>
-
             <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
-
-            {/* Alignment incl. Justify */}
             <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyLeft")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>← Left</button>
             <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyCenter")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>↔ Center</button>
             <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyRight")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>→ Right</button>
             <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("justifyFull")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>≋ Justify</button>
-
             <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
-
-            {/* Undo / Redo */}
             <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("undo")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>↶ Undo</button>
             <button onMouseDown={(e)=>e.preventDefault()} onClick={() => document.execCommand("redo")} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>↷ Redo</button>
-
             <span className={`mx-2 w-px h-6 ${isDark ? "bg-slate-600" : "bg-gray-300"}`} />
-
-            {/* Clear formatting */}
             <button onMouseDown={(e)=>e.preventDefault()} onClick={removeFormatting} className={`px-3 py-2 rounded-xl text-sm ${btnHover}`}>🗑️ Clear</button>
           </div>
         </div>
@@ -572,275 +611,188 @@ function EditableWelcomeSection({ isDark, ownerMode, initialHtml, onSaveHtml }) 
 /* ------------------------------ Enhanced Highlights ------------------------------ */
 const LS_HIGHLIGHTS = "homeHighlightsV1";
 
-const ENHANCED_EMOJI_CATEGORIES = {
-  Tech: ["🌐", "🧩", "🤖", "⚙️", "🧠", "💡", "🛠️", "💾", "🧰", "💻", "🖥️", "📱", "🔬", "⚡", "🚀"],
-  Infrastructure: ["🚦", "🏗️", "🛰️", "🗺️", "📐", "🏙️", "🌉", "🚇", "🚉", "🚆", "🛤️", "🌍", "🏗️"],
-  Science: ["🧪", "📊", "🧮", "🔬", "🧭", "⚡", "🔋", "🔌", "📈", "📉", "🔭", "🧬", "⚗️"],
-  Nature: ["🌍", "🌏", "🌎", "⛰️", "🏔️", "🌱", "🌤️", "🌧️", "⭐", "🌙", "🌊", "🍃", "🌺"],
-  Objects: ["🔧", "🗜️", "🔩", "📦", "🧱", "📎", "🖇️", "✏️", "🖊️", "📝", "📚", "📄", "💎", "🎯"],
-  Creative: ["🎨", "🖼️", "🎭", "🎪", "🎵", "🎶", "📸", "🎬", "✨", "🌟", "💫", "🎆", "🎇"],
-};
-
-/* ------------------------------ Enhanced Highlight Card ------------------------------ */
-function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) {
+/* ------------------------------ REDESIGNED HIGHLIGHT CARD ------------------------------ */
+function HighlightCard({ item, onChange, onDelete, ownerMode, isDark }) {
   const [editing, setEditing] = useState(false);
-  const [iconOpen, setIconOpen] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("Tech");
+  const [showIconPicker, setShowIconPicker] = useState(false);
+  const [showFullModal, setShowFullModal] = useState(false);
   const titleRef = useRef(null);
   const bodyRef = useRef(null);
 
-  useEffect(() => {
-    if (!editing && titleRef.current) titleRef.current.innerHTML = item.titleHtml || "";
-    if (!editing && bodyRef.current) bodyRef.current.innerHTML = item.bodyHtml || "";
-  }, [item.titleHtml, item.bodyHtml, editing]);
+  const gradient = isDark ? DARK_ENHANCED_GRADIENT : ENHANCED_GRADIENT;
 
-  useEffect(() => {
-    if (editing) try {
-      document.execCommand("styleWithCSS", false, true);
-      document.execCommand("defaultParagraphSeparator", false, "p");
-    } catch {}
-  }, [editing]);
-
-  const startEdit = () => { if (!ownerMode) return; setEditing(true); setTimeout(() => bodyRef.current?.focus(), 120); };
+  const startEdit = () => {
+    if (!ownerMode) return;
+    setEditing(true);
+  };
 
   const saveEdit = () => {
-    const titleContent = titleRef.current?.innerHTML || "";
-    const bodyContent = bodyRef.current?.innerHTML || "";
-    onChange({ ...item, titleHtml: titleContent, bodyHtml: bodyContent });
-    setEditing(false); setIconOpen(false);
+    const titleContent = titleRef.current?.value || titleRef.current?.innerText || "";
+    const bodyRaw = bodyRef.current?.value || "";
+    // Convert plain text to HTML paragraphs
+    const bodyContent = bodyRaw.split('\n\n').filter(p => p.trim()).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+    onChange({ ...item, titleHtml: titleContent, title: titleContent, bodyHtml: bodyContent, description: bodyContent });
+    setEditing(false);
   };
 
   const cancelEdit = () => {
-    if (titleRef.current) titleRef.current.innerHTML = item.titleHtml || "";
-    if (bodyRef.current) bodyRef.current.innerHTML = item.bodyHtml || "";
-    setEditing(false); setIconOpen(false);
+    setEditing(false);
   };
 
-  const escapeHtml = (s) => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-
-  const handlePasteTitle = (e) => {
-    if (!editing) return;
-    e.preventDefault();
-    const text = e.clipboardData?.getData("text/plain") || "";
-    const html = escapeHtml(text).replace(/\s+/g, " ");
-    document.execCommand("insertHTML", false, html);
+  const selectIcon = (icon) => {
+    onChange({ ...item, icon });
+    setShowIconPicker(false);
   };
-
-  const handlePasteBody = (e) => {
-    if (!editing) return;
-    e.preventDefault();
-    const text = e.clipboardData?.getData("text/plain") || "";
-    const blocks = text.split(/\n{2,}/).map(p => `<p>${escapeHtml(p).replace(/\n/g,"<br>")}</p>`).join("");
-    document.execCommand("insertHTML", false, blocks);
-  };
-
-  const stopBubble = (e) => e.stopPropagation();
-  const gradient = isDark ? DARK_ENHANCED_GRADIENT : ENHANCED_GRADIENT;
-
-  const displayTitle = item.titleHtml || "Untitled";
-  const displayBody = item.bodyHtml || "No description available";
 
   return (
     <>
-      <div className="relative group h-full">
+      <div className={`flex-shrink-0 w-80 ${isDark ? "bg-slate-800" : "bg-white"} rounded-2xl shadow-lg p-6 transition-all duration-300 hover:shadow-xl relative group`}>
+        {/* Edit/Delete Buttons */}
         {ownerMode && !editing && (
-          <div className="absolute right-4 top-4 z-20 opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-2 group-hover:translate-y-0">
-            <div className="flex gap-3">
-              <button
-                onClick={startEdit}
-                className={`text-xs px-4 py-2 rounded-xl backdrop-blur-md border font-semibold shadow-lg transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-800/90 border-white/20 text-white hover:bg-slate-700/90" : "bg-white/90 border-white/40 text-slate-700 hover:bg-gray-50/90"}`}
-              >
-                ✏️ Edit
-              </button>
-              <button
-                onClick={() => onDelete(item.id)}
-                className={`text-xs px-4 py-2 rounded-xl backdrop-blur-md border font-semibold shadow-lg transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-800/90 border-white/20 text-white hover:bg-red-900/50" : "bg-white/90 border-white/40 text-slate-700 hover:bg-red-50/90"}`}
-              >
-                🗑️ Delete
-              </button>
-            </div>
+          <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            <button
+              onClick={startEdit}
+              className={`px-3 py-1 text-xs rounded-lg ${isDark ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-700"} hover:scale-105 transition-transform`}
+            >
+              ✏️ Edit
+            </button>
+            <button
+              onClick={() => onDelete(item.id)}
+              className={`px-3 py-1 text-xs rounded-lg ${isDark ? "bg-red-900/50 text-white" : "bg-red-100 text-red-700"} hover:scale-105 transition-transform`}
+            >
+              🗑️
+            </button>
           </div>
         )}
 
-        <Card
-          isDark={isDark}
-          className={`relative p-8 h-[320px] w-[360px] transition-all duration-500 hover:shadow-2xl hover:shadow-violet-500/20 hover:-translate-y-2 rounded-3xl border-0 ${isDark ? "bg-slate-800/70 hover:bg-slate-800/80" : "bg-white/80 hover:bg-white/90"} backdrop-blur-md flex flex-col flex-shrink-0 transform-gpu`}
-        >
-          <div className="relative z-10 flex-1 flex flex-col min-h-0">
-            <div className="flex items-start gap-5 mb-4">
-              <div className="relative flex-shrink-0">
-                <button
-                  type="button"
-                  className={`text-4xl transition-all duration-300 p-3 rounded-2xl ${ownerMode ? "hover:scale-110 transform" : ""} ${isDark ? "hover:bg-slate-700/60" : "hover:bg-slate-100/60"} backdrop-blur-sm`}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={(e) => { e.stopPropagation(); ownerMode && setIconOpen((v) => !v); }}
-                  aria-label="Choose icon"
-                >
-                  {item.icon || "💡"}
-                </button>
+        {/* Icon and Title in same row */}
+        <div className="flex items-start gap-3 mb-4">
+          <button
+            onClick={() => ownerMode && setShowIconPicker(true)}
+            className={`text-3xl flex-shrink-0 ${ownerMode ? "cursor-pointer hover:scale-110" : ""} transition-transform`}
+            disabled={!ownerMode}
+            style={{ marginTop: '-2px' }}
+          >
+            {item.icon || "💡"}
+          </button>
 
-                {ownerMode && iconOpen && (
-                  <div
-                    className={`absolute left-0 top-full mt-3 z-50 w-96 max-h-96 overflow-hidden rounded-3xl shadow-2xl backdrop-blur-xl border transition-all duration-300 animate-fade-in-enhanced ${
-                      isDark ? "bg-slate-800/95 border-slate-700/50" : "bg-white/95 border-slate-200/50"
-                    }`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className={`flex overflow-x-auto p-3 border-b ${isDark ? "border-slate-700/50" : "border-slate-200/50"} gap-2`}>
-                      {Object.keys(ENHANCED_EMOJI_CATEGORIES).map((cat) => (
-                        <button
-                          key={cat}
-                          className={`px-4 py-2 text-sm font-semibold rounded-xl whitespace-nowrap transition-all duration-300 ${
-                            selectedCategory === cat
-                              ? `bg-gradient-to-r ${gradient} text-white shadow-lg`
-                              : `${isDark ? "text-white/80 hover:bg-slate-700/60" : "text-slate-600 hover:bg-slate-100/60"} hover:scale-105 transform`
-                          }`}
-                          onClick={() => setSelectedCategory(cat)}
-                        >
-                          {cat}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="p-4 grid grid-cols-8 gap-3 max-h-64 overflow-y-auto">
-                      {ENHANCED_EMOJI_CATEGORIES[selectedCategory].map((emo) => (
-                        <button
-                          key={emo}
-                          className={`h-14 w-14 grid place-items-center text-2xl rounded-2xl transition-all duration-300 transform hover:scale-110 ${isDark ? "hover:bg-slate-700/60" : "hover:bg-slate-100/60"} backdrop-blur-sm`}
-                          onClick={() => {
-                            const newItem = { ...item, icon: emo };
-                            onChange(newItem);
-                            setIconOpen(false);
-                          }}
-                        >
-                          {emo}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+          {/* Title */}
+          {editing ? (
+            <input
+              ref={titleRef}
+              defaultValue={item.titleHtml || item.title || ""}
+              className={`flex-1 text-lg font-bold px-3 py-2 rounded-lg border-2 border-violet-500 ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-900"}`}
+              placeholder="Title"
+            />
+          ) : (
+            <h3 className={`flex-1 text-lg font-bold leading-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              {item.titleHtml || item.title || "Untitled"}
+            </h3>
+          )}
+        </div>
 
-              <div className="flex-1 min-w-0">
-                {editing ? (
-                  <div
-                    ref={titleRef}
-                    contentEditable={true}
-                    suppressContentEditableWarning
-                    onPaste={handlePasteTitle}
-                    className={`text-xl font-bold leading-tight outline-none ring-2 ring-violet-500/60 rounded-xl px-3 py-2 transition-all duration-300 ${isDark ? "bg-slate-700/80 text-white" : "bg-white/80 text-slate-800"} backdrop-blur-sm`}
-                    dangerouslySetInnerHTML={{ __html: item.titleHtml || "" }}
-                  />
-                ) : (
-                  <h3
-                    className={`text-xl font-bold leading-tight bg-clip-text text-transparent bg-gradient-to-r ${gradient} animate-gradient-shift`}
-                    dangerouslySetInnerHTML={{ __html: displayTitle }}
-                  />
-                )}
-                <div className={`mt-3 h-1.5 w-20 rounded-full bg-gradient-to-r ${gradient} opacity-70 animate-pulse-subtle`} />
-              </div>
-            </div>
+        {/* Body */}
+        {editing ? (
+          <textarea
+            ref={bodyRef}
+            defaultValue={item.bodyHtml?.replace(/<[^>]+>/g, '').replace(/<br>/g, '\n') || ""}
+            className={`w-full h-32 px-3 py-2 rounded-lg border-2 border-violet-500 mb-4 resize-none ${isDark ? "bg-slate-700 text-white" : "bg-white text-slate-900"}`}
+            placeholder="Description"
+          />
+        ) : (
+          <div
+            className={`text-sm leading-relaxed mb-4 ${isDark ? "text-slate-300" : "text-slate-600"} line-clamp-4`}
+            dangerouslySetInnerHTML={{ __html: item.bodyHtml || item.description || "" }}
+          />
+        )}
 
-            <div className="flex-1 min-h-0 flex flex-col">
-              {editing ? (
-                <div
-                  ref={bodyRef}
-                  contentEditable={true}
-                  suppressContentEditableWarning
-                  onPaste={handlePasteBody}
-                  onWheel={stopBubble}
-                  onMouseDown={stopBubble}
-                  onTouchStart={stopBubble}
-                  className={`relative z-10 text-sm leading-7 outline-none flex-1 min-h-0 overflow-y-auto pr-2 ring-2 ring-violet-500/60 rounded-xl p-4 transition-all duration-300 ${isDark ? "bg-slate-700/80 text-white" : "bg-white/80 text-slate-700"} backdrop-blur-sm`}
-                  style={{ textAlign: "justify" }}
-                  dangerouslySetInnerHTML={{ __html: item.bodyHtml || "" }}
-                />
-              ) : (
-                <div
-                  className={`relative z-10 text-sm leading-7 flex-1 min-h-0 overflow-y-auto pr-2 transition-all duration-300 ${isDark ? "text-white/90" : "text-slate-600"}`}
-                  style={{ textAlign: "justify" }}
-                  dangerouslySetInnerHTML={{ __html: displayBody }}
-                />
-              )}
-
-              <div className="pt-4 flex justify-end">
-                {!editing ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowModal(true)}
-                    className={`text-sm font-semibold flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 transform hover:scale-105 ${isDark ? "text-white/80 hover:text-violet-300 hover:bg-slate-700/50" : "text-slate-500 hover:text-violet-600 hover:bg-slate-100/50"} backdrop-blur-sm`}
-                    aria-label="Read more highlight"
-                    onMouseDown={stopBubble}
-                    onWheel={stopBubble}
-                    onTouchStart={stopBubble}
-                  >
-                    <span>Read more</span>
-                    <svg className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                ) : (
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => document.execCommand("bold")}
-                      className={`p-3 rounded-xl text-sm font-bold transition-all duration-300 ${isDark ? "hover:bg-slate-600/60 text-white" : "hover:bg-slate-200/60 text-slate-700"} backdrop-blur-sm`}
-                    >
-                      B
-                    </button>
-                    <button
-                      onClick={() => document.execCommand("italic")}
-                      className={`p-3 rounded-xl text-sm italic transition-all duration-300 ${isDark ? "hover:bg-slate-600/60 text-white" : "hover:bg-slate-200/60 text-slate-700"} backdrop-blur-sm`}
-                    >
-                      I
-                    </button>
-                    <button
-                      onClick={saveEdit}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg"
-                    >
-                      💾 Save
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-600/80 text-white" : "bg-slate-100/80 text-slate-700"} backdrop-blur-sm`}
-                    >
-                      ❌ Cancel
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+        {/* Actions */}
+        {editing ? (
+          <div className="flex gap-2">
+            <button
+              onClick={saveEdit}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors"
+            >
+              💾 Save
+            </button>
+            <button
+              onClick={cancelEdit}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${isDark ? "bg-slate-700 text-white hover:bg-slate-600" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+            >
+              Cancel
+            </button>
           </div>
-        </Card>
+        ) : (
+          <button
+            onClick={() => setShowFullModal(true)}
+            className={`text-sm font-semibold ${isDark ? "text-violet-400 hover:text-violet-300" : "text-violet-600 hover:text-violet-700"} transition-colors`}
+          >
+            Read more →
+          </button>
+        )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in-enhanced" onClick={() => setShowModal(false)}>
+      {/* Icon Picker Modal */}
+      {showIconPicker && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setShowIconPicker(false)}>
           <div
-            className={`w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden backdrop-blur-xl transition-all duration-500 transform ${isDark ? "bg-slate-800/95" : "bg-white/95"} border ${isDark ? "border-slate-700/50" : "border-slate-200/50"}`}
+            className={`${isDark ? "bg-slate-800" : "bg-white"} rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className={`p-8 flex items-start justify-between border-b ${isDark ? "border-slate-700/50" : "border-slate-200/50"}`}>
-              <div className="flex items-center gap-4">
-                <span className="text-4xl">{item.icon || "💡"}</span>
-                <div
-                  className={`text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${gradient}`}
-                  dangerouslySetInnerHTML={{ __html: displayTitle }}
-                />
+            <h3 className={`text-xl font-bold mb-4 ${isDark ? "text-white" : "text-slate-900"}`}>Choose Icon</h3>
+            
+            {Object.entries(ENHANCED_EMOJI_CATEGORIES).map(([category, icons]) => (
+              <div key={category} className="mb-6">
+                <h4 className={`text-sm font-semibold mb-3 ${isDark ? "text-slate-300" : "text-slate-600"}`}>{category}</h4>
+                <div className="grid grid-cols-10 gap-3">
+                  {icons.map((icon) => (
+                    <button
+                      key={icon}
+                      onClick={() => selectIcon(icon)}
+                      className={`text-3xl p-2 rounded-lg transition-colors ${isDark ? "hover:bg-slate-700" : "hover:bg-slate-100"}`}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <button
+              onClick={() => setShowIconPicker(false)}
+              className={`w-full py-2 rounded-lg font-semibold transition-colors ${isDark ? "bg-slate-700 text-white hover:bg-slate-600" : "bg-slate-200 text-slate-800 hover:bg-slate-300"}`}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Full Content Modal */}
+      {showFullModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => setShowFullModal(false)}>
+          <div
+            className={`${isDark ? "bg-slate-800" : "bg-white"} rounded-2xl p-8 max-w-3xl w-full max-h-[80vh] overflow-y-auto`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-4 mb-6">
+              <span className="text-5xl">{item.icon || "💡"}</span>
+              <div className="flex-1">
+                <h2 className={`text-2xl font-bold mb-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {item.titleHtml || item.title || "Untitled"}
+                </h2>
               </div>
               <button
-                className={`h-12 w-12 grid place-items-center rounded-2xl transition-all duration-300 transform hover:scale-110 ${isDark ? "hover:bg-slate-700/60 text-white" : "hover:bg-slate-100/60 text-slate-700"} backdrop-blur-sm`}
-                onClick={() => setShowModal(false)}
+                onClick={() => setShowFullModal(false)}
+                className={`text-2xl ${isDark ? "text-slate-400 hover:text-white" : "text-slate-400 hover:text-slate-900"} transition-colors`}
               >
                 ✕
               </button>
             </div>
-            <div className="p-8">
-              <div
-                className={`prose prose-xl max-w-none leading-8 transition-all duration-300 ${isDark ? "text-white [&_*]:text-white" : "text-slate-700"}`}
-                style={{ textAlign: "justify" }}
-                dangerouslySetInnerHTML={{ __html: displayBody }}
-              />
-            </div>
+            <div
+              className={`prose max-w-none ${isDark ? "prose-invert text-slate-300" : "text-slate-600"}`}
+              dangerouslySetInnerHTML={{ __html: item.bodyHtml || item.description || "" }}
+            />
           </div>
         </div>
       )}
@@ -848,35 +800,21 @@ function EnhancedHighlightCard({ item, onChange, onDelete, ownerMode, isDark }) 
   );
 }
 
-/* Enhanced Add Highlight Card */
-function EnhancedAddHighlightCard({ onAdd, ownerMode, isDark }) {
-  if (!ownerMode) return null;
+/* Add Highlight Button */
+function AddHighlightButton({ onAdd, isDark }) {
   return (
     <button
       onClick={onAdd}
-      className="snap-center inline-block flex-shrink-0 text-left group focus:outline-none"
-      type="button"
-      aria-label="Add section"
+      className={`flex-shrink-0 w-80 h-64 ${isDark ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-300"} border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-3 hover:border-violet-500 transition-colors`}
     >
-      <Card
-        isDark={isDark}
-        className={`p-8 h-[320px] w-[360px] border-2 border-dashed rounded-3xl grid place-items-center transition-all duration-500 hover:scale-105 transform-gpu ${isDark ? "border-slate-600/60 hover:border-slate-500/80 bg-slate-800/40 hover:bg-slate-800/60" : "border-slate-300/60 hover:border-slate-400/80 bg-slate-50/60 hover:bg-slate-50/80"} backdrop-blur-sm`}
-      >
-        <div className="flex flex-col items-center gap-4">
-          <div className={`text-5xl p-4 rounded-2xl transition-all duration-300 transform group-hover:scale-110 ${isDark ? "bg-slate-700/80 text-white" : "bg-white/80 text-slate-600"} backdrop-blur-sm shadow-lg`}>
-            <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"/>
-            </svg>
-          </div>
-          <div className={`text-base font-semibold ${isDark ? "text-white/90" : "text-slate-600"}`}>Add New Section</div>
-        </div>
-      </Card>
+      <div className={`text-5xl ${isDark ? "text-slate-600" : "text-slate-400"}`}>+</div>
+      <div className={`text-sm font-semibold ${isDark ? "text-slate-400" : "text-slate-600"}`}>Add Highlight</div>
     </button>
   );
 }
 
 /* ------------------------------ Enhanced Floating Controls ------------------------------ */
-function ControlPanel({ isDark, toggleTheme, viewMode, toggleViewMode }) {
+function ControlPanel({ isDark, toggleTheme }) {
   return (
     <div className="fixed bottom-6 right-6 z-40 flex items-center gap-3">
       <button
@@ -886,23 +824,6 @@ function ControlPanel({ isDark, toggleTheme, viewMode, toggleViewMode }) {
         title="Toggle light/dark"
       >
         {isDark ? "🌙 Dark" : "☀️ Light"}
-      </button>
-
-      <button
-        onClick={toggleViewMode}
-        className={`p-4 rounded-2xl backdrop-blur-xl border shadow-xl transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-800/90 border-slate-700/50 text-white hover:bg-slate-700/80" : "bg-white/90 border-slate-200/50 text-slate-700 hover:bg-white/80"}`}
-        aria-label="Toggle view mode"
-        title="Toggle grid/list"
-      >
-        {viewMode === "grid" ? (
-          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z" strokeWidth="2"/>
-          </svg>
-        ) : (
-          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M4 6h16M4 12h16M4 18h16" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        )}
       </button>
     </div>
   );
@@ -915,7 +836,6 @@ export default function Home() {
   const ownerMode = !!owner;
 
   const { isDark, toggleTheme } = useTheme();
-  const { viewMode, toggleViewMode } = useViewMode();
 
   const [projects, setProjects] = useState([]);
   const [posts, setPosts] = useState([]);
@@ -923,7 +843,6 @@ export default function Home() {
   const [highlights, setHighlights] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Load server data (welcome + highlights)
   useEffect(() => {
     let mounted = true;
 
@@ -954,7 +873,6 @@ export default function Home() {
     return () => { mounted = false; };
   }, []);
 
-  // Projects
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -968,7 +886,6 @@ export default function Home() {
     return () => { mounted = false; };
   }, []);
 
-  // Posts
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -1010,17 +927,16 @@ export default function Home() {
     return () => { mounted = false; };
   }, []);
 
-  // Persist highlights locally
   useEffect(() => {
     try { window.localStorage.setItem(LS_HIGHLIGHTS, JSON.stringify(highlights.map(normalizeHighlight))); } catch {}
   }, [highlights]);
 
-  // Handlers -> DB
   const saveWelcome = async (html) => {
     try {
       await apiSaveWelcome(html);
       setWelcomeHtml(html);
-    } catch {
+    } catch (err) {
+      console.error("Failed to save welcome:", err);
       setWelcomeHtml(html);
     }
   };
@@ -1028,15 +944,19 @@ export default function Home() {
   const addHighlight = async () => {
     const draft = {
       icon: "💡",
+      title: "New highlight",
       titleHtml: "New highlight",
+      description: "<p>Describe your highlight…</p>",
       bodyHtml: "<p>Describe your highlight…</p>",
-      position: (highlights?.length || 0) + 1
+      position: (highlights?.length || 0) + 1,
+      sortOrder: (highlights?.length || 0) + 1
     };
     try {
       const created = await apiCreateHighlight(draft);
       const newHighlight = created ? normalizeHighlight(created) : { ...draft, id: `h-${Date.now()}` };
       setHighlights((prev) => [...prev, newHighlight]);
-    } catch {
+    } catch (err) {
+      console.error("Failed to create highlight:", err);
       const localHighlight = { ...draft, id: `h-${Date.now()}` };
       setHighlights((prev) => [...prev, localHighlight]);
     }
@@ -1044,15 +964,27 @@ export default function Home() {
 
   const updateHighlightOnServer = async (next) => {
     setHighlights((prev) => prev.map((h) => (h.id === next.id ? normalizeHighlight(next) : h)));
-    try { await apiUpdateHighlight(next.id, next); } catch {}
+    try { 
+      await apiUpdateHighlight(next.id, {
+        ...next,
+        title: next.titleHtml || next.title,
+        description: next.bodyHtml || next.description
+      }); 
+    } catch (err) {
+      console.error("Failed to update highlight:", err);
+    }
   };
 
   const deleteHighlightOnServer = async (id) => {
     setHighlights((prev) => prev.filter((h) => h.id !== id));
-    try { await apiDeleteHighlight(id); } catch {}
+    try { 
+      await apiDeleteHighlight(id); 
+    } catch (err) {
+      console.error("Failed to delete highlight:", err);
+    }
   };
 
-  const hiRow = useHRow();
+  const hiRow = useSimpleScroll();
   const pjRow = useHRow();
   const poRow = useHRow();
 
@@ -1074,6 +1006,12 @@ export default function Home() {
   return (
     <div className={`min-h-screen font-sans transition-all duration-700 ${isDark ? "dark bg-slate-900 text-white" : "bg-gray-50 text-slate-900"}`}>
       <style>{`
+        .line-clamp-4 { 
+          display: -webkit-box; 
+          -webkit-line-clamp: 4; 
+          -webkit-box-orient: vertical; 
+          overflow: hidden; 
+        }
         .clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         .clamp-4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
         .clamp-5 { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1155,7 +1093,7 @@ export default function Home() {
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: linear-gradient(45deg, #4f46e5, #7c3aed); }
       `}</style>
 
-      <ControlPanel isDark={isDark} toggleTheme={toggleTheme} viewMode={viewMode} toggleViewMode={toggleViewMode} />
+      <ControlPanel isDark={isDark} toggleTheme={toggleTheme} />
 
       <EditableWelcomeSection
         isDark={isDark}
@@ -1164,7 +1102,7 @@ export default function Home() {
         onSaveHtml={saveWelcome}
       />
 
-      {/* Enhanced Highlights */}
+      {/* REDESIGNED Highlights Section - SIMPLE & WORKING */}
       <section className="container mx-auto px-4 py-10">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-2xl md:text-3xl font-bold flex items-center gap-3">
@@ -1172,67 +1110,56 @@ export default function Home() {
               {MODERN_ICONS.highlights} Highlights
             </span>
           </h3>
-          {hiRow.hasOverflow && (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => hiRow.scrollBy(-1)}
-                className={`h-11 w-11 grid place-items-center rounded-2xl transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-700/80 hover:bg-slate-600/80 text-white" : "bg-slate-100/80 hover:bg-slate-200/80 text-slate-700"} backdrop-blur-sm shadow-lg`}
-                aria-label="Scroll left"
-              >
-                ◀
-              </button>
-              <button
-                onClick={() => hiRow.scrollBy(1)}
-                className={`h-11 w-11 grid place-items-center rounded-2xl transition-all duration-300 transform hover:scale-105 ${isDark ? "bg-slate-700/80 hover:bg-slate-600/80 text-white" : "bg-slate-100/80 hover:bg-slate-200/80 text-slate-700"} backdrop-blur-sm shadow-lg`}
-                aria-label="Scroll right"
-              >
-                ▶
-              </button>
-            </div>
-          )}
         </div>
 
-        <div
-          ref={hiRow.rowRef}
-          className="flex gap-6 overflow-x-auto hide-scrollbar custom-scrollbar snap-x snap-mandatory"
-          style={{ scrollBehavior: "smooth" }}
-          onMouseDown={hiRow.onMouseDown}
-          onMouseMove={hiRow.onMouseMove}
-          onMouseUp={hiRow.onMouseUp}
-          onMouseLeave={hiRow.onMouseLeave}
-          onTouchStart={hiRow.onTouchStart}
-          onTouchMove={hiRow.onTouchMove}
-          onTouchEnd={hiRow.onTouchEnd}
-          onKeyDown={hiRow.onKey}
-          onScroll={hiRow.onScroll}
-          tabIndex={0}
-          aria-label="Highlights carousel"
-        >
-          {highlights.map((h) => (
-            <div key={h.id} className="snap-center">
-              <EnhancedHighlightCard
+        <div className="relative">
+          {/* Left Arrow */}
+          {highlights.length > 0 && hiRow.canScrollLeft && (
+            <button
+              onClick={hiRow.scrollLeft}
+              className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full shadow-xl ${isDark ? "bg-slate-800 text-white" : "bg-white text-slate-900"} flex items-center justify-center hover:scale-110 transition-transform`}
+            >
+              ◀
+            </button>
+          )}
+
+          {/* Right Arrow */}
+          {highlights.length > 0 && hiRow.canScrollRight && (
+            <button
+              onClick={hiRow.scrollRight}
+              className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 h-12 w-12 rounded-full shadow-xl ${isDark ? "bg-slate-800 text-white" : "bg-white text-slate-900"} flex items-center justify-center hover:scale-110 transition-transform`}
+            >
+              ▶
+            </button>
+          )}
+
+          {/* Scrollable Container */}
+          <div
+            ref={hiRow.scrollRef}
+            onScroll={hiRow.checkScroll}
+            onWheel={hiRow.handleWheel}
+            className="flex gap-6 overflow-x-auto pb-4"
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: isDark ? '#475569 #1e293b' : '#cbd5e1 #f1f5f9'
+            }}
+          >
+            {highlights.map((h) => (
+              <HighlightCard
+                key={h.id}
                 item={h}
                 onChange={updateHighlightOnServer}
                 onDelete={deleteHighlightOnServer}
                 ownerMode={!!ownerMode}
                 isDark={isDark}
               />
-            </div>
-          ))}
-          {ownerMode && <EnhancedAddHighlightCard onAdd={addHighlight} ownerMode={!!ownerMode} isDark={isDark} />}
-        </div>
-
-        {hiRow.hasOverflow && (
-          <div className={`mt-4 h-2 w-full rounded-full ${isDark ? "bg-slate-700/60" : "bg-slate-200/60"}`}>
-            <div
-              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full transition-all duration-500"
-              style={{ width: `${hiRow.progress}%` }}
-            />
+            ))}
+            {ownerMode && <AddHighlightButton onAdd={addHighlight} isDark={isDark} />}
           </div>
-        )}
+        </div>
       </section>
 
-      {/* Enhanced Projects */}
+      {/* Enhanced Projects - ORIGINAL STYLE */}
       <section className="container mx-auto px-4 py-10">
         <div className="flex items-center justify-between mb-6">
           <button type="button" onClick={() => navigate("/projects")} className="text-left group" aria-label="Go to all projects" title="Go to Projects">
@@ -1262,17 +1189,15 @@ export default function Home() {
           </span>
         </div>
 
-        <EnhancedProjectsAndPosts
+        <EnhancedProjectsList
           isDark={isDark}
-          viewMode={viewMode}
           rowHook={pjRow}
           items={projects}
           navigateTo={(p)=>navigate("/projects", { state: { focusId: p.id || p.slug || null } })}
-          isProject
         />
       </section>
 
-      {/* Enhanced Posts */}
+      {/* Enhanced Posts - ORIGINAL STYLE WITH IMPROVED TEXT */}
       <section className="container mx-auto px-4 py-10">
         <div className="flex items-center justify-between mb-6">
           <button type="button" onClick={() => navigate("/blog")} className="text-left group" aria-label="Go to all blog posts" title="Go to Blog">
@@ -1293,17 +1218,7 @@ export default function Home() {
           </button>
         </div>
 
-        {/* LIST MODE NOW FULL-WIDTH STACK */}
-        <EnhancedPostsRow isDark={isDark} poRow={poRow} posts={posts} navigate={navigate} viewMode={viewMode} />
-
-        {viewMode !== "grid" && poRow.hasOverflow && (
-          <div className={`mt-4 h-2 w-full rounded-full ${isDark ? "bg-slate-700/60" : "bg-slate-200/60"}`}>
-            <div
-              className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full transition-all duration-500"
-              style={{ width: `${poRow.progress}%` }}
-            />
-          </div>
-        )}
+        <EnhancedPostsList isDark={isDark} poRow={poRow} posts={posts} navigate={navigate} />
       </section>
 
       <div className="h-16" />
@@ -1311,42 +1226,32 @@ export default function Home() {
   );
 }
 
-/* ------------- Enhanced Helper components for Projects/Posts rows ------------- */
-/* ------------- Enhanced Helper components for Projects/Posts rows ------------- */
-function EnhancedProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo, isProject=false }) {
-  const containerCommon =
-    viewMode === "grid"
-      ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
-      : "flex gap-6 overflow-x-auto hide-scrollbar custom-scrollbar snap-x snap-mandatory";
-
-  const containerProps =
-    viewMode === "grid"
-      ? {}
-      : {
-          ref: rowHook.rowRef,
-          style: { scrollBehavior: "smooth" },
-          onMouseDown: rowHook.onMouseDown,
-          onMouseMove: rowHook.onMouseMove,
-          onMouseUp: rowHook.onMouseUp,
-          onMouseLeave: rowHook.onMouseLeave,
-          onTouchStart: rowHook.onTouchStart,
-          onTouchMove: rowHook.onTouchMove,
-          onTouchEnd: rowHook.onTouchEnd,
-          onKeyDown: rowHook.onKey,
-          onScroll: rowHook.onScroll,
-          tabIndex: 0,
-          "aria-label": isProject ? "Projects carousel" : "Posts carousel",
-        };
-
+/* ------------- Helper components for Projects/Posts ------------- */
+function EnhancedProjectsList({ isDark, rowHook, items, navigateTo }) {
   return (
-    <div className={containerCommon} {...containerProps}>
+    <div className="flex gap-6 overflow-x-auto hide-scrollbar custom-scrollbar snap-x snap-mandatory"
+      ref={rowHook.rowRef}
+      style={{ scrollBehavior: "smooth" }}
+      onMouseDown={rowHook.onMouseDown}
+      onMouseMove={rowHook.onMouseMove}
+      onMouseUp={rowHook.onMouseUp}
+      onMouseLeave={rowHook.onMouseLeave}
+      onTouchStart={rowHook.onTouchStart}
+      onTouchMove={rowHook.onTouchMove}
+      onTouchEnd={rowHook.onTouchEnd}
+      onKeyDown={rowHook.onKey}
+      onScroll={rowHook.onScroll}
+      onWheel={rowHook.onWheel}
+      tabIndex={0}
+      aria-label="Projects carousel"
+    >
       {(items || []).map((it) => {
-        const trending = isProject ? isTrendingByTags(it.tags || it.techStack || []) : false;
-        const recent = isProject ? isRecent(it.updatedAt || it.createdAt) : false;
-        const badges = isProject ? projectBadges(it) : [];
+        const trending = isTrendingByTags(it.tags || it.techStack || []);
+        const recent = isRecent(it.updatedAt || it.createdAt);
+        const badges = projectBadges(it);
 
         const go = () => {
-          if (viewMode !== "grid" && rowHook && !rowHook.canClick()) return;
+          if (rowHook && !rowHook.canClick()) return;
           navigateTo(it);
         };
         const onKey = (e) => {
@@ -1360,11 +1265,7 @@ function EnhancedProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo
           <Card
             isDark={isDark}
             key={it.id || it.slug || it.name || Math.random()}
-            className={`${
-              viewMode !== "grid" ? "min-w-[340px] snap-center" : ""
-            } p-6 rounded-3xl transition-all duration-500 hover:shadow-2xl hover:shadow-violet-500/20 hover:-translate-y-2 transform-gpu ${
-              isDark ? "bg-slate-800/70 hover:bg-slate-800/80" : "bg-white/80 hover:bg-white/90"
-            } group`}
+            className="min-w-[340px] snap-center p-6 rounded-3xl transition-all duration-500 hover:shadow-2xl hover:shadow-violet-500/20 hover:-translate-y-2 transform-gpu bg-white/80 hover:bg-white/90 group"
           >
             <button
               type="button"
@@ -1374,7 +1275,7 @@ function EnhancedProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo
               aria-label={it.name || it.title || "Open"}
             />
             <div className="relative pointer-events-none flex flex-col gap-4">
-              {isProject && Array.isArray(it.images) && it.images[0] && (
+              {Array.isArray(it.images) && it.images[0] && (
                 <div className={`${isDark ? "bg-slate-700" : "bg-slate-100"} aspect-[16/9] overflow-hidden rounded-2xl`}>
                   <img
                     src={it.images[0]}
@@ -1385,37 +1286,35 @@ function EnhancedProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo
                 </div>
               )}
 
-              {isProject && (
-                <div className="flex items-center gap-3 flex-wrap">
-                  {trending && (
-                    <span
-                      className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all duration-300 ${
-                        isDark
-                          ? "bg-gradient-to-r from-pink-900/40 to-rose-900/40 text-pink-200 ring-2 ring-pink-600"
-                          : "bg-gradient-to-r from-pink-100 to-rose-100 text-pink-800 ring-2 ring-pink-300"
-                      } hover:scale-105 transform`}
-                    >
-                      {MODERN_ICONS.trending} Trending
-                    </span>
-                  )}
-                  {recent && (
-                    <span
-                      className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all duration-300 ${
-                        isDark
-                          ? "bg-gradient-to-r from-emerald-900/40 to-green-900/40 text-emerald-200 ring-2 ring-emerald-600"
-                          : "bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-900 ring-2 ring-emerald-300"
-                      } hover:scale-105 transform`}
-                    >
-                      {MODERN_ICONS.recent} Recent
-                    </span>
-                  )}
-                  {(it.tags || []).slice(0, 4).map((t) => (
-                    <span key={t} className={chipClassFor(t, isDark)}>
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <div className="flex items-center gap-3 flex-wrap">
+                {trending && (
+                  <span
+                    className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all duration-300 ${
+                      isDark
+                        ? "bg-gradient-to-r from-pink-900/40 to-rose-900/40 text-pink-200 ring-2 ring-pink-600"
+                        : "bg-gradient-to-r from-pink-100 to-rose-100 text-pink-800 ring-2 ring-pink-300"
+                    } hover:scale-105 transform`}
+                  >
+                    {MODERN_ICONS.trending} Trending
+                  </span>
+                )}
+                {recent && (
+                  <span
+                    className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all duration-300 ${
+                      isDark
+                        ? "bg-gradient-to-r from-emerald-900/40 to-green-900/40 text-emerald-200 ring-2 ring-emerald-600"
+                        : "bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-900 ring-2 ring-emerald-300"
+                    } hover:scale-105 transform`}
+                  >
+                    {MODERN_ICONS.recent} Recent
+                  </span>
+                )}
+                {(it.tags || []).slice(0, 4).map((t) => (
+                  <span key={t} className={chipClassFor(t, isDark)}>
+                    {t}
+                  </span>
+                ))}
+              </div>
 
               <div className="flex items-start justify-between gap-3">
                 <h4
@@ -1425,7 +1324,7 @@ function EnhancedProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo
                 >
                   {it.name || it.title}
                 </h4>
-                {isProject && (
+                {(
                   <div className="flex gap-2 flex-wrap">
                     {badges.map(([emo, label]) => (
                       <span key={emo + label} title={label} className="text-xl transition-all duration-300 hover:scale-110">
@@ -1436,7 +1335,7 @@ function EnhancedProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo
                 )}
               </div>
 
-              {isProject && it.summary && (
+              {it.summary && (
                 <p
                   className={`text-sm leading-7 clamp-3 transition-all duration-300 ${
                     isDark ? "text-white/90 force-dark" : "text-slate-600"
@@ -1445,24 +1344,22 @@ function EnhancedProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo
                 />
               )}
 
-              {isProject && (
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex gap-2">
-                    {badges.map(([emo, label]) => (
-                      <span key={emo + label} title={label} className="text-xl transition-all duration-300 hover:scale-110">
-                        {emo}
-                      </span>
-                    ))}
-                  </div>
-                  <span
-                    className={`text-sm px-4 py-2 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 ${
-                      isDark ? "bg-slate-700/80 text-white hover:bg-slate-600/80" : "bg-slate-100/80 text-slate-700 hover:bg-slate-200/80"
-                    } backdrop-blur-sm`}
-                  >
-                    Read more →
-                  </span>
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex gap-2">
+                  {badges.map(([emo, label]) => (
+                    <span key={emo + label} title={label} className="text-xl transition-all duration-300 hover:scale-110">
+                      {emo}
+                    </span>
+                  ))}
                 </div>
-              )}
+                <span
+                  className={`text-sm px-4 py-2 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 ${
+                    isDark ? "bg-slate-700/80 text-white hover:bg-slate-600/80" : "bg-slate-100/80 text-slate-700 hover:bg-slate-200/80"
+                  } backdrop-blur-sm`}
+                >
+                  Read more →
+                </span>
+              </div>
             </div>
           </Card>
         );
@@ -1471,35 +1368,40 @@ function EnhancedProjectsAndPosts({ isDark, viewMode, rowHook, items, navigateTo
   );
 }
 
-function EnhancedPostsRow({ isDark, poRow, posts, navigate, viewMode }) {
-  // GRID: same 3-column grid as before
-  if (viewMode === "grid") {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {posts.map((post) => (
-          <PostCard key={post.id || post.slug || post.title} post={post} isDark={isDark} navigate={navigate} compact={false} />
-        ))}
-      </div>
-    );
-  }
-
-  // LIST: full-width vertical stack (no horizontal scroll)
+function EnhancedPostsList({ isDark, poRow, posts, navigate }) {
   return (
-    <div className="grid grid-cols-1 gap-6 w-full">
+    <div className="flex gap-6 overflow-x-auto hide-scrollbar custom-scrollbar snap-x snap-mandatory"
+      ref={poRow.rowRef}
+      style={{ scrollBehavior: "smooth" }}
+      onMouseDown={poRow.onMouseDown}
+      onMouseMove={poRow.onMouseMove}
+      onMouseUp={poRow.onMouseUp}
+      onMouseLeave={poRow.onMouseLeave}
+      onTouchStart={poRow.onTouchStart}
+      onTouchMove={poRow.onTouchMove}
+      onTouchEnd={poRow.onTouchEnd}
+      onKeyDown={poRow.onKey}
+      onScroll={poRow.onScroll}
+      onWheel={poRow.onWheel}
+      tabIndex={0}
+      aria-label="Posts carousel"
+    >
       {posts.map((post) => (
-        <PostCard key={post.id || post.slug || post.title} post={post} isDark={isDark} navigate={navigate} compact={true} />
+        <PostCard key={post.id || post.slug || post.title} post={post} isDark={isDark} navigate={navigate} poRow={poRow} />
       ))}
     </div>
   );
 }
 
-/* Reusable PostCard used by EnhancedPostsRow (handles both grid and list) */
-function PostCard({ post, isDark, navigate, compact }) {
+function PostCard({ post, isDark, navigate, poRow }) {
   const badges = postBadges(post);
   const html = sanitizePreview(post.bodyHtml || post.content || "", { forceDark: isDark });
-  const snippet = snippetHtml(html, compact ? 520 : 320);
+  const snippet = snippetHtml(html, 520);
 
-  const goBlog = () => navigate("/blog", { state: { focusId: post.id || post.slug || null } });
+  const goBlog = () => {
+    if (poRow && !poRow.canClick()) return;
+    navigate("/blog", { state: { focusId: post.id || post.slug || null } });
+  };
   const onKey = (e) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -1510,11 +1412,8 @@ function PostCard({ post, isDark, navigate, compact }) {
   return (
     <Card
       isDark={isDark}
-      className={`w-full p-6 rounded-3xl transition-all duration-500 hover:shadow-2xl hover:shadow-violet-500/20 hover:-translate-y-2 transform-gpu ${
-        isDark ? "bg-slate-800/70 hover:bg-slate-800/80" : "bg-white/80 hover:bg-white/90"
-      } group`}
+      className="min-w-[340px] snap-center p-6 rounded-3xl transition-all duration-500 hover:shadow-2xl hover:shadow-violet-500/20 hover:-translate-y-2 transform-gpu bg-white/80 hover:bg-white/90 group"
     >
-      {/* Click overlay */}
       <button type="button" className="absolute inset-0" onClick={goBlog} onKeyDown={onKey} aria-label={post.title || "Open post"} />
 
       <div className="relative pointer-events-none flex flex-col gap-4">
@@ -1560,7 +1459,7 @@ function PostCard({ post, isDark, navigate, compact }) {
               isDark ? "bg-slate-700/80 text-white hover:bg-slate-600/80" : "bg-slate-100/80 text-slate-700 hover:bg-slate-200/80"
             } backdrop-blur-sm`}
           >
-            Read more →
+            Read full article →
           </span>
         </div>
       </div>

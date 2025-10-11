@@ -87,7 +87,7 @@ function PasswordPromptModal({ onClose, onSubmit, darkMode, action = "perform th
 
           <div className="bg-amber-50 dark:bg-amber-900/30 border-l-4 border-amber-500 p-3 rounded">
             <p className="text-xs text-amber-700 dark:text-amber-300">
-              🔒 This is a one-time authentication. You'll need to enter your password each time you want to lock/unlock an entry for maximum security.
+              🔒 This is a one-time authentication. You'll need to enter your password each time for maximum security.
             </p>
           </div>
 
@@ -773,7 +773,7 @@ function BlockPreview({ blocks = [], darkMode = false }) {
   );
 }
 
-/* ---------- Full View Modal (Simplified - No owner controls) ---------- */
+/* ---------- Full View Modal ---------- */
 function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
   const [expandedCodeBlocks, setExpandedCodeBlocks] = useState(new Set());
   const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
@@ -1031,7 +1031,6 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
           )}
 
           <style>{`
-            /* Sepia mode text colors */
             .sepia-mode-content {
               color: #5c4033 !important;
             }
@@ -1040,7 +1039,6 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
               color: #3d2817 !important;
             }
             
-            /* Dark mode text colors - using important to override inline styles */
             .dark-mode-content {
               color: #f1f5f9 !important;
             }
@@ -1055,7 +1053,6 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
               color: inherit !important;
             }
             
-            /* Light mode text colors */
             .light-mode-content {
               color: #1e293b !important;
             }
@@ -1067,7 +1064,6 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
               color: #1e293b !important;
             }
             
-            /* List and paragraph formatting */
             .rich-text-content ul,
             .rich-text-content ol {
               margin-left: 1.5rem;
@@ -1082,7 +1078,6 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
             .rich-text-content em { font-style: italic; }
             .rich-text-content u { text-decoration: underline; }
             
-            /* Dynamic line height application */
             .reading-content-container * {
               line-height: inherit !important;
             }
@@ -1093,12 +1088,10 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
               line-height: inherit !important;
             }
             
-            /* Smooth scrolling */
             .reading-content-container {
               scroll-behavior: smooth;
             }
             
-            /* Ensure scrollbar is always visible to prevent layout shift */
             .reading-content-container::-webkit-scrollbar {
               width: 12px;
             }
@@ -1362,7 +1355,7 @@ export default function BIMDisplay() {
   const [darkMode, setDarkMode] = useState(loadDarkMode());
   const [deleteConfirmItem, setDeleteConfirmItem] = useState(null);
   const [lockingIds, setLockingIds] = useState(new Set());
-  const [passwordPrompt, setPasswordPrompt] = useState(null); // { entryId, currentLockState }
+  const [passwordPrompt, setPasswordPrompt] = useState(null);
   
   // Smart Features
   const [searchQuery, setSearchQuery] = useState("");
@@ -1372,12 +1365,10 @@ export default function BIMDisplay() {
   const nav = useNavigate();
   const location = useLocation();
 
-  // Save dark mode preference
   useEffect(() => {
     saveDarkMode(darkMode);
   }, [darkMode]);
 
-  // Save favorites whenever they change
   useEffect(() => {
     saveFavorites(favorites);
   }, [favorites]);
@@ -1437,7 +1428,6 @@ export default function BIMDisplay() {
     try {
       setBusyId(String(deleteConfirmItem.id));
       
-      // Get token for auth
       const token = await new Promise((resolve) => {
         const handleAuth = (token) => {
           resolve(token);
@@ -1488,13 +1478,11 @@ export default function BIMDisplay() {
   };
 
   const toggleLockWithToken = async (id, newLockedState, token) => {
-    // Prevent double-clicks
     if (lockingIds.has(id)) {
       console.log("Lock operation already in progress for entry", id);
       return;
     }
     
-    // Set loading state
     setLockingIds(prev => new Set([...prev, id]));
     
     try {
@@ -1512,7 +1500,6 @@ export default function BIMDisplay() {
       
       console.log(`✅ Backend response:`, response);
       
-      // Reload entire list to ensure consistency
       await load();
       
       console.log(`${newLockedState ? '🔒 Locked' : '🔓 Unlocked'} entry ${id}`);
@@ -1523,7 +1510,6 @@ export default function BIMDisplay() {
       
       console.error("Lock toggle failed:", e);
     } finally {
-      // Clear loading state
       setLockingIds(prev => {
         const next = new Set(prev);
         next.delete(id);
@@ -1545,13 +1531,13 @@ export default function BIMDisplay() {
       alert("⚠️ Please use ?admin=1 URL to access owner features.");
       return;
     }
+    // NO AUTHENTICATION REQUIRED FOR EDITING
     nav(`/bim/edit/${encodeURIComponent(id)}`); 
   };
   
   const goView = (id) => {
     const item = items.find((i) => i.id === id);
     if (item) {
-      // Check if locked and user is not owner
       if (item.locked && !owner) {
         alert("🔒 This entry is locked and can only be viewed by the owner.");
         return;
@@ -1560,11 +1546,9 @@ export default function BIMDisplay() {
     }
   };
 
-  // Filter and sort items
   const filteredAndSortedItems = useMemo(() => {
     let result = [...items];
 
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(item => {
@@ -1574,12 +1558,10 @@ export default function BIMDisplay() {
       });
     }
 
-    // Favorites filter
     if (filterFavorites) {
       result = result.filter(item => favorites.has(item.id));
     }
 
-    // Sort
     if (sortBy === "title") {
       result.sort((a, b) => {
         const titleA = (extractMainTitle(a.blocks || [])?.title || a.title || "").toLowerCase();
@@ -1624,7 +1606,6 @@ export default function BIMDisplay() {
         />
       )}
 
-      {/* Dark Mode Toggle - Fixed Bottom Right */}
       <button
         type="button"
         onClick={() => setDarkMode(!darkMode)}
@@ -1655,7 +1636,6 @@ export default function BIMDisplay() {
           </div>
         </header>
 
-        {/* Search and Filter Bar */}
         {!loading && items.length > 0 && (
           <div className={`rounded-xl p-4 shadow-sm transition-colors ${darkMode ? "bg-slate-800" : "bg-white"}`}>
             <div className="flex flex-wrap gap-3 items-center">
@@ -1795,7 +1775,6 @@ export default function BIMDisplay() {
                           <Star size={16} fill={favorites.has(e.id) ? "currentColor" : "none"} />
                         </button>
                         
-                        {/* 🔥 NEW: Lock/Unlock Button with Password Prompt */}
                         <button
                           type="button"
                           onClick={() => handleLockUnlock(e.id, e.locked)}
@@ -1864,7 +1843,7 @@ export default function BIMDisplay() {
                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                               darkMode ? "bg-blue-900/50 text-blue-300 hover:bg-blue-900/70" : "bg-blue-100 text-blue-700 hover:bg-blue-200"
                             }`}
-                            title="Edit entry"
+                            title="Edit entry (No authentication required)"
                           >
                             <span className="inline-flex items-center gap-1.5">
                               <Edit3 size={16} /> Edit

@@ -7,6 +7,9 @@ import {
   ChevronsUp, ChevronsDown, GripVertical
 } from "lucide-react";
 
+/* ---------- AUTH: reuse the same login helper your display page uses ---------- */
+import { loginAsOwner } from "../lib/owner.js";
+
 /* ---------- API & Auth ---------- */
 const RAW_API = (import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || "").trim();
 const API_BASE = RAW_API.replace(/\/+$/, "");
@@ -40,6 +43,20 @@ const useOwnerMode = () => {
   const [owner, setOwner] = useState(true);
   return { owner, setOwner };
 };
+
+/* ---------- AUTH: ensure we actually have a token; prompt once if missing ---------- */
+async function ensureOwnerToken() {
+  let tok = localStorage.getItem("owner_token");
+  if (tok) return tok;
+  const pwd = window.prompt("Owner password required:");
+  if (!pwd) throw new Error("Authentication cancelled");
+  const result = await loginAsOwner(pwd, API_BASE);
+  if (!result?.success || !result?.token) {
+    throw new Error(result?.error || "Authentication failed");
+  }
+  localStorage.setItem("owner_token", result.token);
+  return result.token;
+}
 
 /* ---------- Add Block Menu ---------- */
 function AddBlockMenu({ onAdd, onClose }) {
@@ -108,11 +125,7 @@ function BlockToolbar({
       </div>
       
       <button 
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onDelete();
-        }}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); }}
         className="p-2 rounded-lg hover:bg-red-50 transition group/btn" 
         title="Delete block"
       >
@@ -124,22 +137,14 @@ function BlockToolbar({
       {canMoveUp && (
         <>
           <button 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onMoveToTop();
-            }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMoveToTop(); }}
             className="p-2 rounded-lg hover:bg-purple-50 transition group/btn" 
             title="Move to top"
           >
             <ChevronsUp size={16} className="text-slate-400 group-hover/btn:text-purple-600" />
           </button>
           <button 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onMoveUp();
-            }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMoveUp(); }}
             className="p-2 rounded-lg hover:bg-blue-50 transition group/btn" 
             title="Move up"
           >
@@ -151,22 +156,14 @@ function BlockToolbar({
       {canMoveDown && (
         <>
           <button 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onMoveDown();
-            }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMoveDown(); }}
             className="p-2 rounded-lg hover:bg-blue-50 transition group/btn" 
             title="Move down"
           >
             <ChevronDown size={16} className="text-slate-400 group-hover/btn:text-blue-600" />
           </button>
           <button 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onMoveToBottom();
-            }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMoveToBottom(); }}
             className="p-2 rounded-lg hover:bg-purple-50 transition group/btn" 
             title="Move to bottom"
           >
@@ -181,6 +178,8 @@ function BlockToolbar({
 /* ---------- Heading Block ---------- */
 function HeadingBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onMoveToTop, onMoveToBottom, canMoveUp, canMoveDown, isDragging }) {
   const [value, setValue] = useState(block.value || "");
+
+  useEffect(() => { setValue(block.value || ""); }, [block.value]);
 
   const handleChange = (e) => {
     const newValue = e.target.value;
@@ -238,7 +237,7 @@ function HeadingBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, 
   );
 }
 
-/* ---------- Text Block with Rich Formatting ---------- */
+/* ---------- Text Block with Rich Formatting (FULL TOOLBAR RESTORED) ---------- */
 function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onMoveToTop, onMoveToBottom, canMoveUp, canMoveDown, isDragging }) {
   const [showFormatBar, setShowFormatBar] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -252,6 +251,12 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
       editorRef.current.innerHTML = block.value;
     }
   }, []);
+
+  useEffect(() => {
+    if (editorRef.current && block.value != null && editorRef.current.innerHTML !== block.value) {
+      editorRef.current.innerHTML = block.value;
+    }
+  }, [block.value]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -279,93 +284,47 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
   };
 
   const colors = [
-    { hex: '#000000', name: 'Black' },
-    { hex: '#374151', name: 'Gray 700' },
-    { hex: '#6B7280', name: 'Gray 500' },
-    { hex: '#9CA3AF', name: 'Gray 400' },
-    { hex: '#EF4444', name: 'Red' },
-    { hex: '#DC2626', name: 'Red 600' },
-    { hex: '#F59E0B', name: 'Amber' },
-    { hex: '#D97706', name: 'Amber 600' },
-    { hex: '#10B981', name: 'Emerald' },
-    { hex: '#059669', name: 'Emerald 600' },
-    { hex: '#3B82F6', name: 'Blue' },
-    { hex: '#2563EB', name: 'Blue 600' },
-    { hex: '#8B5CF6', name: 'Violet' },
-    { hex: '#7C3AED', name: 'Violet 600' },
-    { hex: '#EC4899', name: 'Pink' },
-    { hex: '#DB2777', name: 'Pink 600' },
-    { hex: '#14B8A6', name: 'Teal' },
-    { hex: '#0D9488', name: 'Teal 600' },
-    { hex: '#F97316', name: 'Orange' },
-    { hex: '#EA580C', name: 'Orange 600' },
-    { hex: '#06B6D4', name: 'Cyan' },
-    { hex: '#0891B2', name: 'Cyan 600' },
-    { hex: '#84CC16', name: 'Lime' },
-    { hex: '#65A30D', name: 'Lime 600' }
+    { hex: '#000000', name: 'Black' }, { hex: '#374151', name: 'Gray 700' },
+    { hex: '#6B7280', name: 'Gray 500' }, { hex: '#9CA3AF', name: 'Gray 400' },
+    { hex: '#EF4444', name: 'Red' }, { hex: '#DC2626', name: 'Red 600' },
+    { hex: '#F59E0B', name: 'Amber' }, { hex: '#D97706', name: 'Amber 600' },
+    { hex: '#10B981', name: 'Emerald' }, { hex: '#059669', name: 'Emerald 600' },
+    { hex: '#3B82F6', name: 'Blue' }, { hex: '#2563EB', name: 'Blue 600' },
+    { hex: '#8B5CF6', name: 'Violet' }, { hex: '#7C3AED', name: 'Violet 600' },
+    { hex: '#EC4899', name: 'Pink' }, { hex: '#DB2777', name: 'Pink 600' },
+    { hex: '#14B8A6', name: 'Teal' }, { hex: '#0D9488', name: 'Teal 600' },
+    { hex: '#F97316', name: 'Orange' }, { hex: '#EA580C', name: 'Orange 600' },
+    { hex: '#06B6D4', name: 'Cyan' }, { hex: '#0891B2', name: 'Cyan 600' },
+    { hex: '#84CC16', name: 'Lime' }, { hex: '#65A30D', name: 'Lime 600' }
   ];
 
   const highlightColors = [
-    { hex: '#FEF3C7', name: 'Yellow' },
-    { hex: '#FDE68A', name: 'Yellow 300' },
-    { hex: '#FCD34D', name: 'Yellow 400' },
-    { hex: '#FED7AA', name: 'Orange' },
-    { hex: '#FDBA74', name: 'Orange 300' },
-    { hex: '#FB923C', name: 'Orange 400' },
-    { hex: '#FECACA', name: 'Red' },
-    { hex: '#FCA5A5', name: 'Red 300' },
-    { hex: '#F87171', name: 'Red 400' },
-    { hex: '#FBCFE8', name: 'Pink' },
-    { hex: '#F9A8D4', name: 'Pink 300' },
-    { hex: '#F472B6', name: 'Pink 400' },
-    { hex: '#DDD6FE', name: 'Purple' },
-    { hex: '#C4B5FD', name: 'Purple 300' },
-    { hex: '#A78BFA', name: 'Purple 400' },
-    { hex: '#BFDBFE', name: 'Blue' },
-    { hex: '#93C5FD', name: 'Blue 300' },
-    { hex: '#60A5FA', name: 'Blue 400' },
-    { hex: '#BAE6FD', name: 'Sky' },
-    { hex: '#7DD3FC', name: 'Sky 300' },
-    { hex: '#38BDF8', name: 'Sky 400' },
-    { hex: '#A5F3FC', name: 'Cyan' },
-    { hex: '#67E8F9', name: 'Cyan 300' },
-    { hex: '#22D3EE', name: 'Cyan 400' },
-    { hex: '#99F6E4', name: 'Teal' },
-    { hex: '#5EEAD4', name: 'Teal 300' },
-    { hex: '#2DD4BF', name: 'Teal 400' },
-    { hex: '#BBF7D0', name: 'Green' },
-    { hex: '#86EFAC', name: 'Green 300' },
-    { hex: '#4ADE80', name: 'Green 400' },
-    { hex: '#D9F99D', name: 'Lime' },
-    { hex: '#BEF264', name: 'Lime 300' },
-    { hex: '#A3E635', name: 'Lime 400' },
-    { hex: '#E5E7EB', name: 'Gray' },
-    { hex: '#D1D5DB', name: 'Gray 300' },
-    { hex: '#9CA3AF', name: 'Gray 400' }
+    { hex: '#FEF3C7', name: 'Yellow' }, { hex: '#FDE68A', name: 'Yellow 300' }, { hex: '#FCD34D', name: 'Yellow 400' },
+    { hex: '#FED7AA', name: 'Orange' }, { hex: '#FDBA74', name: 'Orange 300' }, { hex: '#FB923C', name: 'Orange 400' },
+    { hex: '#FECACA', name: 'Red' }, { hex: '#FCA5A5', name: 'Red 300' }, { hex: '#F87171', name: 'Red 400' },
+    { hex: '#FBCFE8', name: 'Pink' }, { hex: '#F9A8D4', name: 'Pink 300' }, { hex: '#F472B6', name: 'Pink 400' },
+    { hex: '#DDD6FE', name: 'Purple' }, { hex: '#C4B5FD', name: 'Purple 300' }, { hex: '#A78BFA', name: 'Purple 400' },
+    { hex: '#BFDBFE', name: 'Blue' }, { hex: '#93C5FD', name: 'Blue 300' }, { hex: '#60A5FA', name: 'Blue 400' },
+    { hex: '#BAE6FD', name: 'Sky' }, { hex: '#7DD3FC', name: 'Sky 300' }, { hex: '#38BDF8', name: 'Sky 400' },
+    { hex: '#A5F3FC', name: 'Cyan' }, { hex: '#67E8F9', name: 'Cyan 300' }, { hex: '#22D3EE', name: 'Cyan 400' },
+    { hex: '#99F6E4', name: 'Teal' }, { hex: '#5EEAD4', name: 'Teal 300' }, { hex: '#2DD4BF', name: 'Teal 400' },
+    { hex: '#BBF7D0', name: 'Green' }, { hex: '#86EFAC', name: 'Green 300' }, { hex: '#4ADE80', name: 'Green 400' },
+    { hex: '#D9F99D', name: 'Lime' }, { hex: '#BEF264', name: 'Lime 300' }, { hex: '#A3E635', name: 'Lime 400' },
+    { hex: '#E5E7EB', name: 'Gray' }, { hex: '#D1D5DB', name: 'Gray 300' }, { hex: '#9CA3AF', name: 'Gray 400' }
   ];
 
   const fontSizes = Array.from({ length: 33 }, (_, i) => i + 8);
-
   const fontFamilies = [
-    { value: 'serif', name: 'Serif' },
-    { value: 'Georgia, serif', name: 'Georgia' },
+    { value: 'serif', name: 'Serif' }, { value: 'Georgia, serif', name: 'Georgia' },
     { value: '"Times New Roman", serif', name: 'Times New Roman' },
-    { value: 'sans-serif', name: 'Sans Serif' },
-    { value: 'Arial, sans-serif', name: 'Arial' },
-    { value: 'Helvetica, sans-serif', name: 'Helvetica' },
-    { value: 'Verdana, sans-serif', name: 'Verdana' },
-    { value: 'Tahoma, sans-serif', name: 'Tahoma' },
-    { value: '"Trebuchet MS", sans-serif', name: 'Trebuchet MS' },
-    { value: '"Segoe UI", sans-serif', name: 'Segoe UI' },
-    { value: 'monospace', name: 'Monospace' },
-    { value: '"Courier New", monospace', name: 'Courier New' },
-    { value: 'Monaco, monospace', name: 'Monaco' },
-    { value: 'cursive', name: 'Cursive' },
-    { value: '"Comic Sans MS", cursive', name: 'Comic Sans' },
-    { value: '"Brush Script MT", cursive', name: 'Brush Script' },
-    { value: 'Garamond, serif', name: 'Garamond' },
-    { value: '"Palatino Linotype", serif', name: 'Palatino' },
-    { value: '"Book Antiqua", serif', name: 'Book Antiqua' },
+    { value: 'sans-serif', name: 'Sans Serif' }, { value: 'Arial, sans-serif', name: 'Arial' },
+    { value: 'Helvetica, sans-serif', name: 'Helvetica' }, { value: 'Verdana, sans-serif', name: 'Verdana' },
+    { value: 'Tahoma, sans-serif', name: 'Tahoma' }, { value: '"Trebuchet MS", sans-serif', name: 'Trebuchet MS' },
+    { value: '"Segoe UI", sans-serif', name: 'Segoe UI' }, { value: 'monospace', name: 'Monospace' },
+    { value: '"Courier New", monospace', name: 'Courier New' }, { value: 'Monaco, monospace', name: 'Monaco' },
+    { value: 'cursive', name: 'Cursive' }, { value: '"Comic Sans MS", cursive', name: 'Comic Sans' },
+    { value: '"Brush Script MT", cursive', name: 'Brush Script' }, { value: 'Garamond, serif', name: 'Garamond' },
+    { value: '"Palatino Linotype", serif', name: 'Palatino' }, { value: '"Book Antiqua", serif', name: 'Book Antiqua' },
     { value: 'Impact, sans-serif', name: 'Impact' }
   ];
 
@@ -388,153 +347,59 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
 
       {showFormatBar && (
         <div className="mb-2 flex flex-wrap items-center gap-1 p-2 bg-white rounded-lg shadow-lg border border-slate-200 z-[90]">
+          {/* Bold / Italic / Underline / Strike */}
           <div className="flex gap-1 pr-2 border-r border-slate-200">
-            <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                execCommand('bold');
-              }}
-              className="p-2 rounded hover:bg-slate-100 transition"
-              title="Bold"
-              type="button"
-            >
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('bold');}} className="p-2 rounded hover:bg-slate-100 transition" title="Bold" type="button">
               <span className="font-bold text-slate-700">B</span>
             </button>
-            <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                execCommand('italic');
-              }}
-              className="p-2 rounded hover:bg-slate-100 transition"
-              title="Italic"
-              type="button"
-            >
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('italic');}} className="p-2 rounded hover:bg-slate-100 transition" title="Italic" type="button">
               <span className="italic text-slate-700">I</span>
             </button>
-            <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                execCommand('underline');
-              }}
-              className="p-2 rounded hover:bg-slate-100 transition"
-              title="Underline"
-              type="button"
-            >
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('underline');}} className="p-2 rounded hover:bg-slate-100 transition" title="Underline" type="button">
               <span className="underline text-slate-700">U</span>
             </button>
-            <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                execCommand('strikeThrough');
-              }}
-              className="p-2 rounded hover:bg-slate-100 transition"
-              title="Strikethrough"
-              type="button"
-            >
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('strikeThrough');}} className="p-2 rounded hover:bg-slate-100 transition" title="Strikethrough" type="button">
               <span className="line-through text-slate-700">S</span>
             </button>
           </div>
 
+          {/* Alignment */}
           <div className="flex gap-1 pr-2 border-r border-slate-200">
-            <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                execCommand('justifyLeft');
-              }}
-              className="p-2 rounded hover:bg-slate-100 transition"
-              title="Align Left"
-              type="button"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2 4h16v2H2V4zm0 4h10v2H2V8zm0 4h16v2H2v-2zm0 4h10v2H2v-2z"/>
-              </svg>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyLeft');}} className="p-2 rounded hover:bg-slate-100 transition" title="Align Left" type="button">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 4h16v2H2V4zm0 4h10v2H2V8zm0 4h16v2H2v-2zm0 4h10v2H2v-2z"/></svg>
             </button>
-            <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                execCommand('justifyCenter');
-              }}
-              className="p-2 rounded hover:bg-slate-100 transition"
-              title="Align Center"
-              type="button"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2 4h16v2H2V4zm3 4h10v2H5V8zm-3 4h16v2H2v-2zm3 4h10v2H5v-2z"/>
-              </svg>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyCenter');}} className="p-2 rounded hover:bg-slate-100 transition" title="Align Center" type="button">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 4h16v2H2V4zm3 4h10v2H5V8zm-3 4h16v2H2v-2zm3 4h10v2H5v-2z"/></svg>
             </button>
-            <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                execCommand('justifyRight');
-              }}
-              className="p-2 rounded hover:bg-slate-100 transition"
-              title="Align Right"
-              type="button"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2 4h16v2H2V4zm6 4h10v2H8V8zm-6 4h16v2H2v-2zm6 4h10v2H8v-2z"/>
-              </svg>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyRight');}} className="p-2 rounded hover:bg-slate-100 transition" title="Align Right" type="button">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 4h16v2H2V4zm6 4h10v2H8V8zm-6 4h16v2H2v-2zm6 4h10v2H8v-2z"/></svg>
             </button>
-            <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                execCommand('justifyFull');
-              }}
-              className="p-2 rounded hover:bg-slate-100 transition"
-              title="Justify"
-              type="button"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2 4h16v2H2V4zm0 4h16v2H2V8zm0 4h16v2H2v-2zm0 4h16v2H2v-2z"/>
-              </svg>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyFull');}} className="p-2 rounded hover:bg-slate-100 transition" title="Justify" type="button">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 4h16v2H2V4zm0 4h16v2H2V8zm0 4h16v2H2v-2zm0 4h16v2H2v-2z"/></svg>
             </button>
           </div>
 
+          {/* Lists */}
           <div className="flex gap-1 pr-2 border-r border-slate-200">
-            <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                execCommand('insertUnorderedList');
-              }}
-              className="p-2 rounded hover:bg-slate-100 transition"
-              title="Bullet List"
-              type="button"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M3 4a1 1 0 100 2 1 1 0 000-2zm4 1h10v1H7V5zm-4 4a1 1 0 100 2 1 1 0 000-2zm4 1h10v1H7v-1zm-4 4a1 1 0 100 2 1 1 0 000-2zm4 1h10v1H7v-1z"/>
-              </svg>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('insertUnorderedList');}} className="p-2 rounded hover:bg-slate-100 transition" title="Bullet List" type="button">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3 4a1 1 0 100 2 1 1 0 000-2zm4 1h10v1H7V5zm-4 4a1 1 0 100 2 1 1 0 000-2zm4 1h10v1H7v-1zm-4 4a1 1 0 100 2 1 1 0 000-2zm4 1h10v1H7v-1z"/></svg>
             </button>
-            <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                execCommand('insertOrderedList');
-              }}
-              className="p-2 rounded hover:bg-slate-100 transition"
-              title="Numbered List"
-              type="button"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M3 3h1v3H3V3zm0 5h1.5v1H3.5v1H4.5v1H3V9zm.5 5H3v1h2v1H3v1h2v-3h-.5zM7 5h10v1H7V5zm0 5h10v1H7v-1zm0 5h10v1H7v-1z"/>
-              </svg>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('insertOrderedList');}} className="p-2 rounded hover:bg-slate-100 transition" title="Numbered List" type="button">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3 3h1v3H3V3zm0 5h1.5v1H3.5v1H4.5v1H3V9zm.5 5H3v1h2v1H3v1h2v-3h-.5zM7 5h10v1H7V5zm0 5h10v1H7v-1zm0 5h10v1H7v-1z"/></svg>
             </button>
           </div>
 
+          {/* Text color */}
           <div className="relative" ref={colorPickerRef}>
             <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setShowColorPicker(!showColorPicker);
-              }}
+              onMouseDown={(e) => { e.preventDefault(); setShowColorPicker(!showColorPicker); }}
               className="p-2 rounded hover:bg-slate-100 transition flex items-center gap-1"
               title="Text Color"
               type="button"
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M13.414 4.586a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-2-2a2 2 0 012.828-2.828L7 8.172l3.586-3.586a2 2 0 012.828 0zM16 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-              </svg>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13.414 4.586a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-2-2a2 2 0 012.828-2.828L7 8.172l3.586-3.586a2 2 0 012.828 0zM16 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
               <span className="text-xs font-bold">A</span>
             </button>
-            
             {showColorPicker && (
               <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 z-[100] min-w-[280px]">
                 <div className="text-xs font-semibold text-slate-500 mb-2 px-1">Text Color</div>
@@ -542,11 +407,7 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
                   {colors.map((color) => (
                     <button
                       key={color.hex}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        execCommand('foreColor', color.hex);
-                        setShowColorPicker(false);
-                      }}
+                      onMouseDown={(e) => { e.preventDefault(); execCommand('foreColor', color.hex); setShowColorPicker(false); }}
                       className="w-9 h-9 rounded-lg border-2 border-slate-200 hover:border-slate-400 hover:scale-110 transition-all shadow-sm hover:shadow-md"
                       style={{ backgroundColor: color.hex }}
                       title={color.name}
@@ -558,21 +419,16 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
             )}
           </div>
 
+          {/* Highlight color */}
           <div className="relative" ref={highlightPickerRef}>
             <button
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setShowHighlightPicker(!showHighlightPicker);
-              }}
+              onMouseDown={(e) => { e.preventDefault(); setShowHighlightPicker(!showHighlightPicker); }}
               className="p-2 rounded hover:bg-slate-100 transition"
               title="Highlight"
               type="button"
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-              </svg>
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
             </button>
-            
             {showHighlightPicker && (
               <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 z-[100] min-w-[320px]">
                 <div className="text-xs font-semibold text-slate-500 mb-2 px-1">Highlight</div>
@@ -580,11 +436,7 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
                   {highlightColors.map((color) => (
                     <button
                       key={color.hex}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        execCommand('backColor', color.hex);
-                        setShowHighlightPicker(false);
-                      }}
+                      onMouseDown={(e) => { e.preventDefault(); execCommand('backColor', color.hex); setShowHighlightPicker(false); }}
                       className="w-9 h-9 rounded-lg border-2 border-slate-200 hover:border-slate-400 hover:scale-110 transition-all shadow-sm hover:shadow-md"
                       style={{ backgroundColor: color.hex }}
                       title={color.name}
@@ -600,16 +452,12 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
           <div className="flex gap-1 pr-2 border-r border-slate-200">
             <select
               onMouseDown={(e) => e.stopPropagation()}
-              onChange={(e) => {
-                execCommand('fontName', e.target.value);
-              }}
+              onChange={(e) => { execCommand('fontName', e.target.value); }}
               className="text-sm px-2 py-1 rounded border border-slate-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
               defaultValue="serif"
             >
               {fontFamilies.map(font => (
-                <option key={font.value} value={font.value}>
-                  {font.name}
-                </option>
+                <option key={font.value} value={font.value}>{font.name}</option>
               ))}
             </select>
           </div>
@@ -627,9 +475,7 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
               defaultValue="14"
             >
               {fontSizes.map(size => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
+                <option key={size} value={size}>{size}</option>
               ))}
             </select>
           </div>
@@ -637,44 +483,24 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
       )}
 
       <style>{`
-        [contenteditable] ul {
-          list-style-type: disc;
-          padding-left: 2rem;
-          margin: 0.5rem 0;
-        }
-        [contenteditable] ol {
-          list-style-type: decimal;
-          padding-left: 2rem;
-          margin: 0.5rem 0;
-        }
-        [contenteditable] li {
-          margin: 0.25rem 0;
-        }
-        [contenteditable] li::marker {
-          color: inherit;
-        }
-        [contenteditable] p {
-          margin: 0.5rem 0;
-        }
-        [contenteditable] p:first-child {
-          margin-top: 0;
-        }
-        [contenteditable] p:last-child {
-          margin-bottom: 0;
-        }
+        [contenteditable] ul { list-style-type: disc; padding-left: 2rem; margin: 0.5rem 0; }
+        [contenteditable] ol { list-style-type: decimal; padding-left: 2rem; margin: 0.5rem 0; }
+        [contenteditable] li { margin: 0.25rem 0; }
+        [contenteditable] li::marker { color: inherit; }
+        [contenteditable] p { margin: 0.5rem 0; }
+        [contenteditable] p:first-child { margin-top: 0; }
+        [contenteditable] p:last-child { margin-bottom: 0; }
         [contenteditable] code {
-          background-color: rgba(135, 131, 120, 0.15);
-          color: #eb5757;
-          border-radius: 3px;
-          font-size: 85%;
-          padding: 0.2em 0.4em;
-          font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+          background-color: rgba(135,131,120,.15);
+          color:#eb5757;
+          border-radius:3px;
+          font-size:85%;
+          padding:0.2em 0.4em;
+          font-family: 'SFMono-Regular',Consolas,'Liberation Mono',Menlo,Courier,monospace;
         }
-        [contenteditable] a {
-          color: #2563eb;
-          text-decoration: underline;
-        }
+        [contenteditable] a { color:#2563eb; text-decoration:underline; }
       `}</style>
+
       <div
         ref={editorRef}
         contentEditable
@@ -712,7 +538,6 @@ function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, on
 
   const handleFileUpload = async (file) => {
     if (!file) return;
-    
     if (!file.type.startsWith("image/")) {
       alert("Please select an image file");
       return;
@@ -740,49 +565,32 @@ function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, on
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
+    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
+    else if (e.type === "dragleave") setDragActive(false);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileUpload(e.dataTransfer.files[0]);
     }
   };
 
-  const handleEdit = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleImageError = () => {
-    setImageError(true);
-  };
+  const handleEdit = () => fileInputRef.current?.click();
+  const handleImageError = () => setImageError(true);
 
   const handleSizeChange = (size) => {
     setImageSize(size);
     onUpdate(index, { ...block, size });
   };
 
-  const sizeClasses = {
-    small: "max-w-md",
-    medium: "max-w-2xl",
-    large: "max-w-4xl",
-    full: "max-w-full"
-  };
+  const sizeClasses = { small: "max-w-md", medium: "max-w-2xl", large: "max-w-4xl", full: "max-w-full" };
 
   if (!imageUrl || imageError) {
     return (
-      <div 
-        className={`group/block relative py-4 transition-all duration-200 ${isDragging ? 'opacity-50' : 'opacity-100'}`}
-        data-block-index={index}
-      >
+      <div className={`group/block relative py-4 transition-all duration-200 ${isDragging ? 'opacity-50' : 'opacity-100'}`} data-block-index={index}>
         <div className="opacity-0 group-hover/block:opacity-100 transition-opacity duration-200">
           <BlockToolbar
             onDelete={() => onDelete(index)}
@@ -801,13 +609,7 @@ function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, on
           onDragOver={handleDrag}
           onDrop={handleDrop}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleFileUpload(e.target.files?.[0])}
-            className="hidden"
-          />
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => handleFileUpload(e.target.files?.[0])} className="hidden" />
           <div className="flex flex-col items-center gap-4">
             <div className="p-5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full shadow-lg">
               <Upload size={32} className="text-white" />
@@ -831,10 +633,7 @@ function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, on
   }
 
   return (
-    <div 
-      className={`group/block relative py-4 transition-all duration-200 ${isDragging ? 'opacity-50' : 'opacity-100'}`}
-      data-block-index={index}
-    >
+    <div className={`group/block relative py-4 transition-all duration-200 ${isDragging ? 'opacity-50' : 'opacity-100'}`} data-block-index={index}>
       <div className="opacity-0 group-hover/block:opacity-100 transition-opacity duration-200">
         <BlockToolbar
           onDelete={() => onDelete(index)}
@@ -848,30 +647,20 @@ function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, on
       </div>
       <div className={`mx-auto ${sizeClasses[imageSize]}`}>
         <div className="rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all relative ring-1 ring-slate-200 group/img">
-          <img 
-            src={imageUrl} 
-            alt="" 
-            className="w-full" 
-            onError={handleImageError}
-          />
+          <img src={imageUrl} alt="" className="w-full" onError={handleImageError} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover/img:opacity-100 transition" />
           <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover/img:opacity-100 transition-all">
-            <button
-              onClick={handleEdit}
-              className="px-4 py-2 bg-white/95 backdrop-blur-sm rounded-lg text-sm font-semibold text-slate-700 shadow-lg hover:shadow-xl hover:bg-white"
-            >
+            <button onClick={handleEdit} className="px-4 py-2 bg-white/95 backdrop-blur-sm rounded-lg text-sm font-semibold text-slate-700 shadow-lg hover:shadow-xl hover:bg-white">
               Change
             </button>
           </div>
           <div className="absolute bottom-4 left-4 flex gap-2 opacity-0 group-hover/img:opacity-100 transition-all">
-            {['small', 'medium', 'large', 'full'].map(size => (
+            {['small','medium','large','full'].map(size => (
               <button
                 key={size}
                 onClick={() => handleSizeChange(size)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  imageSize === size 
-                    ? 'bg-blue-600 text-white shadow-lg' 
-                    : 'bg-white/95 text-slate-700 hover:bg-white'
+                  imageSize === size ? 'bg-blue-600 text-white shadow-lg' : 'bg-white/95 text-slate-700 hover:bg-white'
                 }`}
               >
                 {size}
@@ -897,6 +686,8 @@ function CodeBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
   const [value, setValue] = useState(block.value || "");
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => { setValue(block.value || ""); }, [block.value]);
+
   const handleChange = (e) => {
     const newValue = e.target.value;
     setValue(newValue);
@@ -910,57 +701,24 @@ function CodeBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
   };
 
   const languages = [
-    "javascript", "typescript", "python", "java", "csharp", "cpp", "c",
-    "ruby", "go", "rust", "php", "swift", "kotlin", "scala",
-    "html", "css", "sql", "bash", "powershell", "json", "yaml", "xml"
+    "javascript","typescript","python","java","csharp","cpp","c",
+    "ruby","go","rust","php","swift","kotlin","scala",
+    "html","css","sql","bash","powershell","json","yaml","xml"
   ];
 
   const themes = {
-    dark: {
-      name: "Dark",
-      bg: "bg-slate-900",
-      headerBg: "bg-gradient-to-r from-slate-800 to-slate-700",
-      text: "text-slate-100",
-      border: "border-slate-700"
-    },
-    monokai: {
-      name: "Monokai",
-      bg: "bg-[#272822]",
-      headerBg: "bg-gradient-to-r from-[#1e1f1c] to-[#272822]",
-      text: "text-[#f8f8f2]",
-      border: "border-[#3e3d32]"
-    },
-    github: {
-      name: "GitHub",
-      bg: "bg-[#f6f8fa]",
-      headerBg: "bg-gradient-to-r from-[#e1e4e8] to-[#f6f8fa]",
-      text: "text-[#24292e]",
-      border: "border-[#d1d5da]"
-    },
-    dracula: {
-      name: "Dracula",
-      bg: "bg-[#282a36]",
-      headerBg: "bg-gradient-to-r from-[#21222c] to-[#282a36]",
-      text: "text-[#f8f8f2]",
-      border: "border-[#44475a]"
-    },
-    nord: {
-      name: "Nord",
-      bg: "bg-[#2e3440]",
-      headerBg: "bg-gradient-to-r from-[#3b4252] to-[#2e3440]",
-      text: "text-[#d8dee9]",
-      border: "border-[#4c566a]"
-    }
+    dark: { name: "Dark", bg: "bg-slate-900", headerBg: "bg-gradient-to-r from-slate-800 to-slate-700", text: "text-slate-100", border: "border-slate-700" },
+    monokai: { name: "Monokai", bg: "bg-[#272822]", headerBg: "bg-gradient-to-r from-[#1e1f1c] to-[#272822]", text: "text-[#f8f8f2]", border: "border-[#3e3d32]" },
+    github: { name: "GitHub", bg: "bg-[#f6f8fa]", headerBg: "bg-gradient-to-r from-[#e1e4e8] to-[#f6f8fa]", text: "text-[#24292e]", border: "border-[#d1d5da]" },
+    dracula: { name: "Dracula", bg: "bg-[#282a36]", headerBg: "bg-gradient-to-r from-[#21222c] to-[#282a36]", text: "text-[#f8f8f2]", border: "border-[#44475a]" },
+    nord: { name: "Nord", bg: "bg-[#2e3440]", headerBg: "bg-gradient-to-r from-[#3b4252] to-[#2e3440]", text: "text-[#d8dee9]", border: "border-[#4c566a]" },
   };
 
   const currentLang = block.language || "javascript";
   const currentTheme = themes[block.theme || "dark"];
 
   return (
-    <div 
-      className={`group/block relative py-4 transition-all duration-200 ${isDragging ? 'opacity-50' : 'opacity-100'}`}
-      data-block-index={index}
-    >
+    <div className={`group/block relative py-4 transition-all duration-200 ${isDragging ? 'opacity-50' : 'opacity-100'}`} data-block-index={index}>
       <div className="opacity-0 group-hover/block:opacity-100 transition-opacity duration-200">
         <BlockToolbar
           onDelete={() => onDelete(index)}
@@ -981,9 +739,7 @@ function CodeBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
               className={`text-sm bg-slate-700/50 rounded-lg px-4 py-2 border-none focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono font-semibold cursor-pointer hover:bg-slate-700 transition ${currentTheme.text} min-w-[140px]`}
             >
               {languages.map(lang => (
-                <option key={lang} value={lang}>
-                  {lang.charAt(0).toUpperCase() + lang.slice(1)}
-                </option>
+                <option key={lang} value={lang}>{lang.charAt(0).toUpperCase() + lang.slice(1)}</option>
               ))}
             </select>
             <select
@@ -992,27 +748,12 @@ function CodeBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
               className={`text-sm bg-slate-700/50 rounded-lg px-4 py-2 border-none focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer hover:bg-slate-700 transition ${currentTheme.text}`}
             >
               {Object.entries(themes).map(([key, theme]) => (
-                <option key={key} value={key}>
-                  {theme.name}
-                </option>
+                <option key={key} value={key}>{theme.name}</option>
               ))}
             </select>
           </div>
-          <button
-            onClick={handleCopy}
-            className={`flex items-center gap-2 px-4 py-2 text-sm transition bg-slate-700/50 hover:bg-slate-600 rounded-lg font-medium ${currentTheme.text}`}
-          >
-            {copied ? (
-              <>
-                <Check size={16} className="text-green-400" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy size={16} />
-                Copy
-              </>
-            )}
+          <button onClick={handleCopy} className={`flex items-center gap-2 px-4 py-2 text-sm transition bg-slate-700/50 hover:bg-slate-600 rounded-lg font-medium ${currentTheme.text}`}>
+            {copied ? (<><Check size={16} className="text-green-400" />Copied!</>) : (<><Copy size={16} />Copy</>)}
           </button>
         </div>
         <textarea
@@ -1047,12 +788,7 @@ export default function BIMEditor() {
         setBusy(true);
         const data = await fetchJSON(`/api/bim/${encodeURIComponent(id)}`);
         const loadedBlocks = Array.isArray(data?.blocks) ? data.blocks : [];
-        
-        const blocksWithIds = loadedBlocks.map((block, idx) => ({
-          ...block,
-          id: block.id || `${Date.now()}-${idx}`
-        }));
-        
+        const blocksWithIds = loadedBlocks.map((block, idx) => ({ ...block, id: block.id || `${Date.now()}-${idx}` }));
         setBlocks(blocksWithIds);
         setErr("");
       } catch (e) {
@@ -1065,49 +801,34 @@ export default function BIMEditor() {
 
   useEffect(() => {
     const handleDragStart = (e) => {
-      const dragHandle = e.target.closest('.drag-handle');
+      const dragHandle = e.target.closest?.('.drag-handle');
       if (!dragHandle) return;
-
-      const blockContainer = dragHandle.closest('[data-block-index]');
+      const blockContainer = dragHandle.closest?.('[data-block-index]');
       if (!blockContainer) return;
-
       const index = parseInt(blockContainer.dataset.blockIndex);
       setDraggedIndex(index);
-      
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/html", blockContainer.innerHTML);
-      
-      setTimeout(() => {
-        blockContainer.style.opacity = "0.4";
-      }, 0);
+      setTimeout(() => { blockContainer.style.opacity = "0.4"; }, 0);
     };
 
     const handleDragEnd = (e) => {
-      const blockContainer = e.target.closest('[data-block-index]');
-      if (blockContainer) {
-        blockContainer.style.opacity = "1";
-      }
+      const blockContainer = e.target.closest?.('[data-block-index]');
+      if (blockContainer) blockContainer.style.opacity = "1";
       setDraggedIndex(null);
     };
 
     const handleDragOver = (e) => {
       e.preventDefault();
-      const blockContainer = e.target.closest('[data-block-index]');
+      const blockContainer = e.target.closest?.('[data-block-index]');
       if (!blockContainer || draggedIndex === null) return;
-
       const index = parseInt(blockContainer.dataset.blockIndex);
       if (draggedIndex === index) return;
-
       const newBlocks = [...blocks];
       const draggedBlock = newBlocks[draggedIndex];
-      
-      if (draggedBlock.type === "h1" && newBlocks[index].type === "h1") {
-        return;
-      }
-
+      if (draggedBlock.type === "h1" && newBlocks[index].type === "h1") return;
       newBlocks.splice(draggedIndex, 1);
       newBlocks.splice(index, 0, draggedBlock);
-      
       setBlocks(newBlocks);
       setDraggedIndex(index);
     };
@@ -1115,7 +836,6 @@ export default function BIMEditor() {
     document.addEventListener('dragstart', handleDragStart);
     document.addEventListener('dragend', handleDragEnd);
     document.addEventListener('dragover', handleDragOver);
-
     return () => {
       document.removeEventListener('dragstart', handleDragStart);
       document.removeEventListener('dragend', handleDragEnd);
@@ -1124,15 +844,8 @@ export default function BIMEditor() {
   }, [blocks, draggedIndex]);
 
   const addBlock = (type) => {
-    const newBlock = { 
-      type, 
-      value: "",
-      id: Date.now() + Math.random()
-    };
-    if (type === "code") {
-      newBlock.language = "javascript";
-      newBlock.theme = "dark";
-    }
+    const newBlock = { type, value: "", id: Date.now() + Math.random() };
+    if (type === "code") { newBlock.language = "javascript"; newBlock.theme = "dark"; }
     setBlocks([...blocks, newBlock]);
     setShowAddMenu(false);
   };
@@ -1143,23 +856,9 @@ export default function BIMEditor() {
     setBlocks(newBlocks);
   };
 
-  const deleteBlock = (index) => {
-    setBlocks(blocks.filter((_, i) => i !== index));
-  };
-
-  const findPreviousH1 = (index) => {
-    for (let i = index - 1; i >= 0; i--) {
-      if (blocks[i].type === "h1") return i;
-    }
-    return -1;
-  };
-
-  const findNextH1 = (index) => {
-    for (let i = index + 1; i < blocks.length; i++) {
-      if (blocks[i].type === "h1") return i;
-    }
-    return blocks.length;
-  };
+  const deleteBlock = (index) => setBlocks(blocks.filter((_, i) => i !== index));
+  const findPreviousH1 = (index) => { for (let i = index - 1; i >= 0; i--) if (blocks[i].type === "h1") return i; return -1; };
+  const findNextH1 = (index) => { for (let i = index + 1; i < blocks.length; i++) if (blocks[i].type === "h1") return i; return blocks.length; };
 
   const moveBlockUp = (index) => {
     if (index <= 0) return;
@@ -1168,7 +867,6 @@ export default function BIMEditor() {
       if (prevH1Index >= 0 && index - 1 === prevH1Index) return;
     }
     if (blocks[index - 1].type === "h1") return;
-    
     const newBlocks = [...blocks];
     [newBlocks[index], newBlocks[index - 1]] = [newBlocks[index - 1], newBlocks[index]];
     setBlocks(newBlocks);
@@ -1178,7 +876,6 @@ export default function BIMEditor() {
     if (index >= blocks.length - 1) return;
     if (blocks[index].type === "h1" && blocks[index + 1].type === "h1") return;
     if (blocks[index + 1].type === "h1") return;
-    
     const newBlocks = [...blocks];
     [newBlocks[index], newBlocks[index + 1]] = [newBlocks[index + 1], newBlocks[index]];
     setBlocks(newBlocks);
@@ -1207,6 +904,7 @@ export default function BIMEditor() {
   };
 
   const onUpload = async (file) => {
+    await ensureOwnerToken(); // ensure token for image upload too
     const formData = new FormData();
     formData.append("file", file);
     const data = await fetchJSON("/api/bim/upload-image", { 
@@ -1218,8 +916,18 @@ export default function BIMEditor() {
     return data.url;
   };
 
+  const saveWithMethod = async (method, url, payload) => {
+    return fetchJSON(url, {
+      method,
+      headers: { "Content-Type": "application/json", ...ownerHeaders() },
+      body: JSON.stringify(payload)
+    });
+  };
+
   const handleSave = async () => {
-    if (!owner || blocks.length === 0) {
+    try { await ensureOwnerToken(); } catch (e) { alert(e.message || "Authentication failed"); return; }
+
+    if (blocks.length === 0) {
       alert("Please add at least one block");
       return;
     }
@@ -1235,39 +943,39 @@ export default function BIMEditor() {
     };
     
     const normalizedBlocks = blocks.map((b) => {
-      const base = { 
-        type: b.type,
-        value: (b.value ?? "").toString() 
-      };
+      const base = { type: b.type, value: (b.value ?? "").toString() };
       if (b.type === "code") {
         const uiLang = (b.language || "javascript").toLowerCase();
         base.language = langMap[uiLang] || "js";
         base.theme = b.theme || "dark";
       }
-      if (b.type === "image" && b.size) {
-        base.size = b.size;
-      }
+      if (b.type === "image" && b.size) base.size = b.size;
       return base;
     });
 
+    const payload = { title, blocks: normalizedBlocks };
+
     try {
       setBusy(true);
-      const payload = { title, blocks: normalizedBlocks };
-      
       if (isEdit) {
-        await fetchJSON(`/api/bim/${encodeURIComponent(id)}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", ...ownerHeaders() },
-          body: JSON.stringify(payload)
-        });
+        const url = `/api/bim/${encodeURIComponent(id)}`;
+        try {
+          await saveWithMethod("PUT", url, payload);
+        } catch (err) {
+          if (/403/.test(String(err))) {
+            await ensureOwnerToken();
+            try {
+              await saveWithMethod("PUT", url, payload);
+            } catch {
+              await saveWithMethod("PATCH", url, payload);
+            }
+          } else {
+            await saveWithMethod("PATCH", url, payload);
+          }
+        }
       } else {
-        await fetchJSON("/api/bim", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...ownerHeaders() },
-          body: JSON.stringify(payload)
-        });
+        await saveWithMethod("POST", "/api/bim", payload);
       }
-
       nav("/bim", { replace: true });
     } catch (e) {
       alert(e?.message || "Failed to save");
@@ -1317,12 +1025,7 @@ export default function BIMEditor() {
                 <Plus size={22} />
                 Add Your First Block
               </button>
-              {showAddMenu && (
-                <AddBlockMenu 
-                  onAdd={addBlock} 
-                  onClose={() => setShowAddMenu(false)} 
-                />
-              )}
+              {showAddMenu && <AddBlockMenu onAdd={addBlock} onClose={() => setShowAddMenu(false)} />}
             </div>
           </div>
         ) : (
@@ -1330,18 +1033,14 @@ export default function BIMEditor() {
             {blocks.map((block, index) => {
               let canMoveUp = index > 0;
               let canMoveDown = index < blocks.length - 1;
-              
               if (canMoveUp && blocks[index - 1].type === "h1") canMoveUp = false;
               if (canMoveDown && blocks[index + 1].type === "h1") canMoveDown = false;
               if (block.type === "h1" && canMoveUp) {
                 for (let i = index - 1; i >= 0; i--) {
-                  if (blocks[i].type === "h1" && i === index - 1) {
-                    canMoveUp = false;
-                    break;
-                  }
+                  if (blocks[i].type === "h1" && i === index - 1) { canMoveUp = false; break; }
                 }
               }
-              
+
               const blockProps = {
                 block,
                 index,
@@ -1379,12 +1078,7 @@ export default function BIMEditor() {
                 <Plus size={18} />
                 Add block
               </button>
-              {showAddMenu && (
-                <AddBlockMenu 
-                  onAdd={addBlock} 
-                  onClose={() => setShowAddMenu(false)} 
-                />
-              )}
+              {showAddMenu && <AddBlockMenu onAdd={addBlock} onClose={() => setShowAddMenu(false)} />}
             </div>
           </div>
         )}
