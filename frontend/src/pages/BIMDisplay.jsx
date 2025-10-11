@@ -3,26 +3,136 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   BookOpen, Trash2, Edit3, Plus, Eye, Star,
   ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw,
-  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, LogIn, LogOut, Shield
+  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock
 } from "lucide-react";
-import { useOwnerModeWithSetter, loginAsOwner, logoutOwner, getToken } from "../lib/owner.js";
+import { useOwnerMode } from "../lib/owner.js";
+import { loginAsOwner } from "../lib/owner.js";
 
 /* ---------- API base ---------- */
 const RAW_API = (import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || "").trim();
 const API_BASE = RAW_API.replace(/\/+$/, "");
 const api = (path) => (API_BASE ? `${API_BASE}${path}` : path);
 
-/* ---------- auth header ---------- */
-const ownerHeaders = () => {
-  const token = getToken();
-  if (token) {
-    console.log(`[Auth] ✅ Using token from owner.js`);
-    return { Authorization: `Bearer ${token}` };
-  }
+/* ---------- Password Prompt Modal ---------- */
+function PasswordPromptModal({ onClose, onSubmit, darkMode, action = "perform this action" }) {
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   
-  console.warn("[Auth] ❌ No token found");
-  return {};
-};
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    
+    try {
+      const result = await loginAsOwner(password, API_BASE);
+      
+      if (result.success) {
+        onSubmit(result.token);
+        onClose();
+      } else {
+        setError(result.error || "Authentication failed");
+      }
+    } catch (e) {
+      setError(e.message || "Authentication failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+      <div
+        className={`rounded-2xl shadow-2xl max-w-md w-full ${
+          darkMode ? "bg-slate-800 border-2 border-amber-500" : "bg-white border-2 border-amber-500"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-6 py-4 flex items-center gap-3 rounded-t-xl">
+          <Lock size={32} className="flex-shrink-0" />
+          <div>
+            <h2 className="text-xl font-bold">Owner Authentication Required</h2>
+            <p className="text-sm text-amber-100">Enter password to {action}</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className={`p-6 space-y-4 ${darkMode ? "text-slate-200" : "text-slate-800"}`}>
+          <div>
+            <label className="block text-sm font-semibold mb-2">
+              Owner Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your owner password"
+              className={`w-full px-4 py-3 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-amber-500 ${
+                darkMode 
+                  ? "bg-slate-700 border-slate-600 text-white placeholder-slate-400" 
+                  : "bg-white border-slate-300 text-slate-900 placeholder-slate-400"
+              }`}
+              autoFocus
+              disabled={loading}
+            />
+          </div>
+
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 p-3 rounded">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-amber-50 dark:bg-amber-900/30 border-l-4 border-amber-500 p-3 rounded">
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              🔒 This is a one-time authentication. You'll need to enter your password each time you want to lock/unlock an entry for maximum security.
+            </p>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-colors ${
+                darkMode 
+                  ? "bg-slate-700 text-slate-200 hover:bg-slate-600" 
+                  : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+              } disabled:opacity-50`}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !password}
+              className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-colors ${
+                loading || !password
+                  ? "bg-amber-300 text-amber-100 cursor-not-allowed opacity-50"
+                  : "bg-amber-600 text-white hover:bg-amber-700"
+              }`}
+            >
+              <span className="inline-flex items-center justify-center gap-2">
+                {loading ? (
+                  <>
+                    <RefreshCcw size={18} className="animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    <Unlock size={18} />
+                    Authenticate
+                  </>
+                )}
+              </span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 /* ---------- fetch helper ---------- */
 async function fetchJSON(path, options = {}) {
@@ -79,128 +189,6 @@ const saveFavorites = (favoritesSet) => {
     console.warn("[Favorites] Error saving:", e);
   }
 };
-
-/* ---------- Owner Login Modal ---------- */
-function OwnerLoginModal({ onClose, onSuccess, darkMode }) {
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    
-    try {
-      const result = await loginAsOwner(password, API_BASE);
-      
-      if (result.success) {
-        onSuccess();
-        onClose();
-      } else {
-        setError(result.error || "Authentication failed");
-      }
-    } catch (e) {
-      setError(e.message || "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-      <div
-        className={`rounded-2xl shadow-2xl max-w-md w-full ${
-          darkMode ? "bg-slate-800 border-2 border-blue-500" : "bg-white border-2 border-blue-500"
-        }`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-4 flex items-center gap-3 rounded-t-xl">
-          <Shield size={32} className="flex-shrink-0" />
-          <div>
-            <h2 className="text-xl font-bold">Owner Authentication</h2>
-            <p className="text-sm text-blue-100">Enter password to manage entries</p>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className={`p-6 space-y-4 ${darkMode ? "text-slate-200" : "text-slate-800"}`}>
-          <div>
-            <label className="block text-sm font-semibold mb-2">
-              Owner Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter owner password"
-              className={`w-full px-4 py-3 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                darkMode 
-                  ? "bg-slate-700 border-slate-600 text-white placeholder-slate-400" 
-                  : "bg-white border-slate-300 text-slate-900 placeholder-slate-400"
-              }`}
-              autoFocus
-              disabled={loading}
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 p-3 rounded">
-              <div className="flex items-start gap-2">
-                <AlertTriangle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 p-3 rounded">
-            <p className="text-xs text-blue-700 dark:text-blue-300">
-              🔒 Once logged in, you'll be able to lock/unlock entries and manage all content.
-              Other users will only see unlocked entries.
-            </p>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-colors ${
-                darkMode 
-                  ? "bg-slate-700 text-slate-200 hover:bg-slate-600" 
-                  : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-              } disabled:opacity-50`}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading || !password}
-              className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-colors ${
-                loading || !password
-                  ? "bg-blue-300 text-blue-100 cursor-not-allowed opacity-50"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
-              }`}
-            >
-              <span className="inline-flex items-center justify-center gap-2">
-                {loading ? (
-                  <>
-                    <RefreshCcw size={18} className="animate-spin" />
-                    Authenticating...
-                  </>
-                ) : (
-                  <>
-                    <LogIn size={18} />
-                    Login
-                  </>
-                )}
-              </span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 /* ---------- Delete Confirmation Modal ---------- */
 function DeleteConfirmationModal({ item, onConfirm, onCancel, darkMode }) {
@@ -785,11 +773,11 @@ function BlockPreview({ blocks = [], darkMode = false }) {
   );
 }
 
-/* ---------- Full View Modal with Reading Features ---------- */
-function FullViewModal({ item, onClose, owner, onEdit, onToggleLock, lockingIds = new Set() }) {
+/* ---------- Full View Modal (Simplified - No owner controls) ---------- */
+function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
   const [expandedCodeBlocks, setExpandedCodeBlocks] = useState(new Set());
   const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
-  const [darkMode, setDarkMode] = useState(loadDarkMode());
+  const [darkMode, setDarkMode] = useState(initialDarkMode);
   const [fullScreenImages, setFullScreenImages] = useState(null);
   const [fullScreenIndex, setFullScreenIndex] = useState(0);
   
@@ -807,17 +795,6 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock, lockingIds 
   useEffect(() => {
     saveDarkMode(darkMode);
   }, [darkMode]);
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if (!owner) return;
-      if (e.key.toLowerCase() === "e") {
-        onEdit?.(item.id);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [owner, item?.id, onEdit]);
 
   if (!item) return null;
 
@@ -903,26 +880,6 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock, lockingIds 
               <h1 className="text-3xl font-bold truncate">{displayTitle}</h1>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {owner && item.locked && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!lockingIds.has(item.id) && window.confirm('Unlock this entry? It will be viewable by everyone.')) {
-                      onToggleLock?.(item.id);
-                    }
-                  }}
-                  disabled={lockingIds.has(item.id)}
-                  className={`p-2 rounded-lg transition-colors ${
-                    lockingIds.has(item.id)
-                      ? "bg-slate-500 cursor-wait opacity-60"
-                      : "bg-amber-500 hover:bg-amber-600"
-                  }`}
-                  title={lockingIds.has(item.id) ? "Updating..." : "Unlock this entry"}
-                >
-                  <Unlock size={20} />
-                </button>
-              )}
               <button
                 type="button"
                 onClick={(e) => {
@@ -955,29 +912,15 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock, lockingIds 
                 ? "bg-slate-800 border-slate-700" 
                 : "bg-slate-50 border-slate-200"
             }`}>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className={`text-sm font-bold ${
-                  sepiaMode
-                    ? "text-[#3d2817]"
-                    : darkMode 
-                    ? "text-slate-200" 
-                    : "text-slate-700"
-                }`}>
-                  📖 Reading Settings
-                </h3>
-                {owner && item.locked && (
-                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-semibold ${
-                    sepiaMode
-                      ? "bg-amber-200 text-amber-900"
-                      : darkMode
-                      ? "bg-amber-900/30 text-amber-400"
-                      : "bg-amber-100 text-amber-700"
-                  }`}>
-                    <Lock size={12} />
-                    <span>Entry is locked</span>
-                  </div>
-                )}
-              </div>
+              <h3 className={`text-sm font-bold mb-3 ${
+                sepiaMode
+                  ? "text-[#3d2817]"
+                  : darkMode 
+                  ? "text-slate-200" 
+                  : "text-slate-700"
+              }`}>
+                📖 Reading Settings
+              </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={`text-xs font-semibold block mb-1 ${
@@ -1366,100 +1309,10 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock, lockingIds 
             }`}
           >
             <span className="text-sm">
-              {owner && (
-                <>
-                  <span
-                    className={`font-mono px-2 py-1 rounded border ${
-                      sepiaMode
-                        ? "bg-[#f4e8d4] text-[#5c4033] border-amber-700"
-                        : darkMode 
-                        ? "bg-slate-900 text-slate-300 border-slate-600" 
-                        : "bg-white text-slate-600 border-slate-200"
-                    }`}
-                  >
-                    ID: {item.id}
-                  </span>
-                  <span className={`ml-3 ${
-                    sepiaMode
-                      ? "text-[#5c4033]"
-                      : darkMode 
-                      ? "text-slate-400" 
-                      : "text-slate-600"
-                  }`}>
-                    {item.blocks?.length || 0} block{item.blocks?.length !== 1 ? "s" : ""}
-                  </span>
-                </>
-              )}
+              {/* Empty span for layout */}
             </span>
 
             <div className="flex items-center gap-3">
-              {owner && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (lockingIds.has(item.id)) return;
-                      
-                      if (item.locked) {
-                        if (window.confirm('Unlock this entry? It will be viewable by everyone.')) {
-                          onToggleLock?.(item.id);
-                        }
-                      } else {
-                        if (window.confirm('Lock this entry? Only you will be able to view it.')) {
-                          onToggleLock?.(item.id);
-                        }
-                      }
-                    }}
-                    disabled={lockingIds.has(item.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
-                      lockingIds.has(item.id)
-                        ? "bg-slate-400 text-slate-200 cursor-wait opacity-60"
-                        : sepiaMode
-                        ? item.locked 
-                          ? "bg-amber-500 text-white hover:bg-amber-600"
-                          : "bg-amber-200 text-amber-900 hover:bg-amber-300"
-                        : darkMode 
-                        ? item.locked
-                          ? "bg-amber-600 text-white hover:bg-amber-700"
-                          : "bg-slate-700 text-slate-200 hover:bg-slate-600"
-                        : item.locked
-                        ? "bg-amber-500 text-white hover:bg-amber-600"
-                        : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                    }`}
-                    title={lockingIds.has(item.id) ? "Updating..." : (item.locked ? "Unlock entry" : "Lock entry")}
-                  >
-                    {lockingIds.has(item.id) ? (
-                      <>
-                        <RefreshCcw size={16} className="animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      <>
-                        {item.locked ? <Unlock size={16} /> : <Lock size={16} />}
-                        {item.locked ? "Unlock" : "Lock"}
-                      </>
-                    )}
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => onEdit?.(item.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                      sepiaMode
-                        ? "bg-amber-200 text-amber-900 hover:bg-amber-300"
-                        : darkMode 
-                        ? "bg-blue-900/50 text-blue-300 hover:bg-blue-900/70" 
-                        : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                    }`}
-                    title="Edit (E)"
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      <Edit3 size={16} /> Edit
-                    </span>
-                  </button>
-                </>
-              )}
-
               <button
                 type="button"
                 onClick={() => {
@@ -1499,17 +1352,17 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock, lockingIds 
 
 /* ---------- Main Page ---------- */
 export default function BIMDisplay() {
-  const { owner, setOwner, loading: authLoading } = useOwnerModeWithSetter();
+  const { owner } = useOwnerMode();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState("");
-  const [favorites, setFavorites] = useState(loadFavorites()); // Load from localStorage
+  const [favorites, setFavorites] = useState(loadFavorites());
   const [viewingItem, setViewingItem] = useState(null);
   const [darkMode, setDarkMode] = useState(loadDarkMode());
   const [deleteConfirmItem, setDeleteConfirmItem] = useState(null);
   const [lockingIds, setLockingIds] = useState(new Set());
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [passwordPrompt, setPasswordPrompt] = useState(null); // { entryId, currentLockState }
   
   // Smart Features
   const [searchQuery, setSearchQuery] = useState("");
@@ -1534,13 +1387,6 @@ export default function BIMDisplay() {
       setLoading(true);
       const data = await fetchJSON("/api/bim");
       const itemsArray = Array.isArray(data) ? data : [];
-      
-      // Debug: Check if locked field is present
-      if (itemsArray.length > 0) {
-        console.log("📦 Loaded entries sample:", itemsArray[0]);
-        console.log("🔒 Locked fields present:", itemsArray.map(i => ({ id: i.id, locked: i.locked })));
-      }
-      
       setItems(itemsArray);
       setErr("");
     } catch (e) {
@@ -1590,7 +1436,21 @@ export default function BIMDisplay() {
     if (!deleteConfirmItem) return;
     try {
       setBusyId(String(deleteConfirmItem.id));
-      await fetchJSON(`/api/bim/${deleteConfirmItem.id}`, { method: "DELETE", headers: { ...ownerHeaders() } });
+      
+      // Get token for auth
+      const token = await new Promise((resolve) => {
+        const handleAuth = (token) => {
+          resolve(token);
+        };
+        setPasswordPrompt({ action: 'delete', callback: handleAuth, entryId: deleteConfirmItem.id });
+      });
+      
+      await fetchJSON(`/api/bim/${deleteConfirmItem.id}`, { 
+        method: "DELETE", 
+        headers: { 
+          Authorization: `Bearer ${token}`
+        } 
+      });
       setItems((prev) => prev.filter((p) => String(p?.id) !== String(deleteConfirmItem.id)));
       setDeleteConfirmItem(null);
     } catch (e) {
@@ -1615,29 +1475,24 @@ export default function BIMDisplay() {
     });
   };
 
-  const toggleLock = async (id) => {
-    if (!owner) {
-      alert("⚠️ You must be logged in as owner to lock/unlock entries.\n\nPlease click the 'Owner Login' button in the top-right corner.");
-      return;
-    }
-    
-    // Check if we have a valid token
-    const headers = ownerHeaders();
-    if (!headers.Authorization) {
-      alert("⚠️ No owner token found.\n\nYour owner session may have expired.\n\nPlease log in again using the 'Owner Login' button.");
-      return;
-    }
-    
+  const handleLockUnlock = (entryId, currentLockState) => {
+    const action = currentLockState ? 'unlock this entry' : 'lock this entry';
+    setPasswordPrompt({ 
+      entryId, 
+      currentLockState,
+      action,
+      callback: async (token) => {
+        await toggleLockWithToken(entryId, !currentLockState, token);
+      }
+    });
+  };
+
+  const toggleLockWithToken = async (id, newLockedState, token) => {
     // Prevent double-clicks
     if (lockingIds.has(id)) {
       console.log("Lock operation already in progress for entry", id);
       return;
     }
-    
-    const item = items.find(i => i.id === id);
-    if (!item) return;
-    
-    const newLockedState = !item.locked;
     
     // Set loading state
     setLockingIds(prev => new Set([...prev, id]));
@@ -1645,12 +1500,11 @@ export default function BIMDisplay() {
     try {
       console.log(`Attempting to ${newLockedState ? 'lock' : 'unlock'} entry ${id}...`);
       
-      // Update backend with no-cache to ensure fresh data
       const response = await fetchJSON(`/api/bim/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...headers
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({ locked: newLockedState }),
         cache: "no-store"
@@ -1661,27 +1515,13 @@ export default function BIMDisplay() {
       // Reload entire list to ensure consistency
       await load();
       
-      console.log(`${newLockedState ? '🔒 Locked' : '🔓 Unlocked'} entry ${id} in database`);
+      console.log(`${newLockedState ? '🔒 Locked' : '🔓 Unlocked'} entry ${id}`);
     } catch (e) {
       const errorMsg = e?.message || 'Unknown error';
       
-      if (errorMsg.includes("Owner authentication required") || errorMsg.includes("403")) {
-        alert("🔐 Owner Authentication Required\n\n" +
-              "Your owner session has expired or is invalid.\n\n" +
-              "Please:\n" +
-              "1. Click 'Owner Login' button\n" +
-              "2. Enter your owner password\n" +
-              "3. Try locking/unlocking again");
-      } else {
-        alert(`Failed to ${newLockedState ? 'lock' : 'unlock'} entry:\n\n${errorMsg}\n\n` +
-              "Please check:\n" +
-              "1. Backend is running\n" +
-              "2. Database has 'locked' column\n" +
-              "3. You are logged in as owner");
-      }
+      alert(`Failed to ${newLockedState ? 'lock' : 'unlock'} entry:\n\n${errorMsg}\n\nPlease check your password and try again.`);
       
       console.error("Lock toggle failed:", e);
-      console.error("Error details:", errorMsg);
     } finally {
       // Clear loading state
       setLockingIds(prev => {
@@ -1694,7 +1534,7 @@ export default function BIMDisplay() {
 
   const goAdd = () => { 
     if (!owner) {
-      alert("⚠️ You must be logged in as owner to create entries.\n\nPlease click the 'Owner Login' button.");
+      alert("⚠️ Please use ?admin=1 URL to access owner features.");
       return;
     }
     nav("/bim/new"); 
@@ -1702,7 +1542,7 @@ export default function BIMDisplay() {
   
   const goEdit = (id) => { 
     if (!owner) {
-      alert("⚠️ You must be logged in as owner to edit entries.\n\nPlease click the 'Owner Login' button.");
+      alert("⚠️ Please use ?admin=1 URL to access owner features.");
       return;
     }
     nav(`/bim/edit/${encodeURIComponent(id)}`); 
@@ -1716,20 +1556,8 @@ export default function BIMDisplay() {
         alert("🔒 This entry is locked and can only be viewed by the owner.");
         return;
       }
-      console.log("📖 Opening entry:", id, "Locked:", item.locked);
       setViewingItem(item);
     }
-  };
-
-  const handleLoginSuccess = () => {
-    // loginAsOwner already called signInOwner internally
-    // Just reload to show all entries
-    load();
-  };
-
-  const handleLogout = () => {
-    logoutOwner();
-    load(); // Reload to hide locked entries
   };
 
   // Filter and sort items
@@ -1771,12 +1599,7 @@ export default function BIMDisplay() {
         <FullViewModal
           item={viewingItem}
           onClose={() => setViewingItem(null)}
-          owner={owner}
-          onEdit={(id) => { setViewingItem(null); goEdit(id); }}
-          onToggleLock={async (id) => {
-            await toggleLock(id);
-          }}
-          lockingIds={lockingIds}
+          darkMode={darkMode}
         />
       )}
 
@@ -1789,42 +1612,17 @@ export default function BIMDisplay() {
         />
       )}
 
-      {showLoginModal && (
-        <OwnerLoginModal
-          onClose={() => setShowLoginModal(false)}
-          onSuccess={handleLoginSuccess}
+      {passwordPrompt && (
+        <PasswordPromptModal
+          onClose={() => setPasswordPrompt(null)}
+          onSubmit={(token) => {
+            passwordPrompt.callback(token);
+            setPasswordPrompt(null);
+          }}
           darkMode={darkMode}
+          action={passwordPrompt.action}
         />
       )}
-
-      {/* Owner Login/Logout Button - Fixed Top Right */}
-      <div className="fixed top-6 right-6 z-40 flex gap-2">
-        {owner ? (
-          <button
-            type="button"
-            onClick={handleLogout}
-            className={`px-4 py-2 rounded-lg shadow-2xl font-semibold transition-all hover:scale-105 flex items-center gap-2 ${
-              darkMode ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-500 text-white hover:bg-red-600"
-            }`}
-            title="Logout from owner mode"
-          >
-            <LogOut size={18} />
-            <span>Owner Logout</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowLoginModal(true)}
-            className={`px-4 py-2 rounded-lg shadow-2xl font-semibold transition-all hover:scale-105 flex items-center gap-2 ${
-              darkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600"
-            }`}
-            title="Login as owner to manage entries"
-          >
-            <Shield size={18} />
-            <span>Owner Login</span>
-          </button>
-        )}
-      </div>
 
       {/* Dark Mode Toggle - Fixed Bottom Right */}
       <button
@@ -1854,12 +1652,6 @@ export default function BIMDisplay() {
             <p className="text-center text-blue-100 text-lg italic font-light">
               "Documenting my journey through data-driven design and BIM innovation"
             </p>
-            {owner && (
-              <div className="mt-4 flex items-center justify-center gap-2 text-sm bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg w-fit mx-auto">
-                <Shield size={16} />
-                <span className="font-semibold">Logged in as Owner</span>
-              </div>
-            )}
           </div>
         </header>
 
@@ -2002,35 +1794,36 @@ export default function BIMDisplay() {
                         >
                           <Star size={16} fill={favorites.has(e.id) ? "currentColor" : "none"} />
                         </button>
+                        
+                        {/* 🔥 NEW: Lock/Unlock Button with Password Prompt */}
+                        <button
+                          type="button"
+                          onClick={() => handleLockUnlock(e.id, e.locked)}
+                          disabled={lockingIds.has(e.id)}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            lockingIds.has(e.id)
+                              ? "bg-slate-300 text-slate-500 cursor-wait opacity-60"
+                              : e.locked
+                              ? "bg-amber-100 text-amber-600 hover:bg-amber-200"
+                              : darkMode
+                              ? "bg-slate-700 text-slate-400 hover:text-amber-500 hover:bg-slate-600"
+                              : "bg-slate-100 text-slate-400 hover:text-amber-500 hover:bg-slate-200"
+                          }`}
+                          title={
+                            lockingIds.has(e.id) 
+                              ? "Updating..." 
+                              : e.locked 
+                              ? "🔒 Click to unlock (requires password)" 
+                              : "🔓 Click to lock (requires password)"
+                          }
+                        >
+                          {e.locked ? <Lock size={16} /> : <Unlock size={16} />}
+                        </button>
+                        
                         {owner && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => toggleLock(e.id)}
-                              disabled={lockingIds.has(e.id)}
-                              className={`p-1.5 rounded-lg transition-colors ${
-                                lockingIds.has(e.id)
-                                  ? "bg-slate-300 text-slate-500 cursor-wait opacity-60"
-                                  : e.locked
-                                  ? "bg-amber-100 text-amber-600 hover:bg-amber-200"
-                                  : darkMode
-                                  ? "bg-slate-700 text-slate-400 hover:text-amber-500 hover:bg-slate-600"
-                                  : "bg-slate-100 text-slate-400 hover:text-amber-500 hover:bg-slate-200"
-                              }`}
-                              title={
-                                lockingIds.has(e.id) 
-                                  ? "Updating..." 
-                                  : e.locked 
-                                  ? "Click to unlock (owner only)" 
-                                  : "Click to lock (owner only)"
-                              }
-                            >
-                              {e.locked ? <Lock size={16} /> : <Unlock size={16} />}
-                            </button>
-                            <span className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-bold shadow-sm">
-                              {e.blocks?.length ?? 0} {e.blocks?.length === 1 ? "block" : "blocks"}
-                            </span>
-                          </>
+                          <span className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-bold shadow-sm">
+                            {e.blocks?.length ?? 0} {e.blocks?.length === 1 ? "block" : "blocks"}
+                          </span>
                         )}
                       </div>
                     </div>
