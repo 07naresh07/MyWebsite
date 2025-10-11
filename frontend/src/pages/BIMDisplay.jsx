@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw,
   Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, LogIn, LogOut, Shield
 } from "lucide-react";
-import { useOwnerMode, loginAsOwner, logoutOwner } from "../lib/owner.js";
+import { useOwnerModeWithSetter, loginAsOwner, logoutOwner, getToken } from "../lib/owner.js";
 
 /* ---------- API base ---------- */
 const RAW_API = (import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || "").trim();
@@ -14,17 +14,13 @@ const api = (path) => (API_BASE ? `${API_BASE}${path}` : path);
 
 /* ---------- auth header ---------- */
 const ownerHeaders = () => {
-  const possibleKeys = ["owner_token", "token", "auth_token", "access_token"];
-  
-  for (const key of possibleKeys) {
-    const t = localStorage.getItem(key);
-    if (t) {
-      console.log(`[Auth] Found token under key: ${key}`);
-      return { Authorization: `Bearer ${t}` };
-    }
+  const token = getToken();
+  if (token) {
+    console.log(`[Auth] ✅ Using token from owner.js`);
+    return { Authorization: `Bearer ${token}` };
   }
   
-  console.warn("[Auth] No token found in localStorage");
+  console.warn("[Auth] ❌ No token found");
   return {};
 };
 
@@ -57,6 +53,31 @@ const saveDarkMode = (value) => {
   try {
     localStorage.setItem(DARK_MODE_KEY, String(value));
   } catch {}
+};
+
+/* ---------- Favorites Persistence ---------- */
+const FAVORITES_KEY = "bim:favorites";
+
+const loadFavorites = () => {
+  try {
+    const saved = localStorage.getItem(FAVORITES_KEY);
+    if (saved) {
+      const arr = JSON.parse(saved);
+      return new Set(arr);
+    }
+  } catch (e) {
+    console.warn("[Favorites] Error loading:", e);
+  }
+  return new Set();
+};
+
+const saveFavorites = (favoritesSet) => {
+  try {
+    const arr = Array.from(favoritesSet);
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(arr));
+  } catch (e) {
+    console.warn("[Favorites] Error saving:", e);
+  }
 };
 
 /* ---------- Owner Login Modal ---------- */
@@ -1478,12 +1499,12 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock, lockingIds 
 
 /* ---------- Main Page ---------- */
 export default function BIMDisplay() {
-  const { owner, setOwner } = useOwnerMode();
+  const { owner, setOwner, loading: authLoading } = useOwnerModeWithSetter();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState("");
-  const [favorites, setFavorites] = useState(new Set());
+  const [favorites, setFavorites] = useState(loadFavorites()); // Load from localStorage
   const [viewingItem, setViewingItem] = useState(null);
   const [darkMode, setDarkMode] = useState(loadDarkMode());
   const [deleteConfirmItem, setDeleteConfirmItem] = useState(null);
@@ -1502,6 +1523,11 @@ export default function BIMDisplay() {
   useEffect(() => {
     saveDarkMode(darkMode);
   }, [darkMode]);
+
+  // Save favorites whenever they change
+  useEffect(() => {
+    saveFavorites(favorites);
+  }, [favorites]);
 
   const load = useCallback(async () => {
     try {
@@ -1599,7 +1625,6 @@ export default function BIMDisplay() {
     const headers = ownerHeaders();
     if (!headers.Authorization) {
       alert("⚠️ No owner token found.\n\nYour owner session may have expired.\n\nPlease log in again using the 'Owner Login' button.");
-      setOwner(false);
       return;
     }
     
@@ -1647,7 +1672,6 @@ export default function BIMDisplay() {
               "1. Click 'Owner Login' button\n" +
               "2. Enter your owner password\n" +
               "3. Try locking/unlocking again");
-        setOwner(false);
       } else {
         alert(`Failed to ${newLockedState ? 'lock' : 'unlock'} entry:\n\n${errorMsg}\n\n` +
               "Please check:\n" +
@@ -1698,13 +1722,13 @@ export default function BIMDisplay() {
   };
 
   const handleLoginSuccess = () => {
-    setOwner(true);
-    load(); // Reload to show all entries including locked ones
+    // loginAsOwner already called signInOwner internally
+    // Just reload to show all entries
+    load();
   };
 
   const handleLogout = () => {
     logoutOwner();
-    setOwner(false);
     load(); // Reload to hide locked entries
   };
 
