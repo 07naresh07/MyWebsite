@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   BookOpen, Trash2, Edit3, Plus, Eye, Star,
   ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw,
-  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, Info
+  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock
 } from "lucide-react";
 import { useOwnerMode } from "../lib/owner.js";
 
@@ -14,8 +14,19 @@ const api = (path) => (API_BASE ? `${API_BASE}${path}` : path);
 
 /* ---------- auth header ---------- */
 const ownerHeaders = () => {
-  const t = localStorage.getItem("owner_token");
-  return t ? { Authorization: `Bearer ${t}` } : {};
+  // Try multiple possible token storage keys
+  const possibleKeys = ["owner_token", "token", "auth_token", "access_token"];
+  
+  for (const key of possibleKeys) {
+    const t = localStorage.getItem(key);
+    if (t) {
+      console.log(`[Auth] Found token under key: ${key}`);
+      return { Authorization: `Bearer ${t}` };
+    }
+  }
+  
+  console.warn("[Auth] No token found in localStorage");
+  return {};
 };
 
 /* ---------- fetch helper ---------- */
@@ -33,7 +44,6 @@ async function fetchJSON(path, options = {}) {
 
 /* ---------- Dark Mode Persistence ---------- */
 const DARK_MODE_KEY = "bim:darkMode";
-const LOCKED_ENTRIES_KEY = "bim:lockedEntries";
 
 const loadDarkMode = () => {
   try {
@@ -47,21 +57,6 @@ const loadDarkMode = () => {
 const saveDarkMode = (value) => {
   try {
     localStorage.setItem(DARK_MODE_KEY, String(value));
-  } catch {}
-};
-
-const loadLockedEntries = () => {
-  try {
-    const saved = localStorage.getItem(LOCKED_ENTRIES_KEY);
-    return saved ? new Set(JSON.parse(saved)) : new Set();
-  } catch {
-    return new Set();
-  }
-};
-
-const saveLockedEntries = (lockedSet) => {
-  try {
-    localStorage.setItem(LOCKED_ENTRIES_KEY, JSON.stringify([...lockedSet]));
   } catch {}
 };
 
@@ -169,81 +164,6 @@ function DeleteConfirmationModal({ item, onConfirm, onCancel, darkMode }) {
               </span>
             </button>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Keyboard Shortcuts Info Modal ---------- */
-function KeyboardShortcutsModal({ onClose, darkMode }) {
-  return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={onClose}>
-      <div
-        className={`rounded-2xl shadow-2xl max-w-md w-full ${
-          darkMode ? "bg-slate-800 border-2 border-blue-500" : "bg-white border-2 border-blue-500"
-        }`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-4 flex items-center justify-between rounded-t-xl">
-          <div className="flex items-center gap-3">
-            <Info size={28} />
-            <h2 className="text-xl font-bold">Keyboard Shortcuts & Tips</h2>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className={`p-6 space-y-4 ${darkMode ? "text-slate-200" : "text-slate-800"}`}>
-          <div>
-            <h3 className="font-bold mb-2 text-blue-600 dark:text-blue-400">⌨️ Keyboard Shortcuts</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span>Edit entry (in view mode)</span>
-                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>E</kbd>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Close modal</span>
-                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>Esc</kbd>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Previous image</span>
-                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>←</kbd>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Next image</span>
-                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>→</kbd>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Zoom (image fullscreen)</span>
-                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>Scroll</kbd>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Quick zoom (image)</span>
-                <kbd className={`px-3 py-1 rounded font-mono text-sm ${darkMode ? "bg-slate-700" : "bg-slate-200"}`}>Double Click</kbd>
-              </div>
-            </div>
-          </div>
-          
-          <div className={`pt-4 border-t ${darkMode ? "border-slate-700" : "border-slate-200"}`}>
-            <h3 className="font-bold mb-2 text-amber-600 dark:text-amber-400">🔒 Lock Feature</h3>
-            <p className="text-sm leading-relaxed mb-2">
-              Lock entries to keep them private. Locked entries are visible in the list but only you can view the content. You can unlock them anytime from the view modal.
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 italic">
-              ✨ Locks persist across page refreshes and are saved locally.
-            </p>
-          </div>
-        </div>
-
-        <div className={`px-6 py-4 border-t ${darkMode ? "border-slate-700" : "border-slate-200"}`}>
-          <button
-            onClick={onClose}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-          >
-            Got it!
-          </button>
         </div>
       </div>
     </div>
@@ -724,7 +644,7 @@ function BlockPreview({ blocks = [], darkMode = false }) {
 }
 
 /* ---------- Full View Modal with Reading Features ---------- */
-function FullViewModal({ item, onClose, owner, onEdit, onToggleLock }) {
+function FullViewModal({ item, onClose, owner, onEdit, onToggleLock, lockingIds = new Set() }) {
   const [expandedCodeBlocks, setExpandedCodeBlocks] = useState(new Set());
   const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
   const [darkMode, setDarkMode] = useState(loadDarkMode());
@@ -846,12 +766,17 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock }) {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (window.confirm('Unlock this entry? It will be viewable by everyone.')) {
+                    if (!lockingIds.has(item.id) && window.confirm('Unlock this entry? It will be viewable by everyone.')) {
                       onToggleLock?.(item.id);
                     }
                   }}
-                  className="p-2 bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors"
-                  title="Unlock this entry"
+                  disabled={lockingIds.has(item.id)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    lockingIds.has(item.id)
+                      ? "bg-slate-500 cursor-wait opacity-60"
+                      : "bg-amber-500 hover:bg-amber-600"
+                  }`}
+                  title={lockingIds.has(item.id) ? "Updating..." : "Unlock this entry"}
                 >
                   <Unlock size={20} />
                 </button>
@@ -1123,29 +1048,6 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock }) {
               WebkitOverflowScrolling: 'touch'
             }}
           >
-            {owner && item.locked && (
-              <div className={`mb-6 p-4 rounded-lg border-2 ${
-                sepiaMode
-                  ? "bg-amber-100 border-amber-500"
-                  : darkMode
-                  ? "bg-amber-900/20 border-amber-600"
-                  : "bg-amber-50 border-amber-400"
-              }`}>
-                <div className="flex items-start gap-3">
-                  <Lock size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div className={`text-sm ${
-                    sepiaMode
-                      ? "text-[#5c4033]"
-                      : darkMode
-                      ? "text-amber-200"
-                      : "text-amber-900"
-                  }`}>
-                    <p className="font-semibold mb-1">🔒 This entry is locked</p>
-                    <p>Only you (the owner) can view this content. Other users will see it in the list but cannot open it. Click the "Unlock" button below to make it public.</p>
-                  </div>
-                </div>
-              </div>
-            )}
             
             <div className="max-w-none space-y-6">
               {groupedBlocks.length ? (
@@ -1158,11 +1060,13 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock }) {
                         {bookmarkedSections.has(idx) && (
                           <Bookmark size={20} className="absolute -left-8 top-1 text-amber-500 fill-amber-500" />
                         )}
-                        <h2 className={`text-3xl font-extrabold mb-3 mt-4 pb-2 border-b-2 ${
+                        <h2
+                          className={`text-3xl font-extrabold mb-3 mt-4 pb-2 border-b-2 ${
                             sepiaMode 
                               ? "border-amber-700" 
                               : "border-blue-400"
-                          }`}>
+                          }`}
+                        >
                           {renderHTMLContent(block.value)}
                         </h2>
                         <button
@@ -1179,7 +1083,10 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock }) {
 
                   if (block?.type === "text") {
                     return (
-                      <div key={`p-${idx}`} className="leading-relaxed">
+                      <div
+                        key={`p-${idx}`}
+                        className="leading-relaxed"
+                      >
                         {renderHTMLContent(block.value)}
                       </div>
                     );
@@ -1349,6 +1256,8 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock }) {
                   <button
                     type="button"
                     onClick={() => {
+                      if (lockingIds.has(item.id)) return;
+                      
                       if (item.locked) {
                         if (window.confirm('Unlock this entry? It will be viewable by everyone.')) {
                           onToggleLock?.(item.id);
@@ -1359,8 +1268,11 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock }) {
                         }
                       }
                     }}
+                    disabled={lockingIds.has(item.id)}
                     className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
-                      sepiaMode
+                      lockingIds.has(item.id)
+                        ? "bg-slate-400 text-slate-200 cursor-wait opacity-60"
+                        : sepiaMode
                         ? item.locked 
                           ? "bg-amber-500 text-white hover:bg-amber-600"
                           : "bg-amber-200 text-amber-900 hover:bg-amber-300"
@@ -1372,10 +1284,19 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock }) {
                         ? "bg-amber-500 text-white hover:bg-amber-600"
                         : "bg-slate-200 text-slate-700 hover:bg-slate-300"
                     }`}
-                    title={item.locked ? "Unlock entry" : "Lock entry"}
+                    title={lockingIds.has(item.id) ? "Updating..." : (item.locked ? "Unlock entry" : "Lock entry")}
                   >
-                    {item.locked ? <Unlock size={16} /> : <Lock size={16} />}
-                    {item.locked ? "Unlock" : "Lock"}
+                    {lockingIds.has(item.id) ? (
+                      <>
+                        <RefreshCcw size={16} className="animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        {item.locked ? <Unlock size={16} /> : <Lock size={16} />}
+                        {item.locked ? "Unlock" : "Lock"}
+                      </>
+                    )}
                   </button>
                   
                   <button
@@ -1445,8 +1366,7 @@ export default function BIMDisplay() {
   const [viewingItem, setViewingItem] = useState(null);
   const [darkMode, setDarkMode] = useState(loadDarkMode());
   const [deleteConfirmItem, setDeleteConfirmItem] = useState(null);
-  const [showShortcuts, setShowShortcuts] = useState(false);
-  const [lockedEntries, setLockedEntries] = useState(loadLockedEntries());
+  const [lockingIds, setLockingIds] = useState(new Set());
   
   // Smart Features
   const [searchQuery, setSearchQuery] = useState("");
@@ -1467,26 +1387,13 @@ export default function BIMDisplay() {
       const data = await fetchJSON("/api/bim");
       const itemsArray = Array.isArray(data) ? data : [];
       
-      // Merge backend locked status with localStorage locked entries
-      const localLocked = loadLockedEntries();
-      const mergedItems = itemsArray.map(item => {
-        // Backend locked status OR localStorage locked status
-        const isLocked = item.locked || localLocked.has(String(item.id));
-        return { ...item, locked: isLocked };
-      });
-      
-      // Update localStorage to match merged state
-      const allLockedIds = new Set(
-        mergedItems.filter(item => item.locked).map(item => String(item.id))
-      );
-      setLockedEntries(allLockedIds);
-      saveLockedEntries(allLockedIds);
-      
-      if (allLockedIds.size > 0) {
-        console.log(`🔒 Loaded ${allLockedIds.size} locked entries:`, [...allLockedIds]);
+      // Debug: Check if locked field is present
+      if (itemsArray.length > 0) {
+        console.log("📦 Loaded entries sample:", itemsArray[0]);
+        console.log("🔒 Locked fields present:", itemsArray.map(i => ({ id: i.id, locked: i.locked })));
       }
       
-      setItems(mergedItems);
+      setItems(itemsArray);
       setErr("");
     } catch (e) {
       setErr(e?.message || "Failed to load BIM entries");
@@ -1537,15 +1444,6 @@ export default function BIMDisplay() {
       setBusyId(String(deleteConfirmItem.id));
       await fetchJSON(`/api/bim/${deleteConfirmItem.id}`, { method: "DELETE", headers: { ...ownerHeaders() } });
       setItems((prev) => prev.filter((p) => String(p?.id) !== String(deleteConfirmItem.id)));
-      
-      // Clean up from locked entries localStorage
-      setLockedEntries(prev => {
-        const next = new Set(prev);
-        next.delete(String(deleteConfirmItem.id));
-        saveLockedEntries(next);
-        return next;
-      });
-      
       setDeleteConfirmItem(null);
     } catch (e) {
       alert(e?.message || "Delete failed");
@@ -1570,75 +1468,80 @@ export default function BIMDisplay() {
   };
 
   const toggleLock = async (id) => {
-    if (!owner) return;
+    if (!owner) {
+      alert("⚠️ You must be logged in as owner to lock/unlock entries.\n\nPlease log in as owner first.");
+      return;
+    }
+    
+    // Check if we have a valid token
+    const headers = ownerHeaders();
+    if (!headers.Authorization) {
+      alert("⚠️ No owner token found.\n\nPlease log in as owner first.\n\nYour owner session may have expired.");
+      return;
+    }
+    
+    // Prevent double-clicks
+    if (lockingIds.has(id)) {
+      console.log("Lock operation already in progress for entry", id);
+      return;
+    }
+    
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    
+    const newLockedState = !item.locked;
+    
+    // Set loading state
+    setLockingIds(prev => new Set([...prev, id]));
+    
     try {
-      const item = items.find(i => i.id === id);
-      const newLockedState = !item.locked;
+      console.log(`Attempting to ${newLockedState ? 'lock' : 'unlock'} entry ${id}...`);
       
-      // Update backend
-      await fetchJSON(`/api/bim/${id}`, {
+      // Update backend with no-cache to ensure fresh data
+      const response = await fetchJSON(`/api/bim/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...ownerHeaders()
+          ...headers
         },
-        body: JSON.stringify({ locked: newLockedState })
+        body: JSON.stringify({ locked: newLockedState }),
+        cache: "no-store"
       });
       
-      // Update local state
-      setItems(prev => prev.map(item => 
-        item.id === id ? { ...item, locked: newLockedState } : item
-      ));
+      console.log(`✅ Backend response:`, response);
       
-      // Update localStorage
-      setLockedEntries(prev => {
-        const next = new Set(prev);
-        const itemId = String(id);
-        if (newLockedState) {
-          next.add(itemId);
-          console.log(`🔒 Entry ${id} locked and saved to localStorage`);
-        } else {
-          next.delete(itemId);
-          console.log(`🔓 Entry ${id} unlocked and removed from localStorage`);
-        }
-        saveLockedEntries(next);
-        return next;
-      });
+      // Reload entire list to ensure consistency
+      await load();
+      
+      console.log(`${newLockedState ? '🔒 Locked' : '🔓 Unlocked'} entry ${id} in database`);
     } catch (e) {
-      // If backend fails, still update localStorage
-      const item = items.find(i => i.id === id);
-      const newLockedState = !item.locked;
+      const errorMsg = e?.message || 'Unknown error';
       
-      setItems(prev => prev.map(item => 
-        item.id === id ? { ...item, locked: newLockedState } : item
-      ));
+      if (errorMsg.includes("Owner authentication required") || errorMsg.includes("403")) {
+        alert("🔒 Owner Authentication Required\n\n" +
+              "Your owner session has expired or is invalid.\n\n" +
+              "Please:\n" +
+              "1. Log out\n" +
+              "2. Log in again as owner\n" +
+              "3. Try locking/unlocking again");
+      } else {
+        alert(`Failed to ${newLockedState ? 'lock' : 'unlock'} entry:\n\n${errorMsg}\n\n` +
+              "Please check:\n" +
+              "1. Backend is running\n" +
+              "2. Database has 'locked' column\n" +
+              "3. You are logged in as owner");
+      }
       
-      setLockedEntries(prev => {
+      console.error("Lock toggle failed:", e);
+      console.error("Error details:", errorMsg);
+    } finally {
+      // Clear loading state
+      setLockingIds(prev => {
         const next = new Set(prev);
-        const itemId = String(id);
-        if (newLockedState) {
-          next.add(itemId);
-          console.log(`🔒 Entry ${id} locked (localStorage only - backend unavailable)`);
-        } else {
-          next.delete(itemId);
-          console.log(`🔓 Entry ${id} unlocked (localStorage only - backend unavailable)`);
-        }
-        saveLockedEntries(next);
+        next.delete(id);
         return next;
       });
-      
-      console.warn("Backend lock update failed, using localStorage only:", e?.message);
     }
-  };
-
-  const openFullScreen = (images, index) => {
-    setFullScreenImages(images);
-    setFullScreenIndex(index);
-  };
-
-  const closeFullScreen = () => {
-    setFullScreenImages(null);
-    setFullScreenIndex(0);
   };
 
   const goAdd = () => { if (owner) nav("/bim/new"); };
@@ -1651,6 +1554,7 @@ export default function BIMDisplay() {
         alert("🔒 This entry is locked and can only be viewed by the owner.");
         return;
       }
+      console.log("📖 Opening entry:", id, "Locked:", item.locked);
       setViewingItem(item);
     }
   };
@@ -1696,14 +1600,11 @@ export default function BIMDisplay() {
           onClose={() => setViewingItem(null)}
           owner={owner}
           onEdit={(id) => { setViewingItem(null); goEdit(id); }}
-          onToggleLock={(id) => {
-            toggleLock(id);
-            // Update the viewing item to reflect the new lock status
-            setViewingItem(prev => ({
-              ...prev,
-              locked: !prev.locked
-            }));
+          onToggleLock={async (id) => {
+            await toggleLock(id);
+            // toggleLock already updates viewingItem state via load()
           }}
+          lockingIds={lockingIds}
         />
       )}
 
@@ -1712,13 +1613,6 @@ export default function BIMDisplay() {
           item={deleteConfirmItem}
           onConfirm={confirmDelete}
           onCancel={() => setDeleteConfirmItem(null)}
-          darkMode={darkMode}
-        />
-      )}
-
-      {showShortcuts && (
-        <KeyboardShortcutsModal
-          onClose={() => setShowShortcuts(false)}
           darkMode={darkMode}
         />
       )}
@@ -1732,17 +1626,6 @@ export default function BIMDisplay() {
         title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
       >
         {darkMode ? <Sun size={24} /> : <Moon size={24} />}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => setShowShortcuts(true)}
-        className={`fixed bottom-24 right-6 z-40 p-4 rounded-full shadow-2xl transition-all hover:scale-110 ${
-          darkMode ? "bg-slate-700 text-blue-400 hover:bg-slate-600" : "bg-white text-slate-700 hover:bg-slate-100"
-        }`}
-        title="Keyboard Shortcuts"
-      >
-        <Info size={24} />
       </button>
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
@@ -1759,7 +1642,7 @@ export default function BIMDisplay() {
               <h1 className="text-4xl font-bold tracking-tight">BIM Learning Hub</h1>
             </div>
             <p className="text-center text-blue-100 text-lg italic font-light">
-              "Your personal knowledge base for Building Information Modeling"
+              "Documenting my journey through data-driven design and BIM innovation"
             </p>
           </div>
         </header>
@@ -1908,14 +1791,23 @@ export default function BIMDisplay() {
                             <button
                               type="button"
                               onClick={() => toggleLock(e.id)}
+                              disabled={lockingIds.has(e.id)}
                               className={`p-1.5 rounded-lg transition-colors ${
-                                e.locked
-                                  ? "bg-amber-100 text-amber-600"
+                                lockingIds.has(e.id)
+                                  ? "bg-slate-300 text-slate-500 cursor-wait opacity-60"
+                                  : e.locked
+                                  ? "bg-amber-100 text-amber-600 hover:bg-amber-200"
                                   : darkMode
-                                  ? "bg-slate-700 text-slate-400 hover:text-amber-500"
-                                  : "bg-slate-100 text-slate-400 hover:text-amber-500"
+                                  ? "bg-slate-700 text-slate-400 hover:text-amber-500 hover:bg-slate-600"
+                                  : "bg-slate-100 text-slate-400 hover:text-amber-500 hover:bg-slate-200"
                               }`}
-                              title={e.locked ? "Unlock entry (persists on refresh)" : "Lock entry (persists on refresh)"}
+                              title={
+                                lockingIds.has(e.id) 
+                                  ? "Updating..." 
+                                  : e.locked 
+                                  ? "Click to unlock (owner only)" 
+                                  : "Click to lock (owner only)"
+                              }
                             >
                               {e.locked ? <Lock size={16} /> : <Unlock size={16} />}
                             </button>

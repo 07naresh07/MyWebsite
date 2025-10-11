@@ -1,9 +1,9 @@
-\
+# app/auth.py
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 from fastapi import HTTPException, status, Depends, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import jwt
+from jose import jwt, JWTError
 from .config import settings
 
 ALGO = "HS256"
@@ -24,6 +24,22 @@ def decode_token(token: str) -> Dict[str, Any]:
         return jwt.decode(token, settings.jwt_secret, algorithms=[ALGO])
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+def verify_token(token: str) -> Dict[str, Any]:
+    """Verify and decode JWT token - used by BIM router"""
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGO])
+        # Check if token is expired
+        exp = payload.get("exp")
+        if exp:
+            now = datetime.now(tz=timezone.utc).timestamp()
+            if now > exp:
+                raise HTTPException(status_code=401, detail="Token expired")
+        return payload
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Token verification failed: {str(e)}")
 
 async def get_current_user(
     creds: HTTPAuthorizationCredentials = Depends(security),

@@ -1,4 +1,3 @@
-
 # app/routes/bim.py
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException, UploadFile, File, Request
@@ -10,11 +9,17 @@ from typing import List, Optional, Literal
 from pathlib import Path
 import uuid, shutil, asyncio, base64, os
 import orjson
+import logging
 
 from .. import db
 from ..config import settings
 
 __all__ = ["router"]
+
+# ---------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------
+logger = logging.getLogger("app.bim")
 
 # NOTE: keep this exact prefix so /api/bim and /api/bim/ are handled
 router = APIRouter(prefix="/api/bim", tags=["bim"])
@@ -72,6 +77,22 @@ async def _get_pool(timeout_sec: float = 5.0):
     # Don't raise here for base routes; callers can decide to fallback
     raise HTTPException(status_code=503, detail=f"Database not ready: {last_err or 'initializing'}")
 
+def _is_owner(request: Request) -> bool:
+    """Check if the request has valid owner authentication"""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return False
+    
+    try:
+        from ..auth import verify_token
+        token = auth_header.replace("Bearer ", "")
+        payload = verify_token(token)
+        return payload.get("role") == "owner"
+    except Exception as e:
+        # Use debug to avoid noisy logs at default WARNING level
+        logger.debug("[BIM] Auth check failed: %s", e)
+        return False
+
 # ------------------------------ models --------------------------------
 class BimBlock(BaseModel):
     type: Literal["text", "image", "code", "h1", "h2"]
@@ -82,11 +103,13 @@ class BimCreate(BaseModel):
     title: str = Field(default="BIM Notes", max_length=200)
     blocks: List[BimBlock] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
+    locked: bool = Field(default=False)
 
 class BimUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=200)
     blocks: Optional[List[BimBlock]] = None
     tags: Optional[List[str]] = None
+    locked: Optional[bool] = None
 
 _LANG_MAP = {
     None: None,
@@ -112,6 +135,7 @@ def _normalize_blocks(blocks: List[BimBlock]) -> List[dict]:
 LIST_SQL = """
 select
   e.id, e.title, e.created_at,
+  coalesce(e.locked, false) as locked,
   coalesce(e.tags, '{}') as tags,
   coalesce(
     json_agg(
@@ -129,6 +153,7 @@ order by e.created_at desc;
 GET_ONE_SQL = """
 select
   e.id, e.title, e.created_at,
+  coalesce(e.locked, false) as locked,
   coalesce(e.tags, '{}') as tags,
   coalesce(
     json_agg(
@@ -143,14 +168,35 @@ where e.id = $1
 group by e.id;
 """
 
-INSERT_ENTRY_SQL = "insert into public.bim_entries (title, tags) values ($1, $2) returning id, title, created_at, tags;"
+INSERT_ENTRY_SQL = """
+insert into public.bim_entries (title, tags, locked) 
+values ($1, $2, $3) 
+returning id, title, created_at, tags, coalesce(locked, false) as locked;
+"""
+
 INSERT_BLOCK_SQL_RETURNING = (
     "insert into public.bim_blocks (entry_id, idx, type, value, language) "
     "values ($1, $2, $3, $4, $5) returning id;"
 )
+
 DELETE_BLOCKS_SQL = "delete from public.bim_blocks where entry_id = $1;"
 DELETE_ENTRY_SQL  = "delete from public.bim_entries where id = $1;"
-UPDATE_ENTRY_SQL  = "update public.bim_entries set title = $2, tags = $3 where id = $1 returning id;"
+
+# Optimized UPDATE query that returns the updated row in one round-trip
+UPDATE_ENTRY_SQL = """
+update public.bim_entries 
+set title = $2, tags = $3, locked = $4 
+where id = $1 
+returning id, title, created_at, tags, coalesce(locked, false) as locked;
+"""
+
+# Minimal UPDATE for just toggling lock (more efficient)
+UPDATE_LOCK_ONLY_SQL = """
+update public.bim_entries 
+set locked = $2 
+where id = $1 
+returning id, coalesce(locked, false) as locked;
+"""
 
 from asyncpg import exceptions as pgexc
 
@@ -178,13 +224,13 @@ async def _insert_block_with_retry(conn, entry_id, i, b):
     try:
         row = await conn.fetchrow(INSERT_BLOCK_SQL_RETURNING, entry_id, i, b["type"], b["value"], b["language"])
         if LOG_BIM_SEQ:
-            print("[bim] insert ok -> id", row["id"])
+            logger.debug("[bim] insert ok -> id %s", row["id"])
         return
     except pgexc.UniqueViolationError as e:
         if 'bim_blocks_pkey' not in str(e):
             raise
         if LOG_BIM_SEQ:
-            print("[bim] duplicate on first try; attempting seq reset")
+            logger.debug("[bim] duplicate on first try; attempting seq reset")
 
     seqname = await conn.fetchval(FIND_ATTACHED_SEQ_SQL)
     if seqname:
@@ -192,13 +238,13 @@ async def _insert_block_with_retry(conn, entry_id, i, b):
         try:
             row = await conn.fetchrow(INSERT_BLOCK_SQL_RETURNING, entry_id, i, b["type"], b["value"], b["language"])
             if LOG_BIM_SEQ:
-                print("[bim] after reset -> id", row["id"])
+                logger.debug("[bim] after reset -> id %s", row["id"])
             return
         except pgexc.UniqueViolationError as e2:
             if 'bim_blocks_pkey' not in str(e2):
                 raise
             if LOG_BIM_SEQ:
-                print("[bim] duplicate even after reset; falling back")
+                logger.debug("[bim] duplicate even after reset; falling back")
 
     await conn.execute("SELECT pg_advisory_xact_lock(hashtext('public.bim_blocks.id'));")
     next_id_row = await conn.fetchrow(
@@ -215,7 +261,7 @@ async def _insert_block_with_retry(conn, entry_id, i, b):
                 nid, entry_id, i, b["type"], b["value"], b["language"]
             )
             if LOG_BIM_SEQ:
-                print("[bim] fallback explicit id ->", nid)
+                logger.debug("[bim] fallback explicit id -> %s", nid)
             return
         except pgexc.UniqueViolationError as e3:
             if 'bim_blocks_pkey' not in str(e3):
@@ -265,6 +311,8 @@ def _row_to_dict_with_parsed_blocks(row) -> dict:
     d = dict(row)
     if isinstance(d.get("blocks"), str):
         d["blocks"] = orjson.loads(d["blocks"])
+    # Ensure locked is a boolean
+    d["locked"] = bool(d.get("locked", False))
     return d
 
 # ✅ Base routes so /api/bim and /api/bim/ NEVER 404
@@ -279,8 +327,14 @@ async def bim_root():
         pool = await _get_pool()
         async with pool.acquire() as conn:
             rows = await conn.fetch(LIST_SQL)
-            return [_row_to_dict_with_parsed_blocks(r) for r in rows]
-    except Exception:
+            result = [_row_to_dict_with_parsed_blocks(r) for r in rows]
+            logger.debug("[BIM] Returning %d entries", len(result))
+            if result:
+                logger.debug("[BIM] Sample entry locked status: id=%s, locked=%s", result[0]['id'], result[0].get('locked'))
+            return result
+    except Exception as e:
+        # Keep this as error, but it will be hidden if your global level is WARNING
+        logger.error("[BIM] Error loading entries: %s", e)
         # Preserve response shape expected by the UI (list/array)
         return []
 
@@ -316,15 +370,23 @@ async def bim_meta():
     return {"ok": True}
 
 @router.get("/{entry_id}")
-async def get_entry(entry_id: int):
+async def get_entry(entry_id: int, request: Request):
     pool = await _get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
         if not row:
             raise HTTPException(status_code=404, detail="Not found")
-        d = dict(row)
-        if isinstance(d.get("blocks"), str):
-            d["blocks"] = orjson.loads(d["blocks"])
+        
+        d = _row_to_dict_with_parsed_blocks(row)
+        
+        # Check if entry is locked and user is not owner
+        if d.get("locked", False):
+            if not _is_owner(request):
+                raise HTTPException(
+                    status_code=403, 
+                    detail="🔒 This entry is locked and can only be viewed by the owner."
+                )
+        
         return d
 
 @router.post("", status_code=201)
@@ -332,22 +394,31 @@ async def get_entry(entry_id: int):
 async def create_entry(payload: BimCreate):
     if not payload.blocks:
         raise HTTPException(status_code=400, detail="At least one block required")
+    
+    logger.debug("[BIM] Creating entry with locked=%s", payload.locked)
+    
     pool = await _get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
-            e = await conn.fetchrow(INSERT_ENTRY_SQL, payload.title.strip(), payload.tags or [])
+            e = await conn.fetchrow(INSERT_ENTRY_SQL, payload.title.strip(), payload.tags or [], payload.locked)
             entry_id = e["id"]
+            logger.debug("[BIM] Created entry %s, locked=%s", entry_id, e.get("locked"))
+            
             for i, b in enumerate(_normalize_blocks(payload.blocks)):
                 await _insert_block_with_retry(conn, entry_id, i, b)
+        
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
-        d = dict(row)
-        if isinstance(d.get("blocks"), str):
-            d["blocks"] = orjson.loads(d["blocks"])
+        d = _row_to_dict_with_parsed_blocks(row)
+        logger.debug("[BIM] Final entry %s locked status: %s", entry_id, d.get("locked"))
         return d
 
 @router.put("/{entry_id}")
 @router.put("/{entry_id}/")
-async def update_entry(entry_id: int, payload: BimUpdate):
+async def update_entry(entry_id: int, payload: BimUpdate, request: Request):
+    # Enforce owner authentication
+    if not _is_owner(request):
+        raise HTTPException(status_code=403, detail="Owner authentication required")
+    
     if payload.title is None or payload.blocks is None:
         raise HTTPException(status_code=400, detail="PUT requires 'title' and 'blocks'")
     if not payload.blocks:
@@ -355,7 +426,10 @@ async def update_entry(entry_id: int, payload: BimUpdate):
 
     title = payload.title.strip()
     tags  = payload.tags or []
+    locked = payload.locked if payload.locked is not None else False
     norm  = _normalize_blocks(payload.blocks)
+
+    logger.debug("[BIM] PUT entry %s with locked=%s", entry_id, locked)
 
     pool = await _get_pool()
     async with pool.acquire() as conn:
@@ -364,32 +438,63 @@ async def update_entry(entry_id: int, payload: BimUpdate):
             raise HTTPException(status_code=404, detail="Not found")
 
         async with conn.transaction():
-            await conn.fetchrow(UPDATE_ENTRY_SQL, entry_id, title, tags)
+            update_result = await conn.fetchrow(UPDATE_ENTRY_SQL, entry_id, title, tags, locked)
+            logger.debug("[BIM] Update result: %s", update_result)
+            
             await conn.execute(DELETE_BLOCKS_SQL, entry_id)
             for i, b in enumerate(norm):
                 await _insert_block_with_retry(conn, entry_id, i, b)
+        
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
-        d = dict(row)
-        if isinstance(d.get("blocks"), str):
-            d["blocks"] = orjson.loads(d["blocks"])
+        d = _row_to_dict_with_parsed_blocks(row)
+        logger.debug("[BIM] Final PUT result locked: %s", d.get("locked"))
         return d
 
 @router.patch("/{entry_id}")
 @router.patch("/{entry_id}/")
-async def patch_entry(entry_id: int, payload: BimUpdate):
+async def patch_entry(entry_id: int, payload: BimUpdate, request: Request):
+    # ✅ ENFORCE OWNER - Fail explicitly instead of silently accepting
+    if not _is_owner(request):
+        raise HTTPException(status_code=403, detail="Owner authentication required")
+    
+    logger.debug("%s", "="*60)
+    logger.debug("[BIM] 🔧 PATCH REQUEST for entry %s", entry_id)
+    logger.debug("[BIM] 🔧 Payload: %s", payload)
+    logger.debug("[BIM] 🔧 Payload.locked: %s", payload.locked)
+    logger.debug("[BIM] 🔧 Owner authenticated: ✅")
+    logger.debug("%s", "="*60)
+    
     pool = await _get_pool()
     async with pool.acquire() as conn:
         current = await conn.fetchrow(GET_ONE_SQL, entry_id)
         if not current:
             raise HTTPException(status_code=404, detail="Not found")
 
+        logger.debug("[BIM] 🔧 Current locked state: %s", current.get("locked"))
+
         new_title = payload.title.strip() if isinstance(payload.title, str) else current["title"]
         new_tags  = payload.tags if payload.tags is not None else (current.get("tags") or [])
+        new_locked = payload.locked if payload.locked is not None else (current.get("locked") or False)
+        
+        logger.debug("[BIM] 🔧 New locked state will be: %s", new_locked)
+        
         if isinstance(new_tags, str):
             new_tags = orjson.loads(new_tags)
 
         async with conn.transaction():
-            await conn.fetchrow(UPDATE_ENTRY_SQL, entry_id, new_title, new_tags)
+            # Use optimized query that returns the updated row
+            if payload.blocks is None and payload.title is None and payload.tags is None and payload.locked is not None:
+                # Only updating lock status - use minimal query
+                logger.debug("[BIM] 🔧 Using optimized lock-only UPDATE")
+                result = await conn.fetchrow(UPDATE_LOCK_ONLY_SQL, entry_id, new_locked)
+                logger.debug("[BIM] 🔧 Lock update result: %s", result)
+            else:
+                # Full update
+                logger.debug("[BIM] 🔧 Executing full UPDATE with: id=%s, title=%s, tags=%s, locked=%s", entry_id, new_title, new_tags, new_locked)
+                result = await conn.fetchrow(UPDATE_ENTRY_SQL, entry_id, new_title, new_tags, new_locked)
+                logger.debug("[BIM] 🔧 Update SQL result: %s", result)
+            
+            # Update blocks if provided
             if payload.blocks is not None:
                 if not payload.blocks:
                     raise HTTPException(status_code=400, detail="If 'blocks' is provided, it cannot be empty")
@@ -397,10 +502,15 @@ async def patch_entry(entry_id: int, payload: BimUpdate):
                 await conn.execute(DELETE_BLOCKS_SQL, entry_id)
                 for i, b in enumerate(norm):
                     await _insert_block_with_retry(conn, entry_id, i, b)
+        
+        # Get final state
         row = await conn.fetchrow(GET_ONE_SQL, entry_id)
-        d = dict(row)
-        if isinstance(d.get("blocks"), str):
-            d["blocks"] = orjson.loads(d["blocks"])
+        d = _row_to_dict_with_parsed_blocks(row)
+        
+        logger.debug("[BIM] 🔧 Final response locked: %s", d.get("locked"))
+        logger.debug("[BIM] 🔧 Returning full entry with %d blocks", len(d.get("blocks", [])))
+        logger.debug("%s", "="*60)
+        
         return d
 
 @router.post("/{entry_id}")
@@ -409,17 +519,21 @@ async def method_override(entry_id: int, payload: dict, request: Request):
     override = request.headers.get("X-HTTP-Method-Override", "").upper()
     if override == "PUT":
         data = BimUpdate(**payload)
-        return await update_entry(entry_id, data)
+        return await update_entry(entry_id, data, request)
     elif override == "PATCH":
         data = BimUpdate(**payload)
-        return await patch_entry(entry_id, data)
+        return await patch_entry(entry_id, data, request)
     elif override == "DELETE":
         return await delete_entry(entry_id)
     raise HTTPException(status_code=405, detail="Method Not Allowed")
 
 @router.delete("/{entry_id}", status_code=204)
-@router.delete("/{entry_id}/", status_code=204)
-async def delete_entry(entry_id: int):
+@router.delete("/{entry_id}/")
+async def delete_entry(entry_id: int, request: Request):
+    # Enforce owner authentication for delete
+    if not _is_owner(request):
+        raise HTTPException(status_code=403, detail="Owner authentication required")
+    
     pool = await _get_pool()
     async with pool.acquire() as conn:
         await conn.execute(DELETE_BLOCKS_SQL, entry_id)
