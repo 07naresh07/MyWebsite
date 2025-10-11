@@ -1,23 +1,23 @@
 // src/lib/owner.js
-// HARD RULE: Owner mode is DISABLED on deployed sites.
-// - On production (non-localhost, non-vite-dev), owner is ALWAYS false regardless of tokens
-// - Lock/Unlock flows remain available via password (they call backend with a token each time)
-// - Edit/Delete/Duplicate/Owner UI are only available on local/dev
+// POLICY: Owner mode is DISABLED on deployed sites (no edit/delete UI).
+// However, lock/unlock must work everywhere via a password that yields a
+// short‑lived token for that specific action. On production, we DO NOT persist
+// tokens nor flip any owner flags.
 
 import { useEffect, useState } from "react";
 
 const KEY_MODE   = "ownerMode";            // "true" | "false"
-const KEY_TOKEN  = "ownerToken";           // canonical token key
-const ALT_TOKEN  = "token";                // legacy/alternate key some code used
-const KEY_TOGGLE = "ownerToggleVisible";   // user toggle flag (never used in prod)
+const KEY_TOKEN  = "ownerToken";           // canonical token key (local/dev only)
+const ALT_TOKEN  = "token";                // legacy key (local/dev only)
+const KEY_TOGGLE = "ownerToggleVisible";   // never used in prod
 const EVT        = "owner-mode-changed";
 
 /* --------------------- Environment helpers --------------------- */
 const hasWindow = typeof window !== "undefined";
 const isViteDev = !!import.meta?.env?.DEV;
 const isLocalHost = hasWindow && (/^localhost$|^127\.|^0\.0\.0\.0$/.test(window.location.hostname));
-const isLocalDev = isViteDev || isLocalHost;          // where owner is allowed
-const isProdLike = !isLocalDev;                        // where owner is hard disabled
+const isLocalDev = isViteDev || isLocalHost;   // where owner UI is allowed
+const isProdLike = !isLocalDev;                // where owner UI is hard disabled
 
 /* --------------------- Safe storage helpers --------------------- */
 const ls = (() => { if (!hasWindow) return null; try { return window.localStorage; } catch { return null; }})();
@@ -38,8 +38,7 @@ function getApiBase() { try { const envA = (import.meta.env?.VITE_API_URL || "")
 
 /* --------------------- Core owner state (local/dev only) --------------------- */
 function getOwnerLocalOnly() {
-  // Only honor storage/token when running locally or in vite dev
-  if (isProdLike) return false;
+  if (isProdLike) return false; // never true in prod
   try {
     const mode = (ls && ls.getItem(KEY_MODE)) === "true";
     const tok  = getTokenLocalOnly();
@@ -49,7 +48,7 @@ function getOwnerLocalOnly() {
 }
 
 function getTokenLocalOnly() {
-  if (isProdLike) return ""; // ignore any stored tokens in prod
+  if (isProdLike) return ""; // ignore stored tokens in prod
   try {
     let tok = read(KEY_TOKEN) || read(ALT_TOKEN);
     if (!tok) return "";
@@ -71,48 +70,50 @@ export function signInOwner(token) {
     writeBoth(KEY_TOKEN, token);
     writeBoth(ALT_TOKEN, token);
     writeLS(KEY_MODE, "true");
-    // Do NOT flip toggle visibility automatically
     dispatchOwnerEvent();
   } catch {}
 }
 
-export function signOutOwner() {
-  try { removeBoth(KEY_TOKEN); removeBoth(ALT_TOKEN); writeLS(KEY_MODE, "false"); dispatchOwnerEvent(); } catch {}
-}
+export function signOutOwner() { try { removeBoth(KEY_TOKEN); removeBoth(ALT_TOKEN); writeLS(KEY_MODE, "false"); dispatchOwnerEvent(); } catch {} }
 
 /**
- * Toggle visibility policy (for Navbar button etc.):
+ * Toggle visibility (Navbar button etc.):
  *  - Local/dev: visible
  *  - Prod: hidden unless env overrides to "always"
- *    VITE_OWNER_TOGGLE=always -> always visible (use with caution!)
  */
 export function getToggleVisible() {
   try {
     const envFlag = String(import.meta?.env?.VITE_OWNER_TOGGLE || "off").toLowerCase();
     if (envFlag === "always") return true;
-    if (isLocalDev) return true;   // show on localhost or vite dev
-    return false;                  // hide on prod by default
+    if (isLocalDev) return true;
+    return false;
   } catch { return false; }
 }
 
 export function setToggleVisible(v) { if (isProdLike) return; try { writeLS(KEY_TOGGLE, v ? "true" : "false"); dispatchOwnerEvent(); } catch {} }
 
-/* --------------------- Remote Authentication API --------------------- */
+/* --------------------- Auth for actions (works in prod) --------------------- */
+// IMPORTANT: This authenticates for a SINGLE ACTION (e.g., lock/unlock) and
+// NEVER persists any owner state in production. On local/dev it also returns a
+// token and will persist owner state (so you can use the full owner UI).
 export async function loginAsOwner(password, apiBase = "") {
-  // Allowed to login only on local/dev; in prod this is a no-op (for owner UI)
-  if (isProdLike) {
-    return { success: false, error: "Owner login disabled on production" };
-  }
   try {
     const base = apiBase || getApiBase();
     const url = base ? `${base}/api/auth/owner` : "/api/auth/owner";
+
     const formData = new URLSearchParams();
     formData.append("pass_", password);
+
     const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: formData });
     if (!res.ok) throw new Error((await res.text()) || `Authentication failed (${res.status})`);
+
     const data = await res.json();
     if (!data?.token) throw new Error("No token received from server");
-    signInOwner(data.token); // will be ignored if prod
+
+    // In local/dev we also persist owner mode for convenience.
+    // In production we return the token ONLY (no side effects).
+    if (isLocalDev) signInOwner(data.token);
+
     return { success: true, token: data.token };
   } catch (e) {
     return { success: false, error: e?.message || "Authentication failed" };
@@ -120,8 +121,7 @@ export async function loginAsOwner(password, apiBase = "") {
 }
 
 export async function verifyToken(apiBase = "") {
-  // Never elevate owner in prod
-  if (isProdLike) return false;
+  if (isProdLike) return false; // never elevate owner in prod
   const token = getTokenLocalOnly();
   if (!token) return false;
   try {
@@ -136,13 +136,7 @@ export async function verifyToken(apiBase = "") {
 
 export function logoutOwner() { signOutOwner(); }
 
-export function clearOwnerStorage() {
-  try {
-    const keys = [KEY_MODE, KEY_TOKEN, ALT_TOKEN, KEY_TOGGLE, "owner_token", "auth_token", "access_token"];
-    keys.forEach(key => { removeBoth(key); });
-    dispatchOwnerEvent();
-  } catch {}
-}
+export function clearOwnerStorage() { try { [KEY_MODE, KEY_TOKEN, ALT_TOKEN, KEY_TOGGLE, "owner_token", "auth_token", "access_token"].forEach(k => removeBoth(k)); dispatchOwnerEvent(); } catch {} }
 
 /* --------------------- React hook --------------------- */
 export function useOwnerMode() {
@@ -151,10 +145,7 @@ export function useOwnerMode() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // On prod: force false and stop
     if (isProdLike) { setOwner(false); setTok(""); setLoading(false); return; }
-
-    // Local/dev: optionally verify token
     const checkAuth = async () => {
       const currentToken = getTokenLocalOnly();
       if (currentToken) {
@@ -169,22 +160,15 @@ export function useOwnerMode() {
   }, []);
 
   useEffect(() => {
-    if (isProdLike) return; // no syncing needed in prod
-
+    if (isProdLike) return;
     const sync = () => { setOwner(getOwnerLocalOnly()); setTok(getTokenLocalOnly()); };
     const onStorage = (e) => { if (!e || !("key" in e) || [null, KEY_MODE, KEY_TOKEN, ALT_TOKEN, KEY_TOGGLE].includes(e.key)) sync(); };
     const onVis = () => { if (document.visibilityState === "visible") sync(); };
-
     window.addEventListener(EVT, sync);
     window.addEventListener("storage", onStorage);
     document.addEventListener("visibilitychange", onVis);
     sync();
-
-    return () => {
-      window.removeEventListener(EVT, sync);
-      window.removeEventListener("storage", onStorage);
-      document.removeEventListener("visibilitychange", onVis);
-    };
+    return () => { window.removeEventListener(EVT, sync); window.removeEventListener("storage", onStorage); document.removeEventListener("visibilitychange", onVis); };
   }, []);
 
   return { owner, token, loading };
