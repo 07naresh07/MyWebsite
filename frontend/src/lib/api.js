@@ -106,7 +106,7 @@ async function sendJson(path, method, body) {
 
     if (res.status === 401 || res.status === 403) {
       throw new Error(
-        "401 Unauthorized: Owner mode required or session expired. Please unlock from the navbar and try again."
+        "Owner authentication required. Please log in using the Owner Login button."
       );
     }
     throw new Error(msg);
@@ -141,7 +141,7 @@ async function sendForm(path, formData) {
 
     if (res.status === 401 || res.status === 403) {
       throw new Error(
-        "401 Unauthorized: Owner mode required or session expired. Please unlock from the navbar and try again."
+        "Owner authentication required. Please log in using the Owner Login button."
       );
     }
     throw new Error(msg);

@@ -48,6 +48,18 @@ function isExpired(token) {
   return Number(p.exp) <= now;
 }
 
+/* --------------------- API base URL helper --------------------- */
+function getApiBase() {
+  try {
+    const envA = (import.meta.env?.VITE_API_URL || "").trim();
+    const envB = (import.meta.env?.VITE_BACKEND_URL || "").trim();
+    const base = (envA || envB).replace(/\/+$/, "");
+    return base;
+  } catch {
+    return "";
+  }
+}
+
 /* --------------------- Public API --------------------- */
 // Owner = flag true AND token exists & not expired
 export function getOwner() {
@@ -134,13 +146,145 @@ export function setToggleVisible(v) {
   try { writeLS(KEY_TOGGLE, v ? "true" : "false"); dispatchOwnerEvent(); } catch {}
 }
 
-/* --------------------- React hook --------------------- */
+/* --------------------- NEW: Remote Authentication API --------------------- */
+
+/**
+ * Login as owner by calling the backend authentication endpoint
+ * @param {string} password - The owner password
+ * @param {string} apiBase - Optional API base URL (auto-detected if not provided)
+ * @returns {Promise<{success: boolean, token?: string, error?: string}>}
+ */
+export async function loginAsOwner(password, apiBase = "") {
+  try {
+    const base = apiBase || getApiBase();
+    const url = base ? `${base}/api/auth/owner` : "/api/auth/owner";
+    
+    console.log("[Owner] Attempting login to:", url);
+    
+    const formData = new URLSearchParams();
+    formData.append("pass_", password);
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("[Owner] Login failed:", response.status, error);
+      throw new Error(error || `Authentication failed (${response.status})`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.token) {
+      // Use existing signInOwner function to properly store token
+      signInOwner(data.token);
+      console.log("[Owner] Login successful");
+      return { success: true, token: data.token };
+    } else {
+      throw new Error("No token received from server");
+    }
+  } catch (e) {
+    console.error("[Owner] Login error:", e);
+    return { 
+      success: false, 
+      error: e.message || "Authentication failed" 
+    };
+  }
+}
+
+/**
+ * Verify if current token is valid by checking with the backend
+ * @param {string} apiBase - Optional API base URL (auto-detected if not provided)
+ * @returns {Promise<boolean>}
+ */
+export async function verifyToken(apiBase = "") {
+  const token = getToken();
+  if (!token) return false;
+  
+  try {
+    const base = apiBase || getApiBase();
+    const url = base ? `${base}/api/auth/me` : "/api/auth/me";
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/json"
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log("[Owner] Token verified:", data);
+      return true;
+    } else {
+      console.warn("[Owner] Token verification failed:", response.status);
+      // Token is invalid, clear it
+      signOutOwner();
+      return false;
+    }
+  } catch (e) {
+    console.error("[Owner] Token verification error:", e);
+    return false;
+  }
+}
+
+/**
+ * Logout owner (wrapper around signOutOwner for consistency)
+ */
+export function logoutOwner() {
+  console.log("[Owner] Logging out");
+  signOutOwner();
+}
+
+/**
+ * Clear all owner-related storage (nuclear option for troubleshooting)
+ */
+export function clearOwnerStorage() {
+  try {
+    const keys = [KEY_MODE, KEY_TOKEN, ALT_TOKEN, KEY_TOGGLE, "owner_token", "auth_token", "access_token"];
+    keys.forEach(key => {
+      removeBoth(key);
+    });
+    dispatchOwnerEvent();
+    console.log("[Owner] All storage cleared");
+  } catch (e) {
+    console.error("[Owner] Error clearing storage:", e);
+  }
+}
+
+/* --------------------- React hook with auto-verification --------------------- */
 export function useOwnerMode() {
   const [owner, setOwner] = useState(getOwner());
   const [token, setTok]   = useState(getToken());
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const sync = () => { setOwner(getOwner()); setTok(getToken()); };
+    // Auto-verify token on mount if present
+    const checkAuth = async () => {
+      const currentToken = getToken();
+      if (currentToken) {
+        const isValid = await verifyToken();
+        setOwner(isValid);
+      } else {
+        setOwner(false);
+      }
+      setLoading(false);
+    };
+    
+    checkAuth();
+  }, []);
+
+  useEffect(() => {
+    const sync = () => { 
+      setOwner(getOwner()); 
+      setTok(getToken()); 
+    };
 
     const onStorage = (e) => {
       // some browsers dispatch null keys; resync anyway
@@ -160,7 +304,27 @@ export function useOwnerMode() {
     };
   }, []);
 
-  return { owner, token };
+  return { owner, token, loading };
+}
+
+/**
+ * Hook variant that includes setter for direct owner state control
+ * (for backward compatibility with code that uses setOwner)
+ */
+export function useOwnerModeWithSetter() {
+  const { owner, token, loading } = useOwnerMode();
+  
+  const setOwner = (value) => {
+    if (value) {
+      // Can't set to true without a token - need to login
+      console.warn("[Owner] Cannot set owner=true without logging in. Use loginAsOwner() instead.");
+    } else {
+      // Setting to false = logout
+      signOutOwner();
+    }
+  };
+  
+  return { owner, setOwner, token, loading };
 }
 
 /* --------------------- internal --------------------- */

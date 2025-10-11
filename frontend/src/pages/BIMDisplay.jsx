@@ -3,9 +3,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   BookOpen, Trash2, Edit3, Plus, Eye, Star,
   ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw,
-  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock
+  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, LogIn, LogOut, Shield
 } from "lucide-react";
-import { useOwnerMode } from "../lib/owner.js";
+import { useOwnerMode, loginAsOwner, logoutOwner } from "../lib/owner.js";
 
 /* ---------- API base ---------- */
 const RAW_API = (import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || "").trim();
@@ -14,7 +14,6 @@ const api = (path) => (API_BASE ? `${API_BASE}${path}` : path);
 
 /* ---------- auth header ---------- */
 const ownerHeaders = () => {
-  // Try multiple possible token storage keys
   const possibleKeys = ["owner_token", "token", "auth_token", "access_token"];
   
   for (const key of possibleKeys) {
@@ -59,6 +58,128 @@ const saveDarkMode = (value) => {
     localStorage.setItem(DARK_MODE_KEY, String(value));
   } catch {}
 };
+
+/* ---------- Owner Login Modal ---------- */
+function OwnerLoginModal({ onClose, onSuccess, darkMode }) {
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    
+    try {
+      const result = await loginAsOwner(password, API_BASE);
+      
+      if (result.success) {
+        onSuccess();
+        onClose();
+      } else {
+        setError(result.error || "Authentication failed");
+      }
+    } catch (e) {
+      setError(e.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+      <div
+        className={`rounded-2xl shadow-2xl max-w-md w-full ${
+          darkMode ? "bg-slate-800 border-2 border-blue-500" : "bg-white border-2 border-blue-500"
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-4 flex items-center gap-3 rounded-t-xl">
+          <Shield size={32} className="flex-shrink-0" />
+          <div>
+            <h2 className="text-xl font-bold">Owner Authentication</h2>
+            <p className="text-sm text-blue-100">Enter password to manage entries</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className={`p-6 space-y-4 ${darkMode ? "text-slate-200" : "text-slate-800"}`}>
+          <div>
+            <label className="block text-sm font-semibold mb-2">
+              Owner Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter owner password"
+              className={`w-full px-4 py-3 rounded-lg border-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                darkMode 
+                  ? "bg-slate-700 border-slate-600 text-white placeholder-slate-400" 
+                  : "bg-white border-slate-300 text-slate-900 placeholder-slate-400"
+              }`}
+              autoFocus
+              disabled={loading}
+            />
+          </div>
+
+          {error && (
+            <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 p-3 rounded">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 p-3 rounded">
+            <p className="text-xs text-blue-700 dark:text-blue-300">
+              🔒 Once logged in, you'll be able to lock/unlock entries and manage all content.
+              Other users will only see unlocked entries.
+            </p>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-colors ${
+                darkMode 
+                  ? "bg-slate-700 text-slate-200 hover:bg-slate-600" 
+                  : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+              } disabled:opacity-50`}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !password}
+              className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-colors ${
+                loading || !password
+                  ? "bg-blue-300 text-blue-100 cursor-not-allowed opacity-50"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+            >
+              <span className="inline-flex items-center justify-center gap-2">
+                {loading ? (
+                  <>
+                    <RefreshCcw size={18} className="animate-spin" />
+                    Authenticating...
+                  </>
+                ) : (
+                  <>
+                    <LogIn size={18} />
+                    Login
+                  </>
+                )}
+              </span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 /* ---------- Delete Confirmation Modal ---------- */
 function DeleteConfirmationModal({ item, onConfirm, onCancel, darkMode }) {
@@ -1357,7 +1478,7 @@ function FullViewModal({ item, onClose, owner, onEdit, onToggleLock, lockingIds 
 
 /* ---------- Main Page ---------- */
 export default function BIMDisplay() {
-  const { owner } = useOwnerMode();
+  const { owner, setOwner } = useOwnerMode();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -1367,6 +1488,7 @@ export default function BIMDisplay() {
   const [darkMode, setDarkMode] = useState(loadDarkMode());
   const [deleteConfirmItem, setDeleteConfirmItem] = useState(null);
   const [lockingIds, setLockingIds] = useState(new Set());
+  const [showLoginModal, setShowLoginModal] = useState(false);
   
   // Smart Features
   const [searchQuery, setSearchQuery] = useState("");
@@ -1469,14 +1591,15 @@ export default function BIMDisplay() {
 
   const toggleLock = async (id) => {
     if (!owner) {
-      alert("⚠️ You must be logged in as owner to lock/unlock entries.\n\nPlease log in as owner first.");
+      alert("⚠️ You must be logged in as owner to lock/unlock entries.\n\nPlease click the 'Owner Login' button in the top-right corner.");
       return;
     }
     
     // Check if we have a valid token
     const headers = ownerHeaders();
     if (!headers.Authorization) {
-      alert("⚠️ No owner token found.\n\nPlease log in as owner first.\n\nYour owner session may have expired.");
+      alert("⚠️ No owner token found.\n\nYour owner session may have expired.\n\nPlease log in again using the 'Owner Login' button.");
+      setOwner(false);
       return;
     }
     
@@ -1518,12 +1641,13 @@ export default function BIMDisplay() {
       const errorMsg = e?.message || 'Unknown error';
       
       if (errorMsg.includes("Owner authentication required") || errorMsg.includes("403")) {
-        alert("🔒 Owner Authentication Required\n\n" +
+        alert("🔐 Owner Authentication Required\n\n" +
               "Your owner session has expired or is invalid.\n\n" +
               "Please:\n" +
-              "1. Log out\n" +
-              "2. Log in again as owner\n" +
+              "1. Click 'Owner Login' button\n" +
+              "2. Enter your owner password\n" +
               "3. Try locking/unlocking again");
+        setOwner(false);
       } else {
         alert(`Failed to ${newLockedState ? 'lock' : 'unlock'} entry:\n\n${errorMsg}\n\n` +
               "Please check:\n" +
@@ -1544,8 +1668,22 @@ export default function BIMDisplay() {
     }
   };
 
-  const goAdd = () => { if (owner) nav("/bim/new"); };
-  const goEdit = (id) => { if (owner) nav(`/bim/edit/${encodeURIComponent(id)}`); };
+  const goAdd = () => { 
+    if (!owner) {
+      alert("⚠️ You must be logged in as owner to create entries.\n\nPlease click the 'Owner Login' button.");
+      return;
+    }
+    nav("/bim/new"); 
+  };
+  
+  const goEdit = (id) => { 
+    if (!owner) {
+      alert("⚠️ You must be logged in as owner to edit entries.\n\nPlease click the 'Owner Login' button.");
+      return;
+    }
+    nav(`/bim/edit/${encodeURIComponent(id)}`); 
+  };
+  
   const goView = (id) => {
     const item = items.find((i) => i.id === id);
     if (item) {
@@ -1557,6 +1695,17 @@ export default function BIMDisplay() {
       console.log("📖 Opening entry:", id, "Locked:", item.locked);
       setViewingItem(item);
     }
+  };
+
+  const handleLoginSuccess = () => {
+    setOwner(true);
+    load(); // Reload to show all entries including locked ones
+  };
+
+  const handleLogout = () => {
+    logoutOwner();
+    setOwner(false);
+    load(); // Reload to hide locked entries
   };
 
   // Filter and sort items
@@ -1602,7 +1751,6 @@ export default function BIMDisplay() {
           onEdit={(id) => { setViewingItem(null); goEdit(id); }}
           onToggleLock={async (id) => {
             await toggleLock(id);
-            // toggleLock already updates viewingItem state via load()
           }}
           lockingIds={lockingIds}
         />
@@ -1617,6 +1765,44 @@ export default function BIMDisplay() {
         />
       )}
 
+      {showLoginModal && (
+        <OwnerLoginModal
+          onClose={() => setShowLoginModal(false)}
+          onSuccess={handleLoginSuccess}
+          darkMode={darkMode}
+        />
+      )}
+
+      {/* Owner Login/Logout Button - Fixed Top Right */}
+      <div className="fixed top-6 right-6 z-40 flex gap-2">
+        {owner ? (
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={`px-4 py-2 rounded-lg shadow-2xl font-semibold transition-all hover:scale-105 flex items-center gap-2 ${
+              darkMode ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-500 text-white hover:bg-red-600"
+            }`}
+            title="Logout from owner mode"
+          >
+            <LogOut size={18} />
+            <span>Owner Logout</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowLoginModal(true)}
+            className={`px-4 py-2 rounded-lg shadow-2xl font-semibold transition-all hover:scale-105 flex items-center gap-2 ${
+              darkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600"
+            }`}
+            title="Login as owner to manage entries"
+          >
+            <Shield size={18} />
+            <span>Owner Login</span>
+          </button>
+        )}
+      </div>
+
+      {/* Dark Mode Toggle - Fixed Bottom Right */}
       <button
         type="button"
         onClick={() => setDarkMode(!darkMode)}
@@ -1644,6 +1830,12 @@ export default function BIMDisplay() {
             <p className="text-center text-blue-100 text-lg italic font-light">
               "Documenting my journey through data-driven design and BIM innovation"
             </p>
+            {owner && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-sm bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg w-fit mx-auto">
+                <Shield size={16} />
+                <span className="font-semibold">Logged in as Owner</span>
+              </div>
+            )}
           </div>
         </header>
 
@@ -1966,7 +2158,9 @@ export default function BIMDisplay() {
               </div>
             </div>
             <p className={`font-bold text-2xl mb-2 ${darkMode ? "text-slate-200" : "text-slate-700"}`}>No BIM data available</p>
-            <p className={`mb-6 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>Start building your knowledge base today!</p>
+            <p className={`mb-6 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
+              {owner ? "Start building your knowledge base today!" : "The owner hasn't added any public entries yet."}
+            </p>
             {owner && (
               <button
                 type="button"
