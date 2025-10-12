@@ -789,87 +789,159 @@ function LockedContentOverlay({ darkMode = false }) {
   );
 }
 
-/* ---------- Preview Component ---------- */
+/* ---------- Shared preview body (same as your normal preview) ---------- */
+function PreviewContent({ blocks = [], darkMode = false }) {
+  const groupedBlocks = groupConsecutiveImages(blocks);
+  return (
+    <div
+      className={`p-4 rounded-lg border space-y-4 max-h-48 overflow-hidden relative ${
+        darkMode
+          ? "bg-gradient-to-br from-slate-800 to-white/0 border-slate-600"
+          : "bg-gradient-to-br from-slate-50 to-white border-slate-200"
+      }`}
+    >
+      {groupedBlocks.slice(0, 5).map((block, idx) => {
+        if (block?.type === "h1") return null;
+
+        if (block?.type === "h2") {
+          const textContent = String(block.value || "")
+            .replace(/<[^>]*>/g, "")
+            .slice(0, 100);
+          return (
+            <h2
+              key={`pv-h2-${idx}`}
+              className={`text-lg font-extrabold mb-2 mt-3 pb-1 border-b border-blue-400 ${
+                darkMode ? "text-slate-100" : "text-slate-900"
+              }`}
+            >
+              {textContent}
+            </h2>
+          );
+        }
+
+        if (block?.type === "text") {
+          const textContent = String(block.value || "")
+            .replace(/<[^>]*>/g, "")
+            .slice(0, 180);
+          return (
+            <div
+              key={`pv-text-${idx}`}
+              className={`leading-relaxed text-sm ${
+                darkMode ? "text-slate-300" : "text-slate-700"
+              }`}
+            >
+              {textContent}
+              {textContent.length >= 180 ? "…" : ""}
+            </div>
+          );
+        }
+
+        if (block?.type === "image-group" || block?.type === "image") {
+          return (
+            <div
+              key={`pv-img-${idx}`}
+              className={`relative w-full h-20 rounded-lg overflow-hidden border ${
+                darkMode ? "border-slate-600 bg-slate-700" : "border-slate-200 bg-slate-50"
+              }`}
+            >
+              <div className="w-full h-full flex items-center justify-center">
+                <Eye size={32} className={`${darkMode ? "text-slate-500" : "text-slate-300"}`} />
+                <span
+                  className={`ml-2 text-sm font-semibold ${
+                    darkMode ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
+                  {block?.type === "image-group" ? `${block.images.length} Images` : "Image"}
+                </span>
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })}
+      {groupedBlocks.length > 5 && (
+        <div className="text-xs italic text-slate-400">+ more content…</div>
+      )}
+      <div
+        className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t pointer-events-none ${
+          darkMode ? "from-slate-700" : "from-white"
+        }`}
+      />
+    </div>
+  );
+}
+
+/* ---------- Unlocked overlay (blurred preview available) ---------- */
+function UnlockedPreviewOverlay({ darkMode = false }) {
+  return (
+    <>
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+      `}</style>
+      <div className={`absolute inset-0 flex items-center justify-center z-10 backdrop-blur-sm ${
+        darkMode ? "bg-gradient-to-br from-blue-900/20 via-slate-800/30 to-slate-900/20"
+                 : "bg-gradient-to-br from-blue-50/90 via-cyan-50/90 to-white/90"
+      }`}>
+        <div className="text-center px-6 py-6">
+          <div className="mb-3">
+            <div className={`p-3 rounded-full shadow-2xl inline-block animate-[float_3s_ease-in-out_infinite] ${
+              darkMode ? "bg-blue-700" : "bg-blue-600"
+            }`}>
+              <Eye size={32} className="text-white" />
+            </div>
+          </div>
+          <p className={`text-base font-bold mb-1 ${
+            darkMode ? "text-blue-200" : "text-blue-900"
+          }`}>
+            Preview available
+          </p>
+          <p className={`${darkMode ? "text-slate-200" : "text-slate-700"} text-sm`}>
+            Click <span className={darkMode ? "text-blue-300" : "text-blue-700"}>View More</span> to see details
+          </p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ---------- Preview wrapper: always blur; choose overlay by state ---------- */
 function BlockPreview({ blocks = [], darkMode = false, locked = false }) {
   if (!blocks.length) {
     return (
-      <div className={`flex items-center justify-center h-24 rounded-lg border ${darkMode ? "bg-gradient-to-br from-slate-800 to-slate-700 border-slate-600" : "bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200"}`}>
+      <div
+        className={`flex items-center justify-center h-24 rounded-lg border ${
+          darkMode
+            ? "bg-gradient-to-br from-slate-800 to-slate-700 border-slate-600"
+            : "bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200"
+        }`}
+      >
         <p className="text-sm text-slate-400">No content</p>
       </div>
     );
   }
 
-  if (!locked) {
-    const groupedBlocks = groupConsecutiveImages(blocks);
-    return (
-      <div
-        className={`p-4 rounded-lg border space-y-4 max-h-48 overflow-hidden relative ${
-          darkMode ? "bg-gradient-to-br from-slate-800 to-white/0 border-slate-600" : "bg-gradient-to-br from-slate-50 to-white border-slate-200"
-        }`}
-      >
-        {groupedBlocks.slice(0, 5).map((block, idx) => {
-          if (block?.type === "h1") return null;
-
-          if (block?.type === "h2") {
-            const textContent = String(block.value || "").replace(/<[^>]*>/g, "").slice(0, 100);
-            return (
-              <h2
-                key={`pv-h2-${idx}`}
-                className={`text-lg font-extrabold mb-2 mt-3 pb-1 border-b border-blue-400 ${
-                  darkMode ? "text-slate-100" : "text-slate-900"
-                }`}
-              >
-                {textContent}
-              </h2>
-            );
-          }
-
-          if (block?.type === "text") {
-            const textContent = String(block.value || "").replace(/<[^>]*>/g, "").slice(0, 180);
-            return (
-              <div key={`pv-text-${idx}`} className={`leading-relaxed text-sm ${darkMode ? "text-slate-300" : "text-slate-700"}`}>
-                {textContent}
-                {textContent.length >= 180 ? "…" : ""}
-              </div>
-            );
-          }
-
-          if (block?.type === "image-group" || block?.type === "image") {
-            return (
-              <div key={`pv-img-${idx}`} className={`relative w-full h-20 rounded-lg overflow-hidden border ${darkMode ? "border-slate-600 bg-slate-700" : "border-slate-200 bg-slate-50"}`}>
-                <div className="w-full h-full flex items-center justify-center">
-                  <Eye size={32} className={`${darkMode ? "text-slate-500" : "text-slate-300"}`} />
-                  <span className={`ml-2 text-sm font-semibold ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
-                    {block?.type === "image-group" ? `${block.images.length} Images` : "Image"}
-                  </span>
-                </div>
-              </div>
-            );
-          }
-
-          return null;
-        })}
-        {groupedBlocks.length > 5 && <div className="text-xs italic text-slate-400">+ more content…</div>}
-        <div
-          className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t pointer-events-none ${darkMode ? "from-slate-700" : "from-white"}`}
-        ></div>
-      </div>
-    );
-  }
-
   return (
-    <div className={`relative rounded-lg border overflow-hidden ${darkMode ? "border-slate-600" : "border-slate-200"}`} style={{ minHeight: '12rem' }}>
-      <div className="locked-content-blur p-4">
-        <div className={`space-y-3 ${darkMode ? "text-slate-300" : "text-slate-700"}`}>
-          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-3/4"></div>
-          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-full"></div>
-          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-5/6"></div>
-          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-4/5"></div>
-          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-full"></div>
-          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-2/3"></div>
-        </div>
+    <div
+      className={`relative rounded-lg border overflow-hidden ${
+        darkMode ? "border-slate-600" : "border-slate-200"
+      }`}
+      style={{ minHeight: "12rem" }}
+    >
+      {/* Always show the real preview but blurred */}
+      <div className="locked-content-blur">
+        <PreviewContent blocks={blocks} darkMode={darkMode} />
       </div>
-      <LockedContentOverlay darkMode={darkMode} />
+
+      {/* Overlay changes depending on lock state */}
+      {locked ? (
+        <LockedContentOverlay darkMode={darkMode} />
+      ) : (
+        <UnlockedPreviewOverlay darkMode={darkMode} />
+      )}
     </div>
   );
 }
