@@ -23,11 +23,12 @@ function PasswordPromptModal({ onClose, onSubmit, darkMode, action = "perform th
     e.preventDefault();
     setError("");
     setLoading(true);
-    
+
     try {
       const result = await loginAsOwner(password, API_BASE);
-      
+
       if (result.success) {
+        try { localStorage.setItem("owner_token", result.token); } catch {}
         onSubmit(result.token);
         onClose();
       } else {
@@ -58,9 +59,7 @@ function PasswordPromptModal({ onClose, onSubmit, darkMode, action = "perform th
 
         <form onSubmit={handleSubmit} className={`p-6 space-y-4 ${darkMode ? "text-slate-200" : "text-slate-800"}`}>
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              Owner Password
-            </label>
+            <label className="block text-sm font-semibold mb-2">Owner Password</label>
             <input
               type="password"
               value={password}
@@ -688,92 +687,99 @@ function extractMainTitle(blocks = []) {
   return null;
 }
 
-/* ---------- Preview ---------- */
-function BlockPreview({ blocks = [], darkMode = false }) {
+/* ---------- Locked Content Overlay ---------- */
+function LockedContentOverlay({ darkMode = false, isLocked = true }) {
+  return (
+    <>
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        .float-animation { animation: float 3s ease-in-out infinite; }
+        .locked-content-blur {
+          filter: blur(8px);
+          opacity: 0.3;
+          user-select: none;
+          pointer-events: none;
+        }
+      `}</style>
+
+      <div className={`absolute inset-0 flex items-center justify-center z-10 backdrop-blur-sm ${
+        isLocked 
+          ? 'bg-gradient-to-br from-amber-50/95 via-orange-50/95 to-amber-100/95 dark:from-slate-800/95 dark:via-slate-700/95 dark:to-slate-800/95'
+          : 'bg-gradient-to-br from-blue-50/95 via-cyan-50/95 to-blue-100/95 dark:from-slate-800/95 dark:via-slate-700/95 dark:to-slate-800/95'
+      }`}>
+        <div className="relative text-center px-6 py-6">
+          {isLocked ? (
+            <>
+              <div className="mb-4 float-animation">
+                <div className={`p-4 rounded-full ${darkMode ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'bg-gradient-to-br from-amber-400 to-orange-500'} shadow-2xl inline-block`}>
+                  <Lock size={36} className="text-white" strokeWidth={2.5} />
+                </div>
+              </div>
+              <p className={`text-xl font-bold mb-2 ${darkMode ? 'text-amber-300' : 'text-amber-900'}`}>
+                🔒 Content Locked
+              </p>
+              <p className={`text-base font-semibold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                Unlock and click <span className={`${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>View More</span>
+              </p>
+              <p className={`text-sm mt-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                to see full content
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="mb-4 float-animation">
+                <div className={`p-4 rounded-full ${darkMode ? 'bg-gradient-to-br from-blue-500 to-cyan-600' : 'bg-gradient-to-br from-blue-400 to-cyan-500'} shadow-2xl inline-block`}>
+                  <Eye size={36} className="text-white" strokeWidth={2.5} />
+                </div>
+              </div>
+              <p className={`text-xl font-bold mb-2 ${darkMode ? 'text-blue-300' : 'text-blue-900'}`}>
+                📖 Preview Available
+              </p>
+              <p className={`text-base font-semibold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                Click <span className={`${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>View More</span>
+              </p>
+              <p className={`text-sm mt-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                to see complete details
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ---------- Preview Component ---------- */
+function BlockPreview({ blocks = [], darkMode = false, locked = false }) {
   if (!blocks.length) {
     return (
-      <div
-        className={`flex items-center justify-center h-24 rounded-lg border ${
-          darkMode ? "bg-gradient-to-br from-slate-800 to-slate-700 border-slate-600" : "bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200"
-        }`}
-      >
+      <div className={`flex items-center justify-center h-24 rounded-lg border ${darkMode ? "bg-gradient-to-br from-slate-800 to-slate-700 border-slate-600" : "bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200"}`}>
         <p className="text-sm text-slate-400">No content</p>
       </div>
     );
   }
 
-  const groupedBlocks = groupConsecutiveImages(blocks);
-
   return (
-    <div
-      className={`p-4 rounded-lg border space-y-4 max-h-48 overflow-hidden relative ${
-        darkMode ? "bg-gradient-to-br from-slate-800 to-white/0 border-slate-600" : "bg-gradient-to-br from-slate-50 to-white border-slate-200"
-      }`}
-    >
-      {groupedBlocks.slice(0, 5).map((block, idx) => {
-        if (block?.type === "h1") return null;
-
-        if (block?.type === "h2") {
-          const textContent = String(block.value || "").replace(/<[^>]*>/g, "").slice(0, 100);
-          return (
-            <h2
-              key={`pv-h2-${idx}`}
-              className={`text-lg font-extrabold mb-2 mt-3 pb-1 border-b border-blue-400 ${
-                darkMode ? "text-slate-100" : "text-slate-900"
-              }`}
-            >
-              {textContent}
-            </h2>
-          );
-        }
-
-        if (block?.type === "text") {
-          const textContent = String(block.value || "").replace(/<[^>]*>/g, "").slice(0, 180);
-          return (
-            <div key={`pv-text-${idx}`} className={`leading-relaxed text-sm ${darkMode ? "text-slate-300" : "text-slate-700"}`}>
-              {textContent}
-              {textContent.length >= 180 ? "…" : ""}
-            </div>
-          );
-        }
-
-        if (block?.type === "image-group" || block?.type === "image") {
-          return (
-            <div key={`pv-img-${idx}`} className={`relative w-full h-20 rounded-lg overflow-hidden border ${darkMode ? "border-slate-600 bg-slate-700" : "border-slate-200 bg-slate-50"}`}>
-              <div className="w-full h-full flex items-center justify-center">
-                <Eye size={32} className={`${darkMode ? "text-slate-500" : "text-slate-300"}`} />
-                <span className={`ml-2 text-sm font-semibold ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
-                  {block?.type === "image-group" ? `${block.images.length} Images` : "Image"}
-                </span>
-              </div>
-            </div>
-          );
-        }
-
-        if (block?.type === "code") {
-          const snippet = String(block.value || "");
-          return (
-            <pre key={`pv-code-${idx}`} className="bg-slate-900 text-emerald-300 text-xs rounded p-2 overflow-hidden">
-              <code>
-                {snippet.slice(0, 150)}
-                {snippet.length > 150 ? "…" : ""}
-              </code>
-            </pre>
-          );
-        }
-
-        return null;
-      })}
-
-      {groupedBlocks.length > 5 && <div className="text-xs italic text-slate-400">+ more content…</div>}
-      <div
-        className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t pointer-events-none ${darkMode ? "from-slate-700" : "from-white"}`}
-      ></div>
+    <div className={`relative rounded-lg border overflow-hidden ${darkMode ? "border-slate-600" : "border-slate-200"}`} style={{ minHeight: '12rem' }}>
+      <div className="locked-content-blur p-4">
+        <div className={`space-y-3 ${darkMode ? "text-slate-300" : "text-slate-700"}`}>
+          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-3/4"></div>
+          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-full"></div>
+          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-5/6"></div>
+          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-4/5"></div>
+          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-full"></div>
+          <div className="h-4 bg-slate-300 dark:bg-slate-600 rounded w-2/3"></div>
+        </div>
+      </div>
+      <LockedContentOverlay darkMode={darkMode} isLocked={locked} />
     </div>
   );
 }
 
-/* ---------- Full View Modal ---------- */
+/* ---------- Full View Modal with ALL FEATURES ---------- */
 function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
   const [expandedCodeBlocks, setExpandedCodeBlocks] = useState(new Set());
   const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
@@ -1343,7 +1349,7 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
   );
 }
 
-/* ---------- Main Page ---------- */
+/* ---------- Main Component ---------- */
 export default function BIMDisplay() {
   const { owner } = useOwnerMode();
   const [items, setItems] = useState([]);
@@ -1531,7 +1537,6 @@ export default function BIMDisplay() {
       alert("⚠️ Please use ?admin=1 URL to access owner features.");
       return;
     }
-    // NO AUTHENTICATION REQUIRED FOR EDITING
     nav(`/bim/edit/${encodeURIComponent(id)}`); 
   };
   
@@ -1732,7 +1737,7 @@ export default function BIMDisplay() {
             {filteredAndSortedItems.map((e) => {
               const mainTitleInfo = extractMainTitle(e.blocks || []);
               const displayTitle = mainTitleInfo ? mainTitleInfo.title : e.title;
-              const isLocked = e.locked && !owner;
+              const isLockedForNonOwner = e.locked && !owner;
 
               return (
                 <article
@@ -1740,7 +1745,7 @@ export default function BIMDisplay() {
                   className={`group relative rounded-xl border-2 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden ${
                     darkMode ? "bg-slate-800 border-slate-600 hover:border-blue-500" : "bg-white border-slate-200 hover:border-blue-300"
                   }`}
-                  onDoubleClick={() => !isLocked && goView(e.id)}
+                  onDoubleClick={() => !isLockedForNonOwner && goView(e.id)}
                 >
                   {e.locked && (
                     <div className="absolute top-3 left-3 z-10 bg-amber-500 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-lg">
@@ -1775,40 +1780,46 @@ export default function BIMDisplay() {
                           <Star size={16} fill={favorites.has(e.id) ? "currentColor" : "none"} />
                         </button>
                         
-                        <button
-                          type="button"
-                          onClick={() => handleLockUnlock(e.id, e.locked)}
-                          disabled={lockingIds.has(e.id)}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            lockingIds.has(e.id)
-                              ? "bg-slate-300 text-slate-500 cursor-wait opacity-60"
-                              : e.locked
-                              ? "bg-amber-100 text-amber-600 hover:bg-amber-200"
-                              : darkMode
-                              ? "bg-slate-700 text-slate-400 hover:text-amber-500 hover:bg-slate-600"
-                              : "bg-slate-100 text-slate-400 hover:text-amber-500 hover:bg-slate-200"
-                          }`}
-                          title={
-                            lockingIds.has(e.id) 
-                              ? "Updating..." 
-                              : e.locked 
-                              ? "🔒 Click to unlock (requires password)" 
-                              : "🔓 Click to lock (requires password)"
-                          }
-                        >
-                          {e.locked ? <Lock size={16} /> : <Unlock size={16} />}
-                        </button>
-                        
                         {owner && (
-                          <span className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-bold shadow-sm">
-                            {e.blocks?.length ?? 0} {e.blocks?.length === 1 ? "block" : "blocks"}
-                          </span>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleLockUnlock(e.id, e.locked)}
+                              disabled={lockingIds.has(e.id)}
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                lockingIds.has(e.id)
+                                  ? "bg-slate-300 text-slate-500 cursor-wait opacity-60"
+                                  : e.locked
+                                  ? "bg-amber-100 text-amber-600 hover:bg-amber-200"
+                                  : darkMode
+                                  ? "bg-slate-700 text-slate-400 hover:text-amber-500 hover:bg-slate-600"
+                                  : "bg-slate-100 text-slate-400 hover:text-amber-500 hover:bg-slate-200"
+                              }`}
+                              title={
+                                lockingIds.has(e.id) 
+                                  ? "Updating..." 
+                                  : e.locked 
+                                  ? "🔒 Click to unlock (requires password)" 
+                                  : "🔓 Click to lock (requires password)"
+                              }
+                            >
+                              {e.locked ? <Lock size={16} /> : <Unlock size={16} />}
+                            </button>
+                            
+                            <span className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-bold shadow-sm">
+                              {e.blocks?.length ?? 0} {e.blocks?.length === 1 ? "block" : "blocks"}
+                            </span>
+                          </>
                         )}
                       </div>
                     </div>
 
                     <div className="mb-4">
-                      <BlockPreview blocks={e.blocks || []} darkMode={darkMode} />
+                      <BlockPreview 
+                        blocks={e.blocks || []} 
+                        darkMode={darkMode} 
+                        locked={e.locked}
+                      />
                     </div>
 
                     <div className="flex flex-wrap gap-2 mb-4">
@@ -1818,17 +1829,12 @@ export default function BIMDisplay() {
                           evt.stopPropagation();
                           goView(e.id);
                         }}
-                        disabled={isLocked}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                          isLocked
-                            ? "bg-slate-400 text-slate-200 cursor-not-allowed opacity-50"
-                            : "bg-blue-600 text-white hover:bg-blue-700"
-                        }`}
-                        title={isLocked ? "This entry is locked" : "View full details"}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700"
+                        title="View full details"
                       >
                         <span className="inline-flex items-center gap-1.5">
-                          {isLocked ? <Lock size={16} /> : <Eye size={16} />}
-                          {isLocked ? "Locked" : "View More"}
+                          <Eye size={16} />
+                          View More
                         </span>
                       </button>
 
@@ -1838,12 +1844,19 @@ export default function BIMDisplay() {
                             type="button"
                             onClick={(evt) => {
                               evt.stopPropagation();
-                              goEdit(e.id);
+                              if (!e.locked) {
+                                goEdit(e.id);
+                              }
                             }}
+                            disabled={e.locked}
                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                              darkMode ? "bg-blue-900/50 text-blue-300 hover:bg-blue-900/70" : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                              e.locked
+                                ? "bg-slate-300 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
+                                : darkMode 
+                                ? "bg-blue-900/50 text-blue-300 hover:bg-blue-900/70" 
+                                : "bg-blue-100 text-blue-700 hover:bg-blue-200"
                             }`}
-                            title="Edit entry (No authentication required)"
+                            title={e.locked ? "Unlock entry to edit" : "Edit entry"}
                           >
                             <span className="inline-flex items-center gap-1.5">
                               <Edit3 size={16} /> Edit
