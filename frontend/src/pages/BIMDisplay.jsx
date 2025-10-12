@@ -3,23 +3,19 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   BookOpen, Trash2, Edit3, Plus, Eye, Star,
   ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw,
-  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock
+  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, FileText, FileDown
 } from "lucide-react";
 import { useOwnerMode } from "../lib/owner.js";
-// REMOVED: import { loginAsOwner } from "../lib/owner.js";
 
 /* ---------- API base ---------- */
 const RAW_API = (import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || "").trim();
 const API_BASE = RAW_API.replace(/\/+$/, "");
 const api = (path) => (API_BASE ? `${API_BASE}${path}` : path);
 
-/* ---------- Lock-only token helper (does NOT toggle owner mode) ---------- */
-/* ---------- Lock-only token helper (does NOT toggle owner mode) ---------- */
-/* ---------- Lock-only token helper (does NOT toggle owner mode) ---------- */
+/* ---------- Lock-only token helper ---------- */
 async function getLockToken(password) {
-  // Try form-encoded first (FastAPI Form(...) expects this)
   const url1 = api("/api/auth/owner");
-  const url2 = api("/api/auth/owner/"); // fallback with trailing slash
+  const url2 = api("/api/auth/owner/");
 
   const tryFetch = async (url, init) => {
     const res = await fetch(url, init);
@@ -35,7 +31,6 @@ async function getLockToken(password) {
     return text ? JSON.parse(text) : {};
   };
 
-  // 1) Primary: form-encoded with pass_
   const formBody = new URLSearchParams({ pass_: password });
   try {
     const data = await tryFetch(url1, {
@@ -45,7 +40,6 @@ async function getLockToken(password) {
     });
     return { success: true, token: data?.token };
   } catch (e1) {
-    // Try same as above but with trailing slash (some routers require it)
     try {
       const data = await tryFetch(url2, {
         method: "POST",
@@ -54,7 +48,6 @@ async function getLockToken(password) {
       });
       return { success: true, token: data?.token };
     } catch (e2) {
-      // 2) Fallbacks: JSON payloads (in case server also supports them)
       try {
         const data = await tryFetch(url1, {
           method: "POST",
@@ -90,7 +83,6 @@ function PasswordPromptModal({ onClose, onSubmit, darkMode, action = "perform th
     setLoading(true);
 
     try {
-      // CHANGED: use local lock-only helper; do NOT save owner_token
       const result = await getLockToken(password);
 
       if (result.success) {
@@ -364,15 +356,15 @@ function DeleteConfirmationModal({ item, onConfirm, onCancel, darkMode }) {
   );
 }
 
-/* ---------- Render HTML Content ---------- */
-function renderHTMLContent(htmlContent, className = "") {
+/* ---------- Render HTML Content with Full Style Preservation ---------- */
+function renderHTMLContent(htmlContent, className = "", darkMode = false) {
   if (!htmlContent) return null;
   if (!htmlContent.includes("<")) {
     return <div className={className}>{htmlContent}</div>;
   }
   return (
     <div
-      className={`rich-text-content ${className}`}
+      className={`rich-text-content ${className} ${darkMode ? 'dark-mode-text' : 'light-mode-text'}`}
       dangerouslySetInnerHTML={{ __html: htmlContent }}
     />
   );
@@ -789,7 +781,7 @@ function LockedContentOverlay({ darkMode = false }) {
   );
 }
 
-/* ---------- Shared preview body (same as your normal preview) ---------- */
+/* ---------- Shared preview body ---------- */
 function PreviewContent({ blocks = [], darkMode = false }) {
   const groupedBlocks = groupConsecutiveImages(blocks);
   return (
@@ -872,7 +864,7 @@ function PreviewContent({ blocks = [], darkMode = false }) {
   );
 }
 
-/* ---------- Unlocked overlay (blurred preview available) ---------- */
+/* ---------- Unlocked overlay ---------- */
 function UnlockedPreviewOverlay({ darkMode = false }) {
   return (
     <>
@@ -908,7 +900,7 @@ function UnlockedPreviewOverlay({ darkMode = false }) {
   );
 }
 
-/* ---------- Preview wrapper: always blur; choose overlay by state ---------- */
+/* ---------- Preview wrapper ---------- */
 function BlockPreview({ blocks = [], darkMode = false, locked = false }) {
   if (!blocks.length) {
     return (
@@ -931,12 +923,10 @@ function BlockPreview({ blocks = [], darkMode = false, locked = false }) {
       }`}
       style={{ minHeight: "12rem" }}
     >
-      {/* Always show the real preview but blurred */}
       <div className="locked-content-blur">
         <PreviewContent blocks={blocks} darkMode={darkMode} />
       </div>
 
-      {/* Overlay changes depending on lock state */}
       {locked ? (
         <LockedContentOverlay darkMode={darkMode} />
       ) : (
@@ -946,13 +936,93 @@ function BlockPreview({ blocks = [], darkMode = false, locked = false }) {
   );
 }
 
-/* ---------- Full View Modal with ALL FEATURES ---------- */
+/* ---------- Download Format Dropdown ---------- */
+function DownloadDropdown({ onDownload, darkMode, sepiaMode }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const formats = [
+    { value: 'pdf', label: 'PDF Document', icon: FileText },
+    { value: 'txt', label: 'Plain Text', icon: FileText },
+    { value: 'html', label: 'HTML File', icon: FileDown },
+    { value: 'md', label: 'Markdown', icon: FileText },
+  ];
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1"
+        title="Download"
+      >
+        <Download size={20} />
+      </button>
+
+      {isOpen && (
+        <div className={`absolute top-full right-0 mt-2 w-56 rounded-xl shadow-2xl border overflow-hidden z-[110] ${
+          sepiaMode
+            ? "bg-[#f4e8d4] border-amber-700"
+            : darkMode 
+            ? "bg-slate-800 border-slate-700" 
+            : "bg-white border-slate-200"
+        }`}>
+          <div className={`px-3 py-2 text-xs font-semibold uppercase tracking-wide ${
+            sepiaMode
+              ? "bg-[#e8dcc8] text-[#5c4033]"
+              : darkMode 
+              ? "bg-slate-900 text-slate-400" 
+              : "bg-slate-50 text-slate-600"
+          }`}>
+            Download As
+          </div>
+          {formats.map((format) => (
+            <button
+              key={format.value}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDownload(format.value);
+                setIsOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 transition text-left ${
+                sepiaMode
+                  ? "hover:bg-amber-100 text-[#3d2817]"
+                  : darkMode 
+                  ? "hover:bg-slate-700 text-slate-200" 
+                  : "hover:bg-slate-50 text-slate-700"
+              }`}
+            >
+              <format.icon size={18} />
+              <span className="text-sm font-medium">{format.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Full View Modal with Download Feature ---------- */
 function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
   const [expandedCodeBlocks, setExpandedCodeBlocks] = useState(new Set());
   const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
   const [darkMode, setDarkMode] = useState(initialDarkMode);
   const [fullScreenImages, setFullScreenImages] = useState(null);
   const [fullScreenIndex, setFullScreenIndex] = useState(0);
+  const [downloading, setDownloading] = useState(false);
   
   // Reading Features
   const [fontSize, setFontSize] = useState(18);
@@ -1016,6 +1086,422 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
     }
   };
 
+  // Extract text content from HTML
+  const extractTextContent = (html) => {
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    return temp.textContent || temp.innerText || '';
+  };
+
+  // Download handlers
+  const handleDownload = async (format) => {
+    setDownloading(true);
+    try {
+      const filename = `${displayTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`;
+      
+      if (format === 'txt') {
+        downloadAsText(filename);
+      } else if (format === 'html') {
+        downloadAsHTML(filename);
+      } else if (format === 'md') {
+        downloadAsMarkdown(filename);
+      } else if (format === 'pdf') {
+        await downloadAsPDF(filename);
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Download failed: ' + error.message);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const downloadAsText = (filename) => {
+    let content = `${displayTitle}\n${'='.repeat(displayTitle.length)}\n\n`;
+    
+    groupedBlocks.forEach((block) => {
+      if (block?.type === "h1" || block?.type === "h2") {
+        const text = extractTextContent(block.value);
+        content += `\n${text}\n${'-'.repeat(text.length)}\n\n`;
+      } else if (block?.type === "text") {
+        content += extractTextContent(block.value) + '\n\n';
+      } else if (block?.type === "code") {
+        content += '```\n' + block.value + '\n```\n\n';
+      } else if (block?.type === "image") {
+        content += `[Image: ${block.value}]\n\n`;
+      } else if (block?.type === "image-group") {
+        content += `[Image Gallery: ${block.images.length} images]\n\n`;
+      }
+    });
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAsHTML = (filename) => {
+    let htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${displayTitle}</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      color: #1e293b;
+    }
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 1.5rem;
+      color: #0f172a;
+    }
+    h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #3b82f6;
+      color: #1e293b;
+    }
+    p {
+      margin: 0.75rem 0;
+    }
+    ul, ol {
+      margin: 1rem 0;
+      padding-left: 2.5rem;
+    }
+    ul { list-style-type: disc; }
+    ol { list-style-type: decimal; }
+    li { margin: 0.5rem 0; padding-left: 0.5rem; }
+    code {
+      background-color: rgba(135,131,120,.15);
+      color: #eb5757;
+      border-radius: 4px;
+      font-size: 90%;
+      padding: 0.2em 0.4em;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    }
+    pre {
+      background-color: #1e293b;
+      color: #10b981;
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+    pre code {
+      background: none;
+      color: inherit;
+      padding: 0;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 0.5rem;
+      margin: 1.5rem 0;
+    }
+    strong { font-weight: 700; }
+    em { font-style: italic; }
+    u { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>${displayTitle}</h1>
+`;
+
+    groupedBlocks.forEach((block) => {
+      if (block?.type === "h1") {
+        // Skip main title as it's already added
+      } else if (block?.type === "h2") {
+        htmlContent += `  <h2>${block.value}</h2>\n`;
+      } else if (block?.type === "text") {
+        htmlContent += `  <div>${block.value}</div>\n`;
+      } else if (block?.type === "code") {
+        htmlContent += `  <pre><code>${block.value.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>\n`;
+      } else if (block?.type === "image") {
+        htmlContent += `  <img src="${block.value}" alt="Image" />\n`;
+      } else if (block?.type === "image-group") {
+        block.images.forEach(img => {
+          htmlContent += `  <img src="${img.value}" alt="Image" />\n`;
+        });
+      }
+    });
+
+    htmlContent += `</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAsMarkdown = (filename) => {
+    let content = `# ${displayTitle}\n\n`;
+    
+    groupedBlocks.forEach((block) => {
+      if (block?.type === "h1") {
+        // Skip as main title
+      } else if (block?.type === "h2") {
+        const text = extractTextContent(block.value);
+        content += `## ${text}\n\n`;
+      } else if (block?.type === "text") {
+        content += extractTextContent(block.value) + '\n\n';
+      } else if (block?.type === "code") {
+        const lang = block.language || 'javascript';
+        content += `\`\`\`${lang}\n${block.value}\n\`\`\`\n\n`;
+      } else if (block?.type === "image") {
+        content += `![Image](${block.value})\n\n`;
+      } else if (block?.type === "image-group") {
+        block.images.forEach(img => {
+          content += `![Image](${img.value})\n`;
+        });
+        content += '\n';
+      }
+    });
+
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAsPDF = async (filename) => {
+  // Load required libraries
+  if (!window.html2canvas) {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    document.head.appendChild(script);
+    await new Promise((resolve) => { script.onload = resolve; });
+  }
+
+  if (!window.jspdf) {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    document.head.appendChild(script);
+    await new Promise((resolve) => { script.onload = resolve; });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const contentElement = contentRef.current;
+  if (!contentElement) throw new Error('Content not found');
+
+  // Show loading indicator
+  const loadingDiv = document.createElement('div');
+  loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px 40px; border-radius: 10px; z-index: 10000; font-size: 16px;';
+  loadingDiv.textContent = 'Generating PDF... Please wait';
+  document.body.appendChild(loadingDiv);
+
+  try {
+    // Clone the content
+    const clonedElement = contentElement.cloneNode(true);
+    
+    // Create temporary container with PDF-safe styles
+    const tempContainer = document.createElement('div');
+    tempContainer.style.cssText = `
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      width: 800px;
+      background: white;
+      padding: 40px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+    
+    // Add title
+    const titleElement = document.createElement('h1');
+    titleElement.textContent = displayTitle;
+    titleElement.style.cssText = `
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 30px;
+      color: #0f172a;
+      border-bottom: 3px solid #3b82f6;
+      padding-bottom: 15px;
+    `;
+    tempContainer.appendChild(titleElement);
+    
+    // Style the cloned content
+    clonedElement.style.cssText = `
+      width: 100%;
+      font-size: ${fontSize}px;
+      line-height: ${lineHeight};
+      color: #1e293b;
+    `;
+    
+    // ✅ CRITICAL: Remove all problematic classes and inline styles
+    const sanitizeElement = (element) => {
+      if (!element || element.nodeType !== 1) return;
+      
+      // Remove gradient classes that cause oklch issues
+      const classList = element.classList;
+      const problematicClasses = [
+        'bg-gradient-to-r',
+        'bg-gradient-to-br',
+        'bg-gradient-to-l',
+        'bg-gradient-to-tr',
+        'bg-gradient-to-tl',
+        'bg-gradient-to-b',
+        'bg-gradient-to-t'
+      ];
+      
+      problematicClasses.forEach(cls => {
+        if (classList.contains(cls)) {
+          classList.remove(cls);
+          // Replace with solid safe color
+          element.style.background = '#ffffff';
+        }
+      });
+      
+      // Force safe colors on all elements
+      const computedStyle = window.getComputedStyle(element);
+      
+      // Fix background colors
+      if (computedStyle.backgroundColor && computedStyle.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+        const bgColor = computedStyle.backgroundColor;
+        if (bgColor.includes('oklch') || bgColor.includes('gradient')) {
+          element.style.backgroundColor = '#ffffff';
+          element.style.backgroundImage = 'none';
+        }
+      }
+      
+      // Fix text colors
+      if (computedStyle.color) {
+        const color = computedStyle.color;
+        if (color.includes('oklch')) {
+          element.style.color = '#1e293b';
+        }
+      }
+      
+      // Fix border colors
+      if (computedStyle.borderColor && computedStyle.borderColor.includes('oklch')) {
+        element.style.borderColor = '#e2e8f0';
+      }
+      
+      // Remove any background-image with gradients
+      if (element.style.backgroundImage && element.style.backgroundImage.includes('gradient')) {
+        element.style.backgroundImage = 'none';
+        element.style.backgroundColor = '#ffffff';
+      }
+      
+      // Recursively sanitize children
+      Array.from(element.children).forEach(sanitizeElement);
+    };
+    
+    // Sanitize the entire cloned tree
+    sanitizeElement(clonedElement);
+    
+    tempContainer.appendChild(clonedElement);
+    document.body.appendChild(tempContainer);
+
+    // Wait for any async operations
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Generate canvas with maximum compatibility settings
+    const canvas = await window.html2canvas(tempContainer, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      imageTimeout: 0,
+      removeContainer: true,
+      foreignObjectRendering: false, // Disable foreign object rendering
+      onclone: (clonedDoc) => {
+        // Extra sanitization pass in the cloned document
+        const allElements = clonedDoc.querySelectorAll('*');
+        allElements.forEach(el => {
+          // Remove all class attributes to prevent Tailwind from applying styles
+          const problematicPrefixes = ['bg-', 'text-', 'border-', 'from-', 'to-', 'via-'];
+          const classes = Array.from(el.classList || []);
+          
+          classes.forEach(className => {
+            if (problematicPrefixes.some(prefix => className.startsWith(prefix))) {
+              el.classList.remove(className);
+            }
+          });
+          
+          // Force inline safe styles
+          if (el.style) {
+            // Clear any gradient backgrounds
+            if (el.style.backgroundImage) {
+              el.style.backgroundImage = 'none';
+            }
+            
+            // Ensure safe colors
+            if (!el.style.color || el.style.color === '') {
+              el.style.color = '#1e293b';
+            }
+            
+            if (!el.style.backgroundColor || el.style.backgroundColor === 'transparent') {
+              el.style.backgroundColor = '#ffffff';
+            }
+          }
+        });
+      }
+    });
+
+    // Remove temporary container
+    document.body.removeChild(tempContainer);
+
+    // Create PDF
+    const imgWidth = 210; // A4 width in mm
+    const pageHeight = 297; // A4 height in mm
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    // Add first page
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    // Add additional pages if content is longer
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    // Save the PDF
+    pdf.save(`${filename}.pdf`);
+    
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    alert('Failed to generate PDF: ' + error.message + '\n\nTry using the HTML or Markdown download options instead.');
+    throw error;
+  } finally {
+    // Always remove loading indicator
+    if (document.body.contains(loadingDiv)) {
+      document.body.removeChild(loadingDiv);
+    }
+  }
+};
   return (
     <>
       {fullScreenImages && (
@@ -1053,6 +1539,11 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
               <h1 className="text-3xl font-bold truncate">{displayTitle}</h1>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              <DownloadDropdown 
+                onDownload={handleDownload} 
+                darkMode={darkMode}
+                sepiaMode={sepiaMode}
+              />
               <button
                 type="button"
                 onClick={(e) => {
@@ -1203,7 +1694,9 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
             </div>
           )}
 
+          {/* Enhanced CSS for Complete Style Preservation - INCLUDING NESTED LISTS */}
           <style>{`
+            /* Base text colors for modes */
             .sepia-mode-content {
               color: #5c4033 !important;
             }
@@ -1219,12 +1712,6 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
             .dark-mode-content h2 {
               color: #f1f5f9 !important;
             }
-            .dark-mode-content .rich-text-content {
-              color: #f1f5f9 !important;
-            }
-            .dark-mode-content .rich-text-content * {
-              color: inherit !important;
-            }
             
             .light-mode-content {
               color: #1e293b !important;
@@ -1233,27 +1720,193 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
             .light-mode-content h2 {
               color: #0f172a !important;
             }
-            .light-mode-content .rich-text-content {
-              color: #1e293b !important;
+
+            /* Rich text content - preserve ALL inline styles */
+            .rich-text-content {
+              word-wrap: break-word;
+              overflow-wrap: break-word;
             }
-            
+
+            /* Text formatting */
+            .rich-text-content strong,
+            .rich-text-content b {
+              font-weight: 700;
+            }
+
+            .rich-text-content em,
+            .rich-text-content i {
+              font-style: italic;
+            }
+
+            .rich-text-content u {
+              text-decoration: underline;
+            }
+
+            .rich-text-content s,
+            .rich-text-content strike {
+              text-decoration: line-through;
+            }
+
+            /* Lists - CRITICAL: Preserve nested list styles */
             .rich-text-content ul,
             .rich-text-content ol {
-              margin-left: 1.5rem;
-              margin-top: 0.5rem;
-              margin-bottom: 0.5rem;
+              margin: 1rem 0;
+              padding-left: 2.5rem;
+              list-style-position: outside;
             }
-            .rich-text-content ul { list-style-type: disc; }
-            .rich-text-content ol { list-style-type: decimal; }
-            .rich-text-content li { margin-bottom: 0.25rem; }
-            .rich-text-content p { margin-bottom: 0.5rem; }
-            .rich-text-content strong { font-weight: 600; }
-            .rich-text-content em { font-style: italic; }
-            .rich-text-content u { text-decoration: underline; }
-            
+
+            /* First level bullet lists */
+            .rich-text-content ul {
+              list-style-type: disc;
+            }
+
+            /* Preserve inline list-style-type for bullets */
+            .rich-text-content ul[style*="list-style-type: disc"],
+            .rich-text-content ul[style*="list-style-type:disc"] {
+              list-style-type: disc !important;
+            }
+
+            .rich-text-content ul[style*="list-style-type: circle"],
+            .rich-text-content ul[style*="list-style-type:circle"] {
+              list-style-type: circle !important;
+            }
+
+            .rich-text-content ul[style*="list-style-type: square"],
+            .rich-text-content ul[style*="list-style-type:square"] {
+              list-style-type: square !important;
+            }
+
+            .rich-text-content ul[style*="list-style-type: none"],
+            .rich-text-content ul[style*="list-style-type:none"] {
+              list-style-type: none !important;
+            }
+
+            /* Second level nested bullets - DIFFERENT STYLE */
+            .rich-text-content ul ul {
+              margin: 0.5rem 0;
+              list-style-type: circle;
+            }
+
+            /* Third level nested bullets - DIFFERENT STYLE */
+            .rich-text-content ul ul ul {
+              list-style-type: square;
+            }
+
+            /* BUT: If nested list has explicit style attribute, respect it */
+            .rich-text-content ul ul[style*="list-style-type"],
+            .rich-text-content ul ul ul[style*="list-style-type"] {
+              /* Inline styles will override */
+            }
+
+            /* Numbered lists */
+            .rich-text-content ol {
+              list-style-type: decimal;
+            }
+
+            .rich-text-content ol[style*="list-style-type: decimal"],
+            .rich-text-content ol[style*="list-style-type:decimal"] {
+              list-style-type: decimal !important;
+            }
+
+            .rich-text-content ol[style*="list-style-type: lower-alpha"],
+            .rich-text-content ol[style*="list-style-type:lower-alpha"] {
+              list-style-type: lower-alpha !important;
+            }
+
+            .rich-text-content ol[style*="list-style-type: upper-alpha"],
+            .rich-text-content ol[style*="list-style-type:upper-alpha"] {
+              list-style-type: upper-alpha !important;
+            }
+
+            .rich-text-content ol[style*="list-style-type: lower-roman"],
+            .rich-text-content ol[style*="list-style-type:lower-roman"] {
+              list-style-type: lower-roman !important;
+            }
+
+            .rich-text-content ol[style*="list-style-type: upper-roman"],
+            .rich-text-content ol[style*="list-style-type:upper-roman"] {
+              list-style-type: upper-roman !important;
+            }
+
+            /* Nested numbered lists */
+            .rich-text-content ol ol {
+              margin: 0.5rem 0;
+              list-style-type: lower-alpha;
+            }
+
+            .rich-text-content ol ol ol {
+              list-style-type: lower-roman;
+            }
+
+            /* List items */
+            .rich-text-content li {
+              margin: 0.5rem 0;
+              padding-left: 0.5rem;
+              line-height: 1.6;
+            }
+
+            .rich-text-content li::marker {
+              font-weight: 600;
+            }
+
+            /* Paragraphs */
+            .rich-text-content p {
+              margin: 0.75rem 0;
+              line-height: inherit;
+            }
+
+            .rich-text-content p:first-child {
+              margin-top: 0;
+            }
+
+            .rich-text-content p:last-child {
+              margin-bottom: 0;
+            }
+
+            /* Code inline */
+            .rich-text-content code {
+              background-color: rgba(135,131,120,.15);
+              color: #eb5757;
+              border-radius: 4px;
+              font-size: 90%;
+              padding: 0.2em 0.4em;
+              font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+            }
+
+            /* Links */
+            .rich-text-content a {
+              color: #2563eb;
+              text-decoration: underline;
+              text-underline-offset: 2px;
+              transition: color 0.2s;
+            }
+
+            .rich-text-content a:hover {
+              color: #1d4ed8;
+            }
+
+            /* Dark mode link adjustments */
+            .dark-mode-text .rich-text-content a {
+              color: #60a5fa;
+            }
+
+            .dark-mode-text .rich-text-content a:hover {
+              color: #93c5fd;
+            }
+
+            /* Preserve blockquotes */
+            .rich-text-content blockquote {
+              border-left: 4px solid #e2e8f0;
+              padding-left: 1rem;
+              margin: 1rem 0;
+              font-style: italic;
+            }
+
+            /* Reading content container */
             .reading-content-container * {
               line-height: inherit !important;
             }
+
             .reading-content-container p,
             .reading-content-container div,
             .reading-content-container span,
@@ -1317,7 +1970,7 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
                               : "border-blue-400"
                           }`}
                         >
-                          {renderHTMLContent(block.value)}
+                          {renderHTMLContent(block.value, "", darkMode)}
                         </h2>
                         <button
                           type="button"
@@ -1337,7 +1990,7 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
                         key={`p-${idx}`}
                         className="leading-relaxed"
                       >
-                        {renderHTMLContent(block.value)}
+                        {renderHTMLContent(block.value, "", darkMode)}
                       </div>
                     );
                   }
@@ -1474,7 +2127,14 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
             }`}
           >
             <span className="text-sm">
-              {/* Empty span for layout */}
+              {downloading && (
+                <span className={`flex items-center gap-2 ${
+                  sepiaMode ? "text-[#5c4033]" : darkMode ? "text-slate-300" : "text-slate-600"
+                }`}>
+                  <RefreshCcw size={16} className="animate-spin" />
+                  Downloading...
+                </span>
+              )}
             </span>
 
             <div className="flex items-center gap-3">
@@ -1637,7 +2297,6 @@ export default function BIMDisplay() {
     });
   };
 
-  // Lock/Unlock handler for ALL users (decoupled from owner mode)
   const handleLockUnlock = (entryId, currentLockState) => {
     const action = currentLockState ? 'unlock this entry' : 'lock this entry';
     setPasswordPrompt({ 
@@ -1946,7 +2605,6 @@ export default function BIMDisplay() {
                           <Star size={16} fill={favorites.has(e.id) ? "currentColor" : "none"} />
                         </button>
                         
-                        {/* Lock icon visible to ALL users; prompts for password and does NOT toggle owner mode */}
                         <button
                           type="button"
                           onClick={() => handleLockUnlock(e.id, e.locked)}
@@ -2033,12 +2691,19 @@ export default function BIMDisplay() {
                             type="button"
                             onClick={(evt) => {
                               evt.stopPropagation();
-                              handleDuplicate(e.id);
+                              if (!e.locked) {
+                                handleDuplicate(e.id);
+                              }
                             }}
+                            disabled={e.locked}
                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                              darkMode ? "bg-purple-900/50 text-purple-300 hover:bg-purple-900/70" : "bg-purple-100 text-purple-700 hover:bg-purple-200"
+                              e.locked
+                                ? "bg-slate-300 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
+                                : darkMode 
+                                ? "bg-purple-900/50 text-purple-300 hover:bg-purple-900/70" 
+                                : "bg-purple-100 text-purple-700 hover:bg-purple-200"
                             }`}
-                            title="Duplicate entry"
+                            title={e.locked ? "Unlock entry to duplicate" : "Duplicate entry"}
                           >
                             <span className="inline-flex items-center gap-1.5">
                               <Plus size={16} /> Duplicate
@@ -2049,13 +2714,19 @@ export default function BIMDisplay() {
                             type="button"
                             onClick={(evt) => {
                               evt.stopPropagation();
-                              onDelete(e.id);
+                              if (!e.locked) {
+                                onDelete(e.id);
+                              }
                             }}
-                            disabled={busyId === String(e.id)}
-                            className={`px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
-                              darkMode ? "bg-red-900/50 text-red-300 hover:bg-red-900/70" : "bg-red-100 text-red-600 hover:bg-red-200"
+                            disabled={busyId === String(e.id) || e.locked}
+                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                              e.locked || busyId === String(e.id)
+                                ? "bg-slate-300 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
+                                : darkMode 
+                                ? "bg-red-900/50 text-red-300 hover:bg-red-900/70" 
+                                : "bg-red-100 text-red-600 hover:bg-red-200"
                             }`}
-                            title="Delete entry"
+                            title={e.locked ? "Unlock entry to delete" : "Delete entry"}
                           >
                             <span className="inline-flex items-center gap-1.5">
                               <Trash2 size={16} />

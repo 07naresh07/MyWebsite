@@ -4,7 +4,11 @@ import {
   Save, Plus, ArrowLeft, Trash2, 
   Type, Image, Code, Heading,
   Upload, Check, Copy, ChevronUp, ChevronDown,
-  ChevronsUp, ChevronsDown, GripVertical
+  ChevronsUp, ChevronsDown, GripVertical,
+  RotateCcw, RotateCw, AlignLeft, AlignCenter, 
+  AlignRight, AlignJustify, List, ListOrdered,
+  ChevronRight, Minus, Circle, Square, CheckSquare,
+  Disc, ArrowRight, ChevronDown as ChevronDownIcon
 } from "lucide-react";
 
 /* ---------- AUTH: reuse the same login helper your display page uses ---------- */
@@ -237,24 +241,33 @@ function HeadingBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, 
   );
 }
 
-/* ---------- Text Block with Rich Formatting (FULL TOOLBAR RESTORED) ---------- */
+/* ---------- Enhanced Text Block with Advanced Features ---------- */
 function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onMoveToTop, onMoveToBottom, canMoveUp, canMoveDown, isDragging }) {
   const [showFormatBar, setShowFormatBar] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+  const [showListStyleMenu, setShowListStyleMenu] = useState(false);
+  const [showNumberStyleMenu, setShowNumberStyleMenu] = useState(false);
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+  const [wordCount, setWordCount] = useState(0);
   const editorRef = useRef(null);
   const colorPickerRef = useRef(null);
   const highlightPickerRef = useRef(null);
+  const listStyleMenuRef = useRef(null);
+  const numberStyleMenuRef = useRef(null);
 
   useEffect(() => {
     if (editorRef.current && block.value && editorRef.current.innerHTML !== block.value) {
       editorRef.current.innerHTML = block.value;
+      updateWordCount();
     }
   }, []);
 
   useEffect(() => {
     if (editorRef.current && block.value != null && editorRef.current.innerHTML !== block.value) {
       editorRef.current.innerHTML = block.value;
+      updateWordCount();
     }
   }, [block.value]);
 
@@ -266,21 +279,130 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
       if (highlightPickerRef.current && !highlightPickerRef.current.contains(e.target)) {
         setShowHighlightPicker(false);
       }
+      if (listStyleMenuRef.current && !listStyleMenuRef.current.contains(e.target)) {
+        setShowListStyleMenu(false);
+      }
+      if (numberStyleMenuRef.current && !numberStyleMenuRef.current.contains(e.target)) {
+        setShowNumberStyleMenu(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const updateWordCount = () => {
+    if (editorRef.current) {
+      const text = editorRef.current.innerText || "";
+      const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+      setWordCount(words.length);
+    }
+  };
+
+  const saveToUndo = () => {
+    if (editorRef.current) {
+      setUndoStack(prev => [...prev.slice(-19), editorRef.current.innerHTML]);
+      setRedoStack([]);
+    }
+  };
+
   const handleInput = () => {
     if (editorRef.current) {
       const newValue = editorRef.current.innerHTML;
       onUpdate(index, { ...block, value: newValue });
+      updateWordCount();
     }
   };
 
   const execCommand = (command, value = null) => {
+    saveToUndo();
     document.execCommand(command, false, value);
     handleInput();
+  };
+
+  const handleUndo = () => {
+    if (undoStack.length > 0 && editorRef.current) {
+      const previous = undoStack[undoStack.length - 1];
+      setRedoStack(prev => [...prev, editorRef.current.innerHTML]);
+      setUndoStack(prev => prev.slice(0, -1));
+      editorRef.current.innerHTML = previous;
+      onUpdate(index, { ...block, value: previous });
+      updateWordCount();
+    }
+  };
+
+  const handleRedo = () => {
+    if (redoStack.length > 0 && editorRef.current) {
+      const next = redoStack[redoStack.length - 1];
+      setUndoStack(prev => [...prev, editorRef.current.innerHTML]);
+      setRedoStack(prev => prev.slice(0, -1));
+      editorRef.current.innerHTML = next;
+      onUpdate(index, { ...block, value: next });
+      updateWordCount();
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    // Tab for indent, Shift+Tab for outdent
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        execCommand('outdent');
+      } else {
+        execCommand('indent');
+      }
+    }
+    
+    // Ctrl/Cmd + Z for undo
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      handleUndo();
+    }
+    
+    // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y for redo
+    if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') || 
+        ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
+      e.preventDefault();
+      handleRedo();
+    }
+  };
+
+  const applyListStyle = (styleType) => {
+    saveToUndo();
+    
+    // First ensure we have a list
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    document.execCommand('insertUnorderedList', false, null);
+    
+    // Get all list items in the selection
+    if (editorRef.current) {
+      const lists = editorRef.current.querySelectorAll('ul');
+      lists.forEach(list => {
+        list.style.listStyleType = styleType;
+        list.classList.add('custom-list');
+      });
+    }
+    
+    handleInput();
+    setShowListStyleMenu(false);
+  };
+
+  const applyNumberStyle = (styleType) => {
+    saveToUndo();
+    
+    document.execCommand('insertOrderedList', false, null);
+    
+    if (editorRef.current) {
+      const lists = editorRef.current.querySelectorAll('ol');
+      lists.forEach(list => {
+        list.style.listStyleType = styleType;
+        list.classList.add('custom-list');
+      });
+    }
+    
+    handleInput();
+    setShowNumberStyleMenu(false);
   };
 
   const colors = [
@@ -299,6 +421,7 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
   ];
 
   const highlightColors = [
+    { hex: 'transparent', name: 'None' },
     { hex: '#FEF3C7', name: 'Yellow' }, { hex: '#FDE68A', name: 'Yellow 300' }, { hex: '#FCD34D', name: 'Yellow 400' },
     { hex: '#FED7AA', name: 'Orange' }, { hex: '#FDBA74', name: 'Orange 300' }, { hex: '#FB923C', name: 'Orange 400' },
     { hex: '#FECACA', name: 'Red' }, { hex: '#FCA5A5', name: 'Red 300' }, { hex: '#F87171', name: 'Red 400' },
@@ -328,6 +451,21 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
     { value: 'Impact, sans-serif', name: 'Impact' }
   ];
 
+  const bulletStyles = [
+    { type: 'disc', icon: Circle, label: 'Disc', preview: '●' },
+    { type: 'circle', icon: Circle, label: 'Circle', preview: '○' },
+    { type: 'square', icon: Square, label: 'Square', preview: '■' },
+    { type: 'none', icon: Minus, label: 'None', preview: '−' },
+  ];
+
+  const numberStyles = [
+    { type: 'decimal', icon: ListOrdered, label: '1, 2, 3', preview: '1.' },
+    { type: 'lower-alpha', icon: ListOrdered, label: 'a, b, c', preview: 'a.' },
+    { type: 'upper-alpha', icon: ListOrdered, label: 'A, B, C', preview: 'A.' },
+    { type: 'lower-roman', icon: ListOrdered, label: 'i, ii, iii', preview: 'i.' },
+    { type: 'upper-roman', icon: ListOrdered, label: 'I, II, III', preview: 'I.' },
+  ];
+
   return (
     <div 
       className={`group/block relative py-4 transition-all duration-200 ${isDragging ? 'opacity-50' : 'opacity-100'}`}
@@ -346,59 +484,138 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
       </div>
 
       {showFormatBar && (
-        <div className="mb-2 flex flex-wrap items-center gap-1 p-2 bg-white rounded-lg shadow-lg border border-slate-200 z-[90]">
+        <div className="mb-3 flex flex-wrap items-center gap-1.5 p-2.5 bg-white rounded-xl shadow-2xl border border-slate-200 z-[90]">
+          {/* Undo/Redo */}
+          <div className="flex gap-1 pr-2 border-r border-slate-200">
+            <button 
+              onMouseDown={(e)=>{e.preventDefault();handleUndo();}} 
+              disabled={undoStack.length === 0}
+              className="p-2 rounded-lg hover:bg-slate-100 transition disabled:opacity-30 disabled:cursor-not-allowed group" 
+              title="Undo (Ctrl+Z)" 
+              type="button"
+            >
+              <RotateCcw size={16} className="text-slate-600 group-hover:text-slate-900" />
+            </button>
+            <button 
+              onMouseDown={(e)=>{e.preventDefault();handleRedo();}} 
+              disabled={redoStack.length === 0}
+              className="p-2 rounded-lg hover:bg-slate-100 transition disabled:opacity-30 disabled:cursor-not-allowed group" 
+              title="Redo (Ctrl+Y)" 
+              type="button"
+            >
+              <RotateCw size={16} className="text-slate-600 group-hover:text-slate-900" />
+            </button>
+          </div>
+
           {/* Bold / Italic / Underline / Strike */}
           <div className="flex gap-1 pr-2 border-r border-slate-200">
-            <button onMouseDown={(e)=>{e.preventDefault();execCommand('bold');}} className="p-2 rounded hover:bg-slate-100 transition" title="Bold" type="button">
-              <span className="font-bold text-slate-700">B</span>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('bold');}} className="p-2 rounded-lg hover:bg-slate-100 transition group" title="Bold (Ctrl+B)" type="button">
+              <span className="font-bold text-slate-600 group-hover:text-slate-900">B</span>
             </button>
-            <button onMouseDown={(e)=>{e.preventDefault();execCommand('italic');}} className="p-2 rounded hover:bg-slate-100 transition" title="Italic" type="button">
-              <span className="italic text-slate-700">I</span>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('italic');}} className="p-2 rounded-lg hover:bg-slate-100 transition group" title="Italic (Ctrl+I)" type="button">
+              <span className="italic text-slate-600 group-hover:text-slate-900">I</span>
             </button>
-            <button onMouseDown={(e)=>{e.preventDefault();execCommand('underline');}} className="p-2 rounded hover:bg-slate-100 transition" title="Underline" type="button">
-              <span className="underline text-slate-700">U</span>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('underline');}} className="p-2 rounded-lg hover:bg-slate-100 transition group" title="Underline (Ctrl+U)" type="button">
+              <span className="underline text-slate-600 group-hover:text-slate-900">U</span>
             </button>
-            <button onMouseDown={(e)=>{e.preventDefault();execCommand('strikeThrough');}} className="p-2 rounded hover:bg-slate-100 transition" title="Strikethrough" type="button">
-              <span className="line-through text-slate-700">S</span>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('strikeThrough');}} className="p-2 rounded-lg hover:bg-slate-100 transition group" title="Strikethrough" type="button">
+              <span className="line-through text-slate-600 group-hover:text-slate-900">S</span>
             </button>
           </div>
 
           {/* Alignment */}
           <div className="flex gap-1 pr-2 border-r border-slate-200">
-            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyLeft');}} className="p-2 rounded hover:bg-slate-100 transition" title="Align Left" type="button">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 4h16v2H2V4zm0 4h10v2H2V8zm0 4h16v2H2v-2zm0 4h10v2H2v-2z"/></svg>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyLeft');}} className="p-2 rounded-lg hover:bg-slate-100 transition group" title="Align Left" type="button">
+              <AlignLeft size={16} className="text-slate-600 group-hover:text-slate-900" />
             </button>
-            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyCenter');}} className="p-2 rounded hover:bg-slate-100 transition" title="Align Center" type="button">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 4h16v2H2V4zm3 4h10v2H5V8zm-3 4h16v2H2v-2zm3 4h10v2H5v-2z"/></svg>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyCenter');}} className="p-2 rounded-lg hover:bg-slate-100 transition group" title="Align Center" type="button">
+              <AlignCenter size={16} className="text-slate-600 group-hover:text-slate-900" />
             </button>
-            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyRight');}} className="p-2 rounded hover:bg-slate-100 transition" title="Align Right" type="button">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 4h16v2H2V4zm6 4h10v2H8V8zm-6 4h16v2H2v-2zm6 4h10v2H8v-2z"/></svg>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyRight');}} className="p-2 rounded-lg hover:bg-slate-100 transition group" title="Align Right" type="button">
+              <AlignRight size={16} className="text-slate-600 group-hover:text-slate-900" />
             </button>
-            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyFull');}} className="p-2 rounded hover:bg-slate-100 transition" title="Justify" type="button">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 4h16v2H2V4zm0 4h16v2H2V8zm0 4h16v2H2v-2zm0 4h16v2H2v-2z"/></svg>
+            <button onMouseDown={(e)=>{e.preventDefault();execCommand('justifyFull');}} className="p-2 rounded-lg hover:bg-slate-100 transition group" title="Justify" type="button">
+              <AlignJustify size={16} className="text-slate-600 group-hover:text-slate-900" />
             </button>
           </div>
 
-          {/* Lists */}
+          {/* Enhanced Lists with Styles */}
           <div className="flex gap-1 pr-2 border-r border-slate-200">
-            <button onMouseDown={(e)=>{e.preventDefault();execCommand('insertUnorderedList');}} className="p-2 rounded hover:bg-slate-100 transition" title="Bullet List" type="button">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3 4a1 1 0 100 2 1 1 0 000-2zm4 1h10v1H7V5zm-4 4a1 1 0 100 2 1 1 0 000-2zm4 1h10v1H7v-1zm-4 4a1 1 0 100 2 1 1 0 000-2zm4 1h10v1H7v-1z"/></svg>
-            </button>
-            <button onMouseDown={(e)=>{e.preventDefault();execCommand('insertOrderedList');}} className="p-2 rounded hover:bg-slate-100 transition" title="Numbered List" type="button">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3 3h1v3H3V3zm0 5h1.5v1H3.5v1H4.5v1H3V9zm.5 5H3v1h2v1H3v1h2v-3h-.5zM7 5h10v1H7V5zm0 5h10v1H7v-1zm0 5h10v1H7v-1z"/></svg>
-            </button>
+            <div className="relative" ref={listStyleMenuRef}>
+              <button 
+                onMouseDown={(e)=>{e.preventDefault();setShowListStyleMenu(!showListStyleMenu);}} 
+                className="p-2 rounded-lg hover:bg-slate-100 transition flex items-center gap-1 group" 
+                title="Bullet List Styles" 
+                type="button"
+              >
+                <List size={16} className="text-slate-600 group-hover:text-slate-900" />
+                <ChevronDownIcon size={12} className="text-slate-400" />
+              </button>
+              
+              {showListStyleMenu && (
+                <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 p-2 z-[110] min-w-[200px]">
+                  <div className="text-xs font-semibold text-slate-500 mb-2 px-2">Bullet Styles</div>
+                  {bulletStyles.map((style) => (
+                    <button
+                      key={style.type}
+                      onMouseDown={(e) => { e.preventDefault(); applyListStyle(style.type); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 rounded-lg transition text-left group"
+                      type="button"
+                    >
+                      <span className="text-sm font-bold text-slate-600 w-5 flex items-center justify-center">{style.preview}</span>
+                      <span className="text-sm text-slate-700 group-hover:text-slate-900 font-medium">{style.label}</span>
+                    </button>
+                  ))}
+                  <div className="border-t border-slate-200 my-2" />
+                  <div className="px-2 py-1 text-xs text-slate-400">Press Tab to indent</div>
+                </div>
+              )}
+            </div>
+            
+            <div className="relative" ref={numberStyleMenuRef}>
+              <button 
+                onMouseDown={(e)=>{e.preventDefault();setShowNumberStyleMenu(!showNumberStyleMenu);}} 
+                className="p-2 rounded-lg hover:bg-slate-100 transition flex items-center gap-1 group" 
+                title="Numbered List Styles" 
+                type="button"
+              >
+                <ListOrdered size={16} className="text-slate-600 group-hover:text-slate-900" />
+                <ChevronDownIcon size={12} className="text-slate-400" />
+              </button>
+              
+              {showNumberStyleMenu && (
+                <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 p-2 z-[110] min-w-[200px]">
+                  <div className="text-xs font-semibold text-slate-500 mb-2 px-2">Number Styles</div>
+                  {numberStyles.map((style) => (
+                    <button
+                      key={style.type}
+                      onMouseDown={(e) => { e.preventDefault(); applyNumberStyle(style.type); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 rounded-lg transition text-left group"
+                      type="button"
+                    >
+                      <span className="text-sm font-bold text-slate-600 w-5 flex items-center justify-center">{style.preview}</span>
+                      <span className="text-sm text-slate-700 group-hover:text-slate-900 font-medium">{style.label}</span>
+                    </button>
+                  ))}
+                  <div className="border-t border-slate-200 my-2" />
+                  <div className="px-2 py-1 text-xs text-slate-400">Press Tab to indent</div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Text color */}
           <div className="relative" ref={colorPickerRef}>
             <button
               onMouseDown={(e) => { e.preventDefault(); setShowColorPicker(!showColorPicker); }}
-              className="p-2 rounded hover:bg-slate-100 transition flex items-center gap-1"
+              className="p-2 rounded-lg hover:bg-slate-100 transition flex items-center gap-1 group"
               title="Text Color"
               type="button"
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13.414 4.586a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-2-2a2 2 0 012.828-2.828L7 8.172l3.586-3.586a2 2 0 012.828 0zM16 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-              <span className="text-xs font-bold">A</span>
+              <div className="flex items-center">
+                <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">A</span>
+                <div className="w-3 h-0.5 bg-blue-600 ml-0.5"></div>
+              </div>
             </button>
             {showColorPicker && (
               <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 z-[100] min-w-[280px]">
@@ -423,11 +640,14 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
           <div className="relative" ref={highlightPickerRef}>
             <button
               onMouseDown={(e) => { e.preventDefault(); setShowHighlightPicker(!showHighlightPicker); }}
-              className="p-2 rounded hover:bg-slate-100 transition"
+              className="p-2 rounded-lg hover:bg-slate-100 transition group"
               title="Highlight"
               type="button"
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+              <div className="relative">
+                <Type size={16} className="text-slate-600 group-hover:text-slate-900" />
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-yellow-300 rounded"></div>
+              </div>
             </button>
             {showHighlightPicker && (
               <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 z-[100] min-w-[320px]">
@@ -436,12 +656,27 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
                   {highlightColors.map((color) => (
                     <button
                       key={color.hex}
-                      onMouseDown={(e) => { e.preventDefault(); execCommand('backColor', color.hex); setShowHighlightPicker(false); }}
-                      className="w-9 h-9 rounded-lg border-2 border-slate-200 hover:border-slate-400 hover:scale-110 transition-all shadow-sm hover:shadow-md"
-                      style={{ backgroundColor: color.hex }}
+                      onMouseDown={(e) => { 
+                        e.preventDefault(); 
+                        if (color.hex === 'transparent') {
+                          document.execCommand('removeFormat', false, null);
+                          document.execCommand('backColor', false, 'transparent');
+                        } else {
+                          execCommand('backColor', color.hex);
+                        }
+                        setShowHighlightPicker(false);
+                      }}
+                      className={`w-9 h-9 rounded-lg border-2 ${color.hex === 'transparent' ? 'border-slate-400 border-dashed' : 'border-slate-200'} hover:border-slate-400 hover:scale-110 transition-all shadow-sm hover:shadow-md ${color.hex === 'transparent' ? 'bg-white relative' : ''}`}
+                      style={color.hex !== 'transparent' ? { backgroundColor: color.hex } : {}}
                       title={color.name}
                       type="button"
-                    />
+                    >
+                      {color.hex === 'transparent' && (
+                        <svg className="w-full h-full text-slate-400 p-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      )}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -453,7 +688,7 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
             <select
               onMouseDown={(e) => e.stopPropagation()}
               onChange={(e) => { execCommand('fontName', e.target.value); }}
-              className="text-sm px-2 py-1 rounded border border-slate-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px]"
+              className="text-sm px-2 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[140px] bg-white"
               defaultValue="serif"
             >
               {fontFamilies.map(font => (
@@ -463,7 +698,7 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
           </div>
 
           {/* Font Size */}
-          <div className="flex gap-1">
+          <div className="flex gap-1 pr-2 border-r border-slate-200">
             <select
               onMouseDown={(e) => e.stopPropagation()}
               onChange={(e) => {
@@ -471,7 +706,7 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
                 const fontSize = size <= 10 ? '1' : size <= 13 ? '2' : size <= 16 ? '3' : size <= 18 ? '4' : size <= 24 ? '5' : size <= 32 ? '6' : '7';
                 execCommand('fontSize', fontSize);
               }}
-              className="text-sm px-2 py-1 rounded border border-slate-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[70px]"
+              className="text-sm px-2 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[70px] bg-white"
               defaultValue="14"
             >
               {fontSizes.map(size => (
@@ -482,23 +717,96 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
         </div>
       )}
 
+      {/* Word Count */}
+      {showFormatBar && wordCount > 0 && (
+        <div className="mb-2 text-xs text-slate-400 px-1">
+          {wordCount} {wordCount === 1 ? 'word' : 'words'}
+        </div>
+      )}
+
       <style>{`
-        [contenteditable] ul { list-style-type: disc; padding-left: 2rem; margin: 0.5rem 0; }
-        [contenteditable] ol { list-style-type: decimal; padding-left: 2rem; margin: 0.5rem 0; }
-        [contenteditable] li { margin: 0.25rem 0; }
-        [contenteditable] li::marker { color: inherit; }
-        [contenteditable] p { margin: 0.5rem 0; }
-        [contenteditable] p:first-child { margin-top: 0; }
-        [contenteditable] p:last-child { margin-bottom: 0; }
+        [contenteditable] ul,
+        [contenteditable] ol {
+          padding-left: 2.5rem;
+          margin: 0.75rem 0;
+        }
+        
+        [contenteditable] ul {
+          list-style-type: disc;
+        }
+        
+        [contenteditable] ul ul {
+          list-style-type: circle;
+          margin: 0.25rem 0;
+        }
+        
+        [contenteditable] ul ul ul {
+          list-style-type: square;
+          margin: 0.25rem 0;
+        }
+        
+        [contenteditable] ol {
+          list-style-type: decimal;
+        }
+        
+        [contenteditable] ol ol {
+          list-style-type: lower-alpha;
+          margin: 0.25rem 0;
+        }
+        
+        [contenteditable] ol ol ol {
+          list-style-type: lower-roman;
+          margin: 0.25rem 0;
+        }
+        
+        [contenteditable] li {
+          margin: 0.5rem 0;
+          padding-left: 0.5rem;
+          line-height: 1.6;
+        }
+        
+        [contenteditable] li::marker {
+          color: inherit;
+          font-weight: 600;
+        }
+        
+        [contenteditable] p {
+          margin: 0.75rem 0;
+          line-height: 1.7;
+        }
+        
+        [contenteditable] p:first-child {
+          margin-top: 0;
+        }
+        
+        [contenteditable] p:last-child {
+          margin-bottom: 0;
+        }
+        
         [contenteditable] code {
           background-color: rgba(135,131,120,.15);
-          color:#eb5757;
-          border-radius:3px;
-          font-size:85%;
-          padding:0.2em 0.4em;
-          font-family: 'SFMono-Regular',Consolas,'Liberation Mono',Menlo,Courier,monospace;
+          color: #eb5757;
+          border-radius: 4px;
+          font-size: 90%;
+          padding: 0.2em 0.4em;
+          font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
         }
-        [contenteditable] a { color:#2563eb; text-decoration:underline; }
+        
+        [contenteditable] a {
+          color: #2563eb;
+          text-decoration: underline;
+          text-underline-offset: 2px;
+          transition: color 0.2s;
+        }
+        
+        [contenteditable] a:hover {
+          color: #1d4ed8;
+        }
+        
+        [contenteditable].custom-list ul,
+        [contenteditable] ul.custom-list {
+          list-style-position: outside;
+        }
       `}</style>
 
       <div
@@ -506,16 +814,17 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
         contentEditable
         suppressContentEditableWarning
         onInput={handleInput}
+        onKeyDown={handleKeyDown}
         onFocus={() => setShowFormatBar(true)}
         onBlur={(e) => {
-          const toolbar = e.currentTarget.parentElement?.querySelector('.shadow-lg');
+          const toolbar = e.currentTarget.parentElement?.querySelector('.shadow-2xl');
           if (!toolbar?.contains(e.relatedTarget)) {
             setTimeout(() => setShowFormatBar(false), 150);
           }
         }}
-        data-placeholder="Start typing your paragraph... Use `backticks` for inline code"
-        className="w-full text-lg leading-relaxed focus:outline-none bg-transparent hover:bg-slate-50/50 rounded-lg px-3 py-2 -mx-3 -my-2 transition focus:bg-slate-50/50 font-normal min-h-[48px] empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
-        style={{ wordBreak: 'break-word', color: '#000000', fontFamily: 'serif', fontSize: '14px' }}
+        data-placeholder="Start typing... Use Tab to indent lists, Ctrl+Z to undo"
+        className="w-full text-lg leading-relaxed focus:outline-none bg-transparent hover:bg-slate-50/50 rounded-lg px-4 py-3 -mx-4 -my-3 transition focus:bg-slate-50/50 font-normal min-h-[60px] empty:before:content-[attr(data-placeholder)] empty:before:text-slate-300"
+        style={{ wordBreak: 'break-word', color: '#000000', fontFamily: 'serif', fontSize: '16px' }}
       />
     </div>
   );
@@ -904,7 +1213,7 @@ export default function BIMEditor() {
   };
 
   const onUpload = async (file) => {
-    await ensureOwnerToken(); // ensure token for image upload too
+    await ensureOwnerToken();
     const formData = new FormData();
     formData.append("file", file);
     const data = await fetchJSON("/api/bim/upload-image", { 
