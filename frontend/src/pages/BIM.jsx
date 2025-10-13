@@ -1,14 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { 
-  Save, Plus, ArrowLeft, Trash2, 
+import {
+  Save, Plus, ArrowLeft, Trash2,
   Type, Image, Code, Heading,
   Upload, Check, Copy, ChevronUp, ChevronDown,
   ChevronsUp, ChevronsDown, GripVertical,
-  RotateCcw, RotateCw, AlignLeft, AlignCenter, 
+  RotateCcw, RotateCw, AlignLeft, AlignCenter,
   AlignRight, AlignJustify, List, ListOrdered,
-  ChevronRight, Minus, Circle, Square, CheckSquare,
-  Disc, ArrowRight, ChevronDown as ChevronDownIcon
+  Minus, Circle, Square,
+  ChevronDown as ChevronDownIcon, Smile, Wand2
 } from "lucide-react";
 
 /* ---------- AUTH: reuse the same login helper your display page uses ---------- */
@@ -85,7 +85,10 @@ function AddBlockMenu({ onAdd, onClose }) {
   ];
 
   return (
-    <div className="absolute left-0 top-full mt-2 w-72 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-50" ref={menuRef}>
+    <div
+      className="absolute left-0 top-full mt-2 w-72 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-50"
+      ref={menuRef}
+    >
       <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide bg-slate-50">
         Add Block
       </div>
@@ -95,7 +98,7 @@ function AddBlockMenu({ onAdd, onClose }) {
           onClick={() => onAdd(type)}
           className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gradient-to-r hover:from-slate-50 hover:to-transparent transition text-left group border-b border-slate-100 last:border-0"
         >
-          <div className={`p-2 rounded-lg bg-slate-50 group-hover:scale-110 transition`}>
+          <div className="p-2 rounded-lg bg-slate-50 group-hover:scale-110 transition">
             <Icon size={18} className={color} />
           </div>
           <div className="flex-1">
@@ -109,66 +112,66 @@ function AddBlockMenu({ onAdd, onClose }) {
 }
 
 /* ---------- Block Toolbar ---------- */
-function BlockToolbar({ 
-  onDelete, 
-  onMoveUp, 
-  onMoveDown, 
-  onMoveToTop, 
-  onMoveToBottom, 
-  canMoveUp, 
+function BlockToolbar({
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  onMoveToTop,
+  onMoveToBottom,
+  canMoveUp,
   canMoveDown
 }) {
   return (
     <div className="absolute -left-16 top-0 flex flex-col gap-1 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-[100]">
-      <div 
-        className="p-2 rounded-lg hover:bg-slate-100 transition cursor-grab active:cursor-grabbing drag-handle" 
+      <div
+        className="p-2 rounded-lg hover:bg-slate-100 transition cursor-grab active:cursor-grabbing drag-handle"
         title="Drag to reorder"
         draggable="true"
       >
         <GripVertical size={16} className="text-slate-400 pointer-events-none" />
       </div>
-      
-      <button 
+
+      <button
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); }}
-        className="p-2 rounded-lg hover:bg-red-50 transition group/btn" 
+        className="p-2 rounded-lg hover:bg-red-50 transition group/btn"
         title="Delete block"
       >
         <Trash2 size={16} className="text-slate-400 group-hover/btn:text-red-600" />
       </button>
-      
+
       <div className="border-t border-slate-200 my-1" />
-      
+
       {canMoveUp && (
         <>
-          <button 
+          <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMoveToTop(); }}
-            className="p-2 rounded-lg hover:bg-purple-50 transition group/btn" 
+            className="p-2 rounded-lg hover:bg-purple-50 transition group/btn"
             title="Move to top"
           >
             <ChevronsUp size={16} className="text-slate-400 group-hover/btn:text-purple-600" />
           </button>
-          <button 
+          <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMoveUp(); }}
-            className="p-2 rounded-lg hover:bg-blue-50 transition group/btn" 
+            className="p-2 rounded-lg hover:bg-blue-50 transition group/btn"
             title="Move up"
           >
             <ChevronUp size={16} className="text-slate-400 group-hover/btn:text-blue-600" />
           </button>
         </>
       )}
-      
+
       {canMoveDown && (
         <>
-          <button 
+          <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMoveDown(); }}
-            className="p-2 rounded-lg hover:bg-blue-50 transition group/btn" 
+            className="p-2 rounded-lg hover:bg-blue-50 transition group/btn"
             title="Move down"
           >
             <ChevronDown size={16} className="text-slate-400 group-hover/btn:text-blue-600" />
           </button>
-          <button 
+          <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMoveToBottom(); }}
-            className="p-2 rounded-lg hover:bg-purple-50 transition group/btn" 
+            className="p-2 rounded-lg hover:bg-purple-50 transition group/btn"
             title="Move to bottom"
           >
             <ChevronsDown size={16} className="text-slate-400 group-hover/btn:text-purple-600" />
@@ -193,13 +196,13 @@ function HeadingBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, 
 
   const isH1 = block.type === "h1";
   const Tag = isH1 ? "h1" : "h2";
-  const className = isH1 
-    ? "text-5xl font-extrabold text-slate-900 tracking-tight leading-tight" 
+  const className = isH1
+    ? "text-5xl font-extrabold text-slate-900 tracking-tight leading-tight"
     : "text-4xl font-bold text-purple-800 leading-snug";
   const placeholder = isH1 ? "Main Heading" : "Subheading";
 
   return (
-    <div 
+    <div
       className={`group/block relative py-4 transition-all duration-200 ${isDragging ? 'opacity-50' : 'opacity-100'}`}
       data-block-index={index}
     >
@@ -248,6 +251,12 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
   const [showListStyleMenu, setShowListStyleMenu] = useState(false);
   const [showNumberStyleMenu, setShowNumberStyleMenu] = useState(false);
+
+  // INSERT DROPDOWN (new)
+  const [showInsertMenu, setShowInsertMenu] = useState(false);
+  const [insertTab, setInsertTab] = useState("arrows"); // arrows | emojis | symbols
+  const insertMenuRef = useRef(null);
+
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [wordCount, setWordCount] = useState(0);
@@ -273,18 +282,11 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
-        setShowColorPicker(false);
-      }
-      if (highlightPickerRef.current && !highlightPickerRef.current.contains(e.target)) {
-        setShowHighlightPicker(false);
-      }
-      if (listStyleMenuRef.current && !listStyleMenuRef.current.contains(e.target)) {
-        setShowListStyleMenu(false);
-      }
-      if (numberStyleMenuRef.current && !numberStyleMenuRef.current.contains(e.target)) {
-        setShowNumberStyleMenu(false);
-      }
+      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) setShowColorPicker(false);
+      if (highlightPickerRef.current && !highlightPickerRef.current.contains(e.target)) setShowHighlightPicker(false);
+      if (listStyleMenuRef.current && !listStyleMenuRef.current.contains(e.target)) setShowListStyleMenu(false);
+      if (numberStyleMenuRef.current && !numberStyleMenuRef.current.contains(e.target)) setShowNumberStyleMenu(false);
+      if (insertMenuRef.current && !insertMenuRef.current.contains(e.target)) setShowInsertMenu(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -345,21 +347,18 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
     // Tab for indent, Shift+Tab for outdent
     if (e.key === 'Tab') {
       e.preventDefault();
-      if (e.shiftKey) {
-        execCommand('outdent');
-      } else {
-        execCommand('indent');
-      }
+      if (e.shiftKey) execCommand('outdent');
+      else execCommand('indent');
     }
-    
+
     // Ctrl/Cmd + Z for undo
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
       e.preventDefault();
       handleUndo();
     }
-    
+
     // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y for redo
-    if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') || 
+    if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') ||
         ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
       e.preventDefault();
       handleRedo();
@@ -368,13 +367,13 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
 
   const applyListStyle = (styleType) => {
     saveToUndo();
-    
+
     // First ensure we have a list
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
-    
+
     document.execCommand('insertUnorderedList', false, null);
-    
+
     // Get all list items in the selection
     if (editorRef.current) {
       const lists = editorRef.current.querySelectorAll('ul');
@@ -383,16 +382,16 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
         list.classList.add('custom-list');
       });
     }
-    
+
     handleInput();
     setShowListStyleMenu(false);
   };
 
   const applyNumberStyle = (styleType) => {
     saveToUndo();
-    
+
     document.execCommand('insertOrderedList', false, null);
-    
+
     if (editorRef.current) {
       const lists = editorRef.current.querySelectorAll('ol');
       lists.forEach(list => {
@@ -400,10 +399,34 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
         list.classList.add('custom-list');
       });
     }
-    
+
     handleInput();
     setShowNumberStyleMenu(false);
   };
+
+  // ---------- INSERT HELPERS (new) ----------
+  const insertAtCaret = (text) => {
+    saveToUndo();
+    const ok = document.execCommand?.("insertText", false, text);
+    if (!ok) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(document.createTextNode(text));
+        range.setStart(range.endContainer, range.endOffset);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } else if (editorRef.current) {
+        editorRef.current.appendChild(document.createTextNode(text));
+      }
+    }
+    handleInput();
+  };
+
+  const arrows = ["→","←","↑","↓","➜","➤","➥","➦","⇒","⇐","⇑","⇓","⇔","⇕","↪","↩","↗","↘","↖","↙","⟶","⟵","⟷","▶","◀","▲","▼","↠","↞","⇢","⇠","➔","➙","➛"];
+  const emojis = ["✅","✨","🔥","⭐","💡","📌","🧠","🚀","👍","💯","📝","✅","⚠️","❗","🔗","📎","📷","⏱️","📦","🧩","📈","📊","🧪","🔧","🛠️","🗂️","🧭","🗓️","💬","🧵"];
+  const symbols = ["•","‣","◦","▪","–","—","·","◇","◆","▹","▸","▻","▾","▿","☐","☑","☒","✓","✗","★","☆","♥","♡","“","”","‘","’","§","†","‡","∞","≈","±","→"];
 
   const colors = [
     { hex: '#000000', name: 'Black' }, { hex: '#374151', name: 'Gray 700' },
@@ -467,7 +490,7 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
   ];
 
   return (
-    <div 
+    <div
       className={`group/block relative py-4 transition-all duration-200 ${isDragging ? 'opacity-50' : 'opacity-100'}`}
       data-block-index={index}
     >
@@ -487,20 +510,20 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
         <div className="mb-3 flex flex-wrap items-center gap-1.5 p-2.5 bg-white rounded-xl shadow-2xl border border-slate-200 z-[90]">
           {/* Undo/Redo */}
           <div className="flex gap-1 pr-2 border-r border-slate-200">
-            <button 
-              onMouseDown={(e)=>{e.preventDefault();handleUndo();}} 
+            <button
+              onMouseDown={(e)=>{e.preventDefault();handleUndo();}}
               disabled={undoStack.length === 0}
-              className="p-2 rounded-lg hover:bg-slate-100 transition disabled:opacity-30 disabled:cursor-not-allowed group" 
-              title="Undo (Ctrl+Z)" 
+              className="p-2 rounded-lg hover:bg-slate-100 transition disabled:opacity-30 disabled:cursor-not-allowed group"
+              title="Undo (Ctrl+Z)"
               type="button"
             >
               <RotateCcw size={16} className="text-slate-600 group-hover:text-slate-900" />
             </button>
-            <button 
-              onMouseDown={(e)=>{e.preventDefault();handleRedo();}} 
+            <button
+              onMouseDown={(e)=>{e.preventDefault();handleRedo();}}
               disabled={redoStack.length === 0}
-              className="p-2 rounded-lg hover:bg-slate-100 transition disabled:opacity-30 disabled:cursor-not-allowed group" 
-              title="Redo (Ctrl+Y)" 
+              className="p-2 rounded-lg hover:bg-slate-100 transition disabled:opacity-30 disabled:cursor-not-allowed group"
+              title="Redo (Ctrl+Y)"
               type="button"
             >
               <RotateCw size={16} className="text-slate-600 group-hover:text-slate-900" />
@@ -542,16 +565,16 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
           {/* Enhanced Lists with Styles */}
           <div className="flex gap-1 pr-2 border-r border-slate-200">
             <div className="relative" ref={listStyleMenuRef}>
-              <button 
-                onMouseDown={(e)=>{e.preventDefault();setShowListStyleMenu(!showListStyleMenu);}} 
-                className="p-2 rounded-lg hover:bg-slate-100 transition flex items-center gap-1 group" 
-                title="Bullet List Styles" 
+              <button
+                onMouseDown={(e)=>{e.preventDefault();setShowListStyleMenu(!showListStyleMenu);}}
+                className="p-2 rounded-lg hover:bg-slate-100 transition flex items-center gap-1 group"
+                title="Bullet List Styles"
                 type="button"
               >
                 <List size={16} className="text-slate-600 group-hover:text-slate-900" />
                 <ChevronDownIcon size={12} className="text-slate-400" />
               </button>
-              
+
               {showListStyleMenu && (
                 <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 p-2 z-[110] min-w-[200px]">
                   <div className="text-xs font-semibold text-slate-500 mb-2 px-2">Bullet Styles</div>
@@ -571,18 +594,18 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
                 </div>
               )}
             </div>
-            
+
             <div className="relative" ref={numberStyleMenuRef}>
-              <button 
-                onMouseDown={(e)=>{e.preventDefault();setShowNumberStyleMenu(!showNumberStyleMenu);}} 
-                className="p-2 rounded-lg hover:bg-slate-100 transition flex items-center gap-1 group" 
-                title="Numbered List Styles" 
+              <button
+                onMouseDown={(e)=>{e.preventDefault();setShowNumberStyleMenu(!showNumberStyleMenu);}}
+                className="p-2 rounded-lg hover:bg-slate-100 transition flex items-center gap-1 group"
+                title="Numbered List Styles"
                 type="button"
               >
                 <ListOrdered size={16} className="text-slate-600 group-hover:text-slate-900" />
                 <ChevronDownIcon size={12} className="text-slate-400" />
               </button>
-              
+
               {showNumberStyleMenu && (
                 <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 p-2 z-[110] min-w-[200px]">
                   <div className="text-xs font-semibold text-slate-500 mb-2 px-2">Number Styles</div>
@@ -656,8 +679,8 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
                   {highlightColors.map((color) => (
                     <button
                       key={color.hex}
-                      onMouseDown={(e) => { 
-                        e.preventDefault(); 
+                      onMouseDown={(e) => {
+                        e.preventDefault();
                         if (color.hex === 'transparent') {
                           document.execCommand('removeFormat', false, null);
                           document.execCommand('backColor', false, 'transparent');
@@ -714,6 +737,106 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
               ))}
             </select>
           </div>
+
+          {/* INSERT DROPDOWN (new) */}
+          <div className="relative" ref={insertMenuRef}>
+            <button
+              onMouseDown={(e) => { e.preventDefault(); setShowInsertMenu(!showInsertMenu); }}
+              className="p-2 rounded-lg hover:bg-slate-100 transition flex items-center gap-1 group"
+              title="Insert arrows, emojis, symbols"
+              type="button"
+            >
+              <Smile size={16} className="text-slate-600 group-hover:text-slate-900" />
+              <ChevronDownIcon size={12} className="text-slate-400" />
+            </button>
+
+            {showInsertMenu && (
+              <div className="absolute top-full mt-2 left-0 bg-white rounded-xl shadow-2xl border border-slate-200 z-[120] min-w-[340px]">
+                {/* Tabs */}
+                <div className="flex items-center justify-between px-2 pt-2">
+                  <div className="inline-flex bg-slate-100 rounded-lg p-1">
+                    <button
+                      type="button"
+                      onMouseDown={(e)=>{e.preventDefault();setInsertTab("arrows");}}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md ${insertTab==="arrows" ? "bg-white shadow border border-slate-200 text-slate-800" : "text-slate-500 hover:text-slate-700"}`}
+                    >
+                      Arrows
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e)=>{e.preventDefault();setInsertTab("emojis");}}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md ${insertTab==="emojis" ? "bg-white shadow border border-slate-200 text-slate-800" : "text-slate-500 hover:text-slate-700"}`}
+                    >
+                      Emojis
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e)=>{e.preventDefault();setInsertTab("symbols");}}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md ${insertTab==="symbols" ? "bg-white shadow border border-slate-200 text-slate-800" : "text-slate-500 hover:text-slate-700"}`}
+                    >
+                      Tools
+                    </button>
+                  </div>
+                  <div className="pr-2 pl-3 py-1 text-[11px] text-slate-400 flex items-center gap-1">
+                    <Wand2 size={12} />
+                    Click to insert at cursor
+                  </div>
+                </div>
+
+                {/* Panels */}
+                <div className="p-3">
+                  {insertTab === "arrows" && (
+                    <div className="grid grid-cols-10 gap-2">
+                      {arrows.map((a,i)=>(
+                        <button
+                          key={i}
+                          type="button"
+                          onMouseDown={(e)=>{e.preventDefault(); insertAtCaret(a); setShowInsertMenu(false);}}
+                          className="h-9 rounded-lg border border-slate-200 hover:border-blue-400 hover:shadow text-lg leading-none flex items-center justify-center"
+                          title="Insert arrow"
+                        >
+                          {a}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {insertTab === "emojis" && (
+                    <div className="grid grid-cols-10 gap-2">
+                      {emojis.map((ej,i)=>(
+                        <button
+                          key={i}
+                          type="button"
+                          onMouseDown={(e)=>{e.preventDefault(); insertAtCaret(ej); setShowInsertMenu(false);}}
+                          className="h-9 rounded-lg border border-slate-200 hover:border-blue-400 hover:shadow text-lg leading-none flex items-center justify-center"
+                          title="Insert emoji"
+                        >
+                          {ej}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {insertTab === "symbols" && (
+                    <div className="grid grid-cols-10 gap-2">
+                      {symbols.map((s,i)=>(
+                        <button
+                          key={i}
+                          type="button"
+                          onMouseDown={(e)=>{e.preventDefault(); insertAtCaret(s); setShowInsertMenu(false);}}
+                          className="h-9 rounded-lg border border-slate-200 hover:border-blue-400 hover:shadow text-lg leading-none flex items-center justify-center"
+                          title="Insert symbol"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          {/* END INSERT DROPDOWN */}
         </div>
       )}
 
@@ -730,59 +853,22 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
           padding-left: 2.5rem;
           margin: 0.75rem 0;
         }
-        
-        [contenteditable] ul {
-          list-style-type: disc;
-        }
-        
-        [contenteditable] ul ul {
-          list-style-type: circle;
-          margin: 0.25rem 0;
-        }
-        
-        [contenteditable] ul ul ul {
-          list-style-type: square;
-          margin: 0.25rem 0;
-        }
-        
-        [contenteditable] ol {
-          list-style-type: decimal;
-        }
-        
-        [contenteditable] ol ol {
-          list-style-type: lower-alpha;
-          margin: 0.25rem 0;
-        }
-        
-        [contenteditable] ol ol ol {
-          list-style-type: lower-roman;
-          margin: 0.25rem 0;
-        }
-        
-        [contenteditable] li {
-          margin: 0.5rem 0;
-          padding-left: 0.5rem;
-          line-height: 1.6;
-        }
-        
-        [contenteditable] li::marker {
-          color: inherit;
-          font-weight: 600;
-        }
-        
-        [contenteditable] p {
-          margin: 0.75rem 0;
-          line-height: 1.7;
-        }
-        
-        [contenteditable] p:first-child {
-          margin-top: 0;
-        }
-        
-        [contenteditable] p:last-child {
-          margin-bottom: 0;
-        }
-        
+
+        [contenteditable] ul { list-style-type: disc; }
+        [contenteditable] ul ul { list-style-type: circle; margin: 0.25rem 0; }
+        [contenteditable] ul ul ul { list-style-type: square; margin: 0.25rem 0; }
+
+        [contenteditable] ol { list-style-type: decimal; }
+        [contenteditable] ol ol { list-style-type: lower-alpha; margin: 0.25rem 0; }
+        [contenteditable] ol ol ol { list-style-type: lower-roman; margin: 0.25rem 0; }
+
+        [contenteditable] li { margin: 0.5rem 0; padding-left: 0.5rem; line-height: 1.6; }
+        [contenteditable] li::marker { color: inherit; font-weight: 600; }
+
+        [contenteditable] p { margin: 0.75rem 0; line-height: 1.7; }
+        [contenteditable] p:first-child { margin-top: 0; }
+        [contenteditable] p:last-child { margin-bottom: 0; }
+
         [contenteditable] code {
           background-color: rgba(135,131,120,.15);
           color: #eb5757;
@@ -791,20 +877,16 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
           padding: 0.2em 0.4em;
           font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
         }
-        
+
         [contenteditable] a {
           color: #2563eb;
           text-decoration: underline;
           text-underline-offset: 2px;
           transition: color 0.2s;
         }
-        
-        [contenteditable] a:hover {
-          color: #1d4ed8;
-        }
-        
-        [contenteditable].custom-list ul,
-        [contenteditable] ul.custom-list {
+        [contenteditable] a:hover { color: #1d4ed8; }
+
+        [contenteditable] ul.custom-list, [contenteditable] ol.custom-list {
           list-style-position: outside;
         }
       `}</style>
@@ -834,7 +916,7 @@ function TextBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
 function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onMoveToTop, onMoveToBottom, canMoveUp, canMoveDown, onUpload, isDragging }) {
   const [uploading, setUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState(block.value || "");
-  const [imageError, setImageError] = useState(false);
+  const [imageError, setImageError] = useState(false); // <- fixed (removed invisible char)
   const [dragActive, setDragActive] = useState(false);
   const [imageSize, setImageSize] = useState(block.size || "full");
   const fileInputRef = useRef(null);
@@ -911,7 +993,7 @@ function ImageBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, on
             canMoveDown={canMoveDown}
           />
         </div>
-        <div 
+        <div
           className={`border-2 border-dashed ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-blue-300 bg-gradient-to-br from-blue-50 to-purple-50'} rounded-2xl p-16 text-center hover:border-blue-400 hover:shadow-lg transition-all`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -1016,11 +1098,11 @@ function CodeBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
   ];
 
   const themes = {
-    dark: { name: "Dark", bg: "bg-slate-900", headerBg: "bg-gradient-to-r from-slate-800 to-slate-700", text: "text-slate-100", border: "border-slate-700" },
-    monokai: { name: "Monokai", bg: "bg-[#272822]", headerBg: "bg-gradient-to-r from-[#1e1f1c] to-[#272822]", text: "text-[#f8f8f2]", border: "border-[#3e3d32]" },
-    github: { name: "GitHub", bg: "bg-[#f6f8fa]", headerBg: "bg-gradient-to-r from-[#e1e4e8] to-[#f6f8fa]", text: "text-[#24292e]", border: "border-[#d1d5da]" },
-    dracula: { name: "Dracula", bg: "bg-[#282a36]", headerBg: "bg-gradient-to-r from-[#21222c] to-[#282a36]", text: "text-[#f8f8f2]", border: "border-[#44475a]" },
-    nord: { name: "Nord", bg: "bg-[#2e3440]", headerBg: "bg-gradient-to-r from-[#3b4252] to-[#2e3440]", text: "text-[#d8dee9]", border: "border-[#4c566a]" },
+    dark:     { name: "Dark",     bg: "bg-slate-900",  headerBg: "bg-gradient-to-r from-slate-800 to-slate-700", text: "text-slate-100", border: "border-slate-700" },
+    monokai:  { name: "Monokai",  bg: "bg-[#272822]", headerBg: "bg-gradient-to-r from-[#1e1f1c] to-[#272822]", text: "text-[#f8f8f2]", border: "border-[#3e3d32]" },
+    github:   { name: "GitHub",   bg: "bg-[#f6f8fa]", headerBg: "bg-gradient-to-r from-[#e1e4e8] to-[#f6f8fa]", text: "text-[#24292e]", border: "border-[#d1d5da]" },
+    dracula:  { name: "Dracula",  bg: "bg-[#282a36]", headerBg: "bg-gradient-to-r from-[#21222c] to-[#282a36]", text: "text-[#f8f8f2]", border: "border-[#44475a]" },
+    nord:     { name: "Nord",     bg: "bg-[#2e3440]", headerBg: "bg-gradient-to-r from-[#3b4252] to-[#2e3440]", text: "text-[#d8dee9]", border: "border-[#4c566a]" },
   };
 
   const currentLang = block.language || "javascript";
@@ -1039,7 +1121,8 @@ function CodeBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
           canMoveDown={canMoveDown}
         />
       </div>
-      <div className={`rounded-2xl overflow-hidden ${currentTheme.bg} shadow-xl ring-1 ${currentTheme.border}`}>
+
+      <div className={`rounded-2xl overflow-hidden ${currentTheme.bg} shadow-xl border ${currentTheme.border}`}>
         <div className={`px-5 py-3 ${currentTheme.headerBg} flex items-center justify-between border-b ${currentTheme.border}`}>
           <div className="flex items-center gap-3">
             <select
@@ -1061,15 +1144,30 @@ function CodeBlock({ block, index, onUpdate, onDelete, onMoveUp, onMoveDown, onM
               ))}
             </select>
           </div>
-          <button onClick={handleCopy} className={`flex items-center gap-2 px-4 py-2 text-sm transition bg-slate-700/50 hover:bg-slate-600 rounded-lg font-medium ${currentTheme.text}`}>
-            {copied ? (<><Check size={16} className="text-green-400" />Copied!</>) : (<><Copy size={16} />Copy</>)}
+
+          <button
+            onClick={handleCopy}
+            className={`flex items-center gap-2 px-4 py-2 text-sm transition bg-slate-700/50 hover:bg-slate-600 rounded-lg font-medium ${currentTheme.text}`}
+          >
+            {copied ? (
+              <>
+                <Check size={16} className="text-green-400" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy size={16} />
+                Copy
+              </>
+            )}
           </button>
         </div>
+
         <textarea
           value={value}
           onChange={handleChange}
           placeholder="// Write your code here..."
-          className={`w-full h-64 p-5 ${currentTheme.bg} ${currentTheme.text} font-mono text-sm leading-relaxed focus:outline-none resize-none placeholder-slate-600`}
+          className={`w-full h-64 p-5 ${currentTheme.bg} ${currentTheme.text} font-mono text-sm leading-relaxed focus:outline-none resize-none placeholder-slate-500`}
           spellCheck="false"
         />
       </div>
@@ -1085,11 +1183,13 @@ export default function BIMEditor() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const nav = useNavigate();
+
   const [blocks, setBlocks] = useState([]);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState(null);
   const addButtonRef = useRef(null);
 
+  // Load existing post (edit mode)
   useEffect(() => {
     if (!isEdit) return;
     (async () => {
@@ -1097,7 +1197,10 @@ export default function BIMEditor() {
         setBusy(true);
         const data = await fetchJSON(`/api/bim/${encodeURIComponent(id)}`);
         const loadedBlocks = Array.isArray(data?.blocks) ? data.blocks : [];
-        const blocksWithIds = loadedBlocks.map((block, idx) => ({ ...block, id: block.id || `${Date.now()}-${idx}` }));
+        const blocksWithIds = loadedBlocks.map((block, idx) => ({
+          ...block,
+          id: block.id || `${Date.now()}-${idx}`,
+        }));
         setBlocks(blocksWithIds);
         setErr("");
       } catch (e) {
@@ -1108,6 +1211,7 @@ export default function BIMEditor() {
     })();
   }, [id, isEdit]);
 
+  // Basic drag-to-reorder (using a handle)
   useEffect(() => {
     const handleDragStart = (e) => {
       const dragHandle = e.target.closest?.('.drag-handle');
@@ -1133,9 +1237,13 @@ export default function BIMEditor() {
       if (!blockContainer || draggedIndex === null) return;
       const index = parseInt(blockContainer.dataset.blockIndex);
       if (draggedIndex === index) return;
+
       const newBlocks = [...blocks];
       const draggedBlock = newBlocks[draggedIndex];
-      if (draggedBlock.type === "h1" && newBlocks[index].type === "h1") return;
+
+      // Avoid placing an H1 immediately adjacent to another H1
+      if (draggedBlock?.type === "h1" && newBlocks[index]?.type === "h1") return;
+
       newBlocks.splice(draggedIndex, 1);
       newBlocks.splice(index, 0, draggedBlock);
       setBlocks(newBlocks);
@@ -1145,6 +1253,7 @@ export default function BIMEditor() {
     document.addEventListener('dragstart', handleDragStart);
     document.addEventListener('dragend', handleDragEnd);
     document.addEventListener('dragover', handleDragOver);
+
     return () => {
       document.removeEventListener('dragstart', handleDragStart);
       document.removeEventListener('dragend', handleDragEnd);
@@ -1152,22 +1261,37 @@ export default function BIMEditor() {
     };
   }, [blocks, draggedIndex]);
 
+  /* ---------- Block helpers ---------- */
   const addBlock = (type) => {
     const newBlock = { type, value: "", id: Date.now() + Math.random() };
-    if (type === "code") { newBlock.language = "javascript"; newBlock.theme = "dark"; }
-    setBlocks([...blocks, newBlock]);
+    if (type === "code") {
+      newBlock.language = "javascript";
+      newBlock.theme = "dark";
+    }
+    setBlocks((prev) => [...prev, newBlock]);
     setShowAddMenu(false);
   };
 
   const updateBlock = (index, updatedBlock) => {
-    const newBlocks = [...blocks];
-    newBlocks[index] = updatedBlock;
-    setBlocks(newBlocks);
+    setBlocks((prev) => {
+      const next = [...prev];
+      next[index] = updatedBlock;
+      return next;
+    });
   };
 
-  const deleteBlock = (index) => setBlocks(blocks.filter((_, i) => i !== index));
-  const findPreviousH1 = (index) => { for (let i = index - 1; i >= 0; i--) if (blocks[i].type === "h1") return i; return -1; };
-  const findNextH1 = (index) => { for (let i = index + 1; i < blocks.length; i++) if (blocks[i].type === "h1") return i; return blocks.length; };
+  const deleteBlock = (index) => {
+    setBlocks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const findPreviousH1 = (index) => {
+    for (let i = index - 1; i >= 0; i--) if (blocks[i].type === "h1") return i;
+    return -1;
+  };
+  const findNextH1 = (index) => {
+    for (let i = index + 1; i < blocks.length; i++) if (blocks[i].type === "h1") return i;
+    return blocks.length;
+  };
 
   const moveBlockUp = (index) => {
     if (index <= 0) return;
@@ -1176,6 +1300,7 @@ export default function BIMEditor() {
       if (prevH1Index >= 0 && index - 1 === prevH1Index) return;
     }
     if (blocks[index - 1].type === "h1") return;
+
     const newBlocks = [...blocks];
     [newBlocks[index], newBlocks[index - 1]] = [newBlocks[index - 1], newBlocks[index]];
     setBlocks(newBlocks);
@@ -1185,6 +1310,7 @@ export default function BIMEditor() {
     if (index >= blocks.length - 1) return;
     if (blocks[index].type === "h1" && blocks[index + 1].type === "h1") return;
     if (blocks[index + 1].type === "h1") return;
+
     const newBlocks = [...blocks];
     [newBlocks[index], newBlocks[index + 1]] = [newBlocks[index + 1], newBlocks[index]];
     setBlocks(newBlocks);
@@ -1194,7 +1320,8 @@ export default function BIMEditor() {
     if (index <= 0) return;
     const newBlocks = [...blocks];
     const movedBlock = newBlocks[index];
-    const targetIndex = movedBlock.type === "h1" ? 0 : (findPreviousH1(index) >= 0 ? findPreviousH1(index) + 1 : 0);
+    const targetIndex =
+      movedBlock.type === "h1" ? 0 : (findPreviousH1(index) >= 0 ? findPreviousH1(index) + 1 : 0);
     if (targetIndex === index) return;
     newBlocks.splice(index, 1);
     newBlocks.splice(targetIndex, 0, movedBlock);
@@ -1205,36 +1332,44 @@ export default function BIMEditor() {
     if (index >= blocks.length - 1) return;
     const newBlocks = [...blocks];
     const movedBlock = newBlocks[index];
-    const targetIndex = movedBlock.type === "h1" ? blocks.length - 1 : findNextH1(index) - 1;
+    const targetIndex =
+      movedBlock.type === "h1" ? blocks.length - 1 : findNextH1(index) - 1;
     if (targetIndex === index) return;
     newBlocks.splice(index, 1);
     newBlocks.splice(targetIndex, 0, movedBlock);
     setBlocks(newBlocks);
   };
 
+  /* ---------- Upload helper ---------- */
   const onUpload = async (file) => {
     await ensureOwnerToken();
     const formData = new FormData();
     formData.append("file", file);
-    const data = await fetchJSON("/api/bim/upload-image", { 
-      method: "POST", 
+    const data = await fetchJSON("/api/bim/upload-image", {
+      method: "POST",
       headers: { ...ownerHeaders() },
-      body: formData 
+      body: formData,
     });
     if (!data?.url) throw new Error("No URL returned");
     return data.url;
   };
 
+  /* ---------- Save helpers ---------- */
   const saveWithMethod = async (method, url, payload) => {
     return fetchJSON(url, {
       method,
       headers: { "Content-Type": "application/json", ...ownerHeaders() },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
   };
 
   const handleSave = async () => {
-    try { await ensureOwnerToken(); } catch (e) { alert(e.message || "Authentication failed"); return; }
+    try {
+      await ensureOwnerToken();
+    } catch (e) {
+      alert(e.message || "Authentication failed");
+      return;
+    }
 
     if (blocks.length === 0) {
       alert("Please add at least one block");
@@ -1244,13 +1379,13 @@ export default function BIMEditor() {
     const rawTitle = blocks.find(b => b.type === "h1" || b.type === "h2")?.value || "";
     const title = (rawTitle || "").trim() || "Untitled";
 
-    const langMap = { 
+    const langMap = {
       javascript: "js", typescript: "ts", python: "py", html: "html", css: "css",
       java: "java", csharp: "cs", cpp: "cpp", c: "c", ruby: "rb", go: "go",
       rust: "rs", php: "php", swift: "swift", kotlin: "kt", scala: "scala",
-      sql: "sql", bash: "sh", powershell: "ps1", json: "json", yaml: "yaml", xml: "xml"
+      sql: "sql", bash: "sh", powershell: "ps1", json: "json", yaml: "yaml", xml: "xml",
     };
-    
+
     const normalizedBlocks = blocks.map((b) => {
       const base = { type: b.type, value: (b.value ?? "").toString() };
       if (b.type === "code") {
@@ -1271,6 +1406,7 @@ export default function BIMEditor() {
         try {
           await saveWithMethod("PUT", url, payload);
         } catch (err) {
+          // Retry with token refresh and PATCH fallback
           if (/403/.test(String(err))) {
             await ensureOwnerToken();
             try {
@@ -1295,6 +1431,7 @@ export default function BIMEditor() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+      {/* Top bar */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-sm">
         <div className="max-w-5xl mx-auto px-8 py-6 flex items-center justify-between">
           <button
@@ -1317,15 +1454,24 @@ export default function BIMEditor() {
       </div>
 
       <div className="max-w-5xl mx-auto px-8 pt-36 pb-32">
+        {err && (
+          <div className="mb-6 text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+            {err}
+          </div>
+        )}
+
         {blocks.length === 0 ? (
           <div className="text-center py-32">
             <div className="mb-10">
               <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center shadow-lg">
                 <Type size={36} className="text-purple-600" />
               </div>
-              <h3 className="text-2xl font-bold text-slate-800 mb-3">Start Creating Your Content</h3>
+              <h3 className="text-2xl font-bold text-slate-800 mb-3">
+                Start Creating Your Content
+              </h3>
               <p className="text-slate-500">Add your first block to begin writing</p>
             </div>
+
             <div className="relative inline-block" ref={addButtonRef}>
               <button
                 onClick={() => setShowAddMenu(!showAddMenu)}
@@ -1334,7 +1480,9 @@ export default function BIMEditor() {
                 <Plus size={22} />
                 Add Your First Block
               </button>
-              {showAddMenu && <AddBlockMenu onAdd={addBlock} onClose={() => setShowAddMenu(false)} />}
+              {showAddMenu && (
+                <AddBlockMenu onAdd={addBlock} onClose={() => setShowAddMenu(false)} />
+              )}
             </div>
           </div>
         ) : (
@@ -1342,11 +1490,16 @@ export default function BIMEditor() {
             {blocks.map((block, index) => {
               let canMoveUp = index > 0;
               let canMoveDown = index < blocks.length - 1;
+
               if (canMoveUp && blocks[index - 1].type === "h1") canMoveUp = false;
               if (canMoveDown && blocks[index + 1].type === "h1") canMoveDown = false;
+
               if (block.type === "h1" && canMoveUp) {
                 for (let i = index - 1; i >= 0; i--) {
-                  if (blocks[i].type === "h1" && i === index - 1) { canMoveUp = false; break; }
+                  if (blocks[i].type === "h1" && i === index - 1) {
+                    canMoveUp = false;
+                    break;
+                  }
                 }
               }
 
@@ -1361,7 +1514,7 @@ export default function BIMEditor() {
                 onMoveToBottom: moveBlockToBottom,
                 canMoveUp,
                 canMoveDown,
-                isDragging: draggedIndex === index
+                isDragging: draggedIndex === index,
               };
 
               return (
@@ -1379,6 +1532,7 @@ export default function BIMEditor() {
               );
             })}
 
+            {/* Add more blocks at the bottom */}
             <div className="relative pt-6" ref={addButtonRef}>
               <button
                 onClick={() => setShowAddMenu(!showAddMenu)}
@@ -1387,7 +1541,9 @@ export default function BIMEditor() {
                 <Plus size={18} />
                 Add block
               </button>
-              {showAddMenu && <AddBlockMenu onAdd={addBlock} onClose={() => setShowAddMenu(false)} />}
+              {showAddMenu && (
+                <AddBlockMenu onAdd={addBlock} onClose={() => setShowAddMenu(false)} />
+              )}
             </div>
           </div>
         )}

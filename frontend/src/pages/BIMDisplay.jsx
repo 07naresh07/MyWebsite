@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   BookOpen, Trash2, Edit3, Plus, Eye, Star,
   ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw,
-  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, FileText, FileDown
+  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, FileText, FileDown, File
 } from "lucide-react";
 import { useOwnerMode } from "../lib/owner.js";
 
@@ -356,15 +356,17 @@ function DeleteConfirmationModal({ item, onConfirm, onCancel, darkMode }) {
   );
 }
 
-/* ---------- Render HTML Content with Full Style Preservation ---------- */
+/* ---------- Render HTML Content with All Colors Preserved ---------- */
 function renderHTMLContent(htmlContent, className = "", darkMode = false) {
   if (!htmlContent) return null;
   if (!htmlContent.includes("<")) {
     return <div className={className}>{htmlContent}</div>;
   }
+  
+  // Always render in light mode with all colors preserved
   return (
     <div
-      className={`rich-text-content ${className} ${darkMode ? 'dark-mode-text' : 'light-mode-text'}`}
+      className={`rich-text-content ${className} light-mode-text`}
       dangerouslySetInnerHTML={{ __html: htmlContent }}
     />
   );
@@ -937,7 +939,7 @@ function BlockPreview({ blocks = [], darkMode = false, locked = false }) {
 }
 
 /* ---------- Download Format Dropdown ---------- */
-function DownloadDropdown({ onDownload, darkMode, sepiaMode }) {
+function DownloadDropdown({ onDownload }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -952,10 +954,10 @@ function DownloadDropdown({ onDownload, darkMode, sepiaMode }) {
   }, []);
 
   const formats = [
-    { value: 'pdf', label: 'PDF Document', icon: FileText },
-    { value: 'txt', label: 'Plain Text', icon: FileText },
-    { value: 'html', label: 'HTML File', icon: FileDown },
-    { value: 'md', label: 'Markdown', icon: FileText },
+    { value: 'pdf', label: 'PDF Document', icon: File, color: 'text-red-500' },
+    { value: 'txt', label: 'Plain Text', icon: FileText, color: 'text-blue-500' },
+    { value: 'html', label: 'HTML File', icon: FileDown, color: 'text-orange-500' },
+    { value: 'md', label: 'Markdown', icon: FileText, color: 'text-purple-500' },
   ];
 
   return (
@@ -973,20 +975,8 @@ function DownloadDropdown({ onDownload, darkMode, sepiaMode }) {
       </button>
 
       {isOpen && (
-        <div className={`absolute top-full right-0 mt-2 w-56 rounded-xl shadow-2xl border overflow-hidden z-[110] ${
-          sepiaMode
-            ? "bg-[#f4e8d4] border-amber-700"
-            : darkMode 
-            ? "bg-slate-800 border-slate-700" 
-            : "bg-white border-slate-200"
-        }`}>
-          <div className={`px-3 py-2 text-xs font-semibold uppercase tracking-wide ${
-            sepiaMode
-              ? "bg-[#e8dcc8] text-[#5c4033]"
-              : darkMode 
-              ? "bg-slate-900 text-slate-400" 
-              : "bg-slate-50 text-slate-600"
-          }`}>
+        <div className="absolute top-full right-0 mt-2 w-56 rounded-xl shadow-2xl border overflow-hidden z-[110] bg-white border-slate-200">
+          <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide bg-slate-50 text-slate-600">
             Download As
           </div>
           {formats.map((format) => (
@@ -997,15 +987,9 @@ function DownloadDropdown({ onDownload, darkMode, sepiaMode }) {
                 onDownload(format.value);
                 setIsOpen(false);
               }}
-              className={`w-full flex items-center gap-3 px-4 py-3 transition text-left ${
-                sepiaMode
-                  ? "hover:bg-amber-100 text-[#3d2817]"
-                  : darkMode 
-                  ? "hover:bg-slate-700 text-slate-200" 
-                  : "hover:bg-slate-50 text-slate-700"
-              }`}
+              className="w-full flex items-center gap-3 px-4 py-3 transition text-left hover:bg-slate-50 text-slate-700"
             >
-              <format.icon size={18} />
+              <format.icon size={18} className={format.color} />
               <span className="text-sm font-medium">{format.label}</span>
             </button>
           ))}
@@ -1015,29 +999,213 @@ function DownloadDropdown({ onDownload, darkMode, sepiaMode }) {
   );
 }
 
-/* ---------- Full View Modal with Download Feature ---------- */
-function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
+/* ---------- ✅ COMPLETELY REWRITTEN PDF EXPORT with jsPDF ---------- */
+async function generatePDF(displayTitle, groupedBlocks, fontSize, lineHeight) {
+  // Load jsPDF library dynamically
+  if (!window.jspdf) {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    document.head.appendChild(script);
+    await new Promise((resolve) => { script.onload = resolve; });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p', 'mm', 'a4');
+  
+  const pageWidth = 210; // A4 width in mm
+  const pageHeight = 297; // A4 height in mm
+  const margin = 20;
+  const contentWidth = pageWidth - 2 * margin;
+  let yPosition = margin;
+  
+  // Helper: Add new page if needed
+  const checkPageBreak = (requiredHeight) => {
+    if (yPosition + requiredHeight > pageHeight - margin) {
+      doc.addPage();
+      yPosition = margin;
+      return true;
+    }
+    return false;
+  };
+  
+  // Helper: Extract plain text from HTML
+  const extractText = (html) => {
+    if (!html) return '';
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    return temp.textContent || temp.innerText || '';
+  };
+  
+  // Helper: Wrap text to fit width
+  const wrapText = (text, maxWidth, fontSize) => {
+    doc.setFontSize(fontSize);
+    const lines = doc.splitTextToSize(text, maxWidth);
+    return lines;
+  };
+  
+  // Add title
+  doc.setFontSize(24);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42); // slate-900
+  const titleLines = wrapText(displayTitle, contentWidth, 24);
+  titleLines.forEach((line, i) => {
+    doc.text(line, margin, yPosition);
+    yPosition += 10;
+  });
+  
+  // Add title underline
+  doc.setDrawColor(59, 130, 246); // blue-500
+  doc.setLineWidth(1);
+  doc.line(margin, yPosition, pageWidth - margin, yPosition);
+  yPosition += 15;
+  
+  // Process content blocks
+  for (const block of groupedBlocks) {
+    if (block?.type === "h1") {
+      // Skip main title as it's already added
+      continue;
+    }
+    
+    if (block?.type === "h2") {
+      checkPageBreak(15);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 41, 59); // slate-800
+      const text = extractText(block.value);
+      const lines = wrapText(text, contentWidth, 18);
+      lines.forEach((line) => {
+        doc.text(line, margin, yPosition);
+        yPosition += 8;
+      });
+      doc.setDrawColor(59, 130, 246);
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPosition, pageWidth - margin, yPosition);
+      yPosition += 10;
+    }
+    
+    else if (block?.type === "text") {
+      checkPageBreak(10);
+      doc.setFontSize(fontSize || 11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85); // slate-700
+      const text = extractText(block.value);
+      const lines = wrapText(text, contentWidth, fontSize || 11);
+      
+      for (const line of lines) {
+        checkPageBreak(7);
+        doc.text(line, margin, yPosition);
+        yPosition += 7 * (lineHeight || 1.5);
+      }
+      yPosition += 3;
+    }
+    
+    else if (block?.type === "code") {
+      checkPageBreak(20);
+      doc.setFillColor(30, 41, 59); // slate-900
+      doc.rect(margin, yPosition - 3, contentWidth, 10, 'F');
+      
+      doc.setFontSize(9);
+      doc.setFont('courier', 'normal');
+      doc.setTextColor(16, 185, 129); // emerald-500
+      
+      yPosition += 5;
+      const codeLines = String(block.value || '').split('\n');
+      
+      for (const line of codeLines) {
+        if (checkPageBreak(5)) {
+          doc.setFillColor(30, 41, 59);
+          doc.rect(margin, yPosition - 3, contentWidth, 10, 'F');
+        }
+        doc.text(line || ' ', margin + 2, yPosition);
+        yPosition += 5;
+      }
+      yPosition += 8;
+    }
+    
+    else if (block?.type === "image") {
+      try {
+        checkPageBreak(60);
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = () => {
+            console.warn('Image load failed:', block.value);
+            resolve(); // Continue even if image fails
+          };
+          img.src = block.value;
+        });
+        
+        if (img.complete && img.naturalWidth > 0) {
+          const imgWidth = contentWidth;
+          const imgHeight = (img.height / img.width) * imgWidth;
+          const maxHeight = 100; // Maximum image height
+          const finalHeight = Math.min(imgHeight, maxHeight);
+          
+          checkPageBreak(finalHeight + 10);
+          doc.addImage(img, 'JPEG', margin, yPosition, imgWidth, finalHeight);
+          yPosition += finalHeight + 10;
+        }
+      } catch (e) {
+        console.warn('Failed to add image to PDF:', e);
+        // Add placeholder text
+        doc.setFontSize(10);
+        doc.setTextColor(100, 116, 139);
+        doc.text('[Image]', margin, yPosition);
+        yPosition += 10;
+      }
+    }
+    
+    else if (block?.type === "image-group") {
+      for (const img of block.images) {
+        try {
+          checkPageBreak(60);
+          const image = new Image();
+          image.crossOrigin = "anonymous";
+          await new Promise((resolve) => {
+            image.onload = resolve;
+            image.onerror = resolve;
+            image.src = img.value;
+          });
+          
+          if (image.complete && image.naturalWidth > 0) {
+            const imgWidth = contentWidth;
+            const imgHeight = (image.height / image.width) * imgWidth;
+            const maxHeight = 80;
+            const finalHeight = Math.min(imgHeight, maxHeight);
+            
+            checkPageBreak(finalHeight + 10);
+            doc.addImage(image, 'JPEG', margin, yPosition, imgWidth, finalHeight);
+            yPosition += finalHeight + 10;
+          }
+        } catch (e) {
+          console.warn('Failed to add image to PDF:', e);
+        }
+      }
+    }
+  }
+  
+  return doc;
+}
+
+/* ---------- Full View Modal with FIXED Download Feature & Edit Button ---------- */
+function FullViewModal({ item, onClose, owner }) {
+  const navigate = useNavigate();
   const [expandedCodeBlocks, setExpandedCodeBlocks] = useState(new Set());
   const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
-  const [darkMode, setDarkMode] = useState(initialDarkMode);
   const [fullScreenImages, setFullScreenImages] = useState(null);
   const [fullScreenIndex, setFullScreenIndex] = useState(0);
   const [downloading, setDownloading] = useState(false);
   
-  // Reading Features
+  // Reading Features - ALWAYS LIGHT MODE
   const [fontSize, setFontSize] = useState(18);
   const [lineHeight, setLineHeight] = useState(1.7);
   const [fontFamily, setFontFamily] = useState("default");
   const [readingMode, setReadingMode] = useState(false);
-  const [sepiaMode, setSepiaMode] = useState(false);
   const [showReadingPanel, setShowReadingPanel] = useState(false);
   const [bookmarkedSections, setBookmarkedSections] = useState(new Set());
 
   const contentRef = useRef(null);
-
-  useEffect(() => {
-    saveDarkMode(darkMode);
-  }, [darkMode]);
 
   if (!item) return null;
 
@@ -1088,9 +1256,16 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
 
   // Extract text content from HTML
   const extractTextContent = (html) => {
+    if (!html) return '';
     const temp = document.createElement('div');
     temp.innerHTML = html;
     return temp.textContent || temp.innerText || '';
+  };
+
+  const handleEdit = () => {
+    if (!owner) return;
+    onClose();
+    navigate(`/bim/edit/${encodeURIComponent(item.id)}`);
   };
 
   // Download handlers
@@ -1110,7 +1285,7 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
       }
     } catch (error) {
       console.error('Download failed:', error);
-      alert('Download failed: ' + error.message);
+      alert('Download failed: ' + error.message + '\n\nPlease try another format.');
     } finally {
       setDownloading(false);
     }
@@ -1124,9 +1299,10 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
         const text = extractTextContent(block.value);
         content += `\n${text}\n${'-'.repeat(text.length)}\n\n`;
       } else if (block?.type === "text") {
-        content += extractTextContent(block.value) + '\n\n';
+        const text = extractTextContent(block.value);
+        content += text + '\n\n';
       } else if (block?.type === "code") {
-        content += '```\n' + block.value + '\n```\n\n';
+        content += '```\n' + (block.value || '') + '\n```\n\n';
       } else if (block?.type === "image") {
         content += `[Image: ${block.value}]\n\n`;
       } else if (block?.type === "image-group") {
@@ -1134,7 +1310,7 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
       }
     });
 
-    const blob = new Blob([content], { type: 'text/plain' });
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1153,31 +1329,36 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${displayTitle}</title>
   <style>
+    * { box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
+      line-height: 1.7;
       max-width: 800px;
       margin: 40px auto;
       padding: 20px;
       color: #1e293b;
+      background: white;
     }
     h1 {
       font-size: 2.5rem;
       font-weight: 800;
       margin-bottom: 1.5rem;
       color: #0f172a;
+      border-bottom: 3px solid #3b82f6;
+      padding-bottom: 15px;
     }
     h2 {
       font-size: 2rem;
       font-weight: 700;
-      margin-top: 2rem;
+      margin-top: 2.5rem;
       margin-bottom: 1rem;
       padding-bottom: 0.5rem;
       border-bottom: 2px solid #3b82f6;
       color: #1e293b;
     }
     p {
-      margin: 0.75rem 0;
+      margin: 1rem 0;
+      line-height: 1.7;
     }
     ul, ol {
       margin: 1rem 0;
@@ -1185,7 +1366,11 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
     }
     ul { list-style-type: disc; }
     ol { list-style-type: decimal; }
-    li { margin: 0.5rem 0; padding-left: 0.5rem; }
+    li { 
+      margin: 0.5rem 0; 
+      padding-left: 0.5rem; 
+      line-height: 1.6;
+    }
     code {
       background-color: rgba(135,131,120,.15);
       color: #eb5757;
@@ -1201,6 +1386,7 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
       border-radius: 0.5rem;
       overflow-x: auto;
       margin: 1.5rem 0;
+      line-height: 1.5;
     }
     pre code {
       background: none;
@@ -1212,10 +1398,14 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
       height: auto;
       border-radius: 0.5rem;
       margin: 1.5rem 0;
+      display: block;
     }
     strong { font-weight: 700; }
     em { font-style: italic; }
     u { text-decoration: underline; }
+    @media print {
+      body { margin: 0; }
+    }
   </style>
 </head>
 <body>
@@ -1224,18 +1414,19 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
 
     groupedBlocks.forEach((block) => {
       if (block?.type === "h1") {
-        // Skip main title as it's already added
+        // Skip main title
       } else if (block?.type === "h2") {
         htmlContent += `  <h2>${block.value}</h2>\n`;
       } else if (block?.type === "text") {
         htmlContent += `  <div>${block.value}</div>\n`;
       } else if (block?.type === "code") {
-        htmlContent += `  <pre><code>${block.value.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>\n`;
+        const escaped = (block.value || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        htmlContent += `  <pre><code>${escaped}</code></pre>\n`;
       } else if (block?.type === "image") {
-        htmlContent += `  <img src="${block.value}" alt="Image" />\n`;
+        htmlContent += `  <img src="${block.value}" alt="Content image" />\n`;
       } else if (block?.type === "image-group") {
         block.images.forEach(img => {
-          htmlContent += `  <img src="${img.value}" alt="Image" />\n`;
+          htmlContent += `  <img src="${img.value}" alt="Content image" />\n`;
         });
       }
     });
@@ -1243,7 +1434,7 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
     htmlContent += `</body>
 </html>`;
 
-    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1259,15 +1450,16 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
     
     groupedBlocks.forEach((block) => {
       if (block?.type === "h1") {
-        // Skip as main title
+        // Skip
       } else if (block?.type === "h2") {
         const text = extractTextContent(block.value);
         content += `## ${text}\n\n`;
       } else if (block?.type === "text") {
-        content += extractTextContent(block.value) + '\n\n';
+        const text = extractTextContent(block.value);
+        content += text + '\n\n';
       } else if (block?.type === "code") {
         const lang = block.language || 'javascript';
-        content += `\`\`\`${lang}\n${block.value}\n\`\`\`\n\n`;
+        content += `\`\`\`${lang}\n${block.value || ''}\n\`\`\`\n\n`;
       } else if (block?.type === "image") {
         content += `![Image](${block.value})\n\n`;
       } else if (block?.type === "image-group") {
@@ -1278,7 +1470,7 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
       }
     });
 
-    const blob = new Blob([content], { type: 'text/markdown' });
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1289,219 +1481,27 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
     URL.revokeObjectURL(url);
   };
 
+  // ✅ COMPLETELY REWRITTEN PDF generation
   const downloadAsPDF = async (filename) => {
-  // Load required libraries
-  if (!window.html2canvas) {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-    document.head.appendChild(script);
-    await new Promise((resolve) => { script.onload = resolve; });
-  }
+    const loadingDiv = document.createElement('div');
+    loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); color: white; padding: 20px 40px; border-radius: 10px; z-index: 10000; font-size: 16px; font-weight: bold;';
+    loadingDiv.textContent = '📄 Generating PDF... Please wait';
+    document.body.appendChild(loadingDiv);
 
-  if (!window.jspdf) {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    document.head.appendChild(script);
-    await new Promise((resolve) => { script.onload = resolve; });
-  }
-
-  const { jsPDF } = window.jspdf;
-  const contentElement = contentRef.current;
-  if (!contentElement) throw new Error('Content not found');
-
-  // Show loading indicator
-  const loadingDiv = document.createElement('div');
-  loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px 40px; border-radius: 10px; z-index: 10000; font-size: 16px;';
-  loadingDiv.textContent = 'Generating PDF... Please wait';
-  document.body.appendChild(loadingDiv);
-
-  try {
-    // Clone the content
-    const clonedElement = contentElement.cloneNode(true);
-    
-    // Create temporary container with PDF-safe styles
-    const tempContainer = document.createElement('div');
-    tempContainer.style.cssText = `
-      position: absolute;
-      left: -9999px;
-      top: 0;
-      width: 800px;
-      background: white;
-      padding: 40px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    `;
-    
-    // Add title
-    const titleElement = document.createElement('h1');
-    titleElement.textContent = displayTitle;
-    titleElement.style.cssText = `
-      font-size: 32px;
-      font-weight: 800;
-      margin-bottom: 30px;
-      color: #0f172a;
-      border-bottom: 3px solid #3b82f6;
-      padding-bottom: 15px;
-    `;
-    tempContainer.appendChild(titleElement);
-    
-    // Style the cloned content
-    clonedElement.style.cssText = `
-      width: 100%;
-      font-size: ${fontSize}px;
-      line-height: ${lineHeight};
-      color: #1e293b;
-    `;
-    
-    // ✅ CRITICAL: Remove all problematic classes and inline styles
-    const sanitizeElement = (element) => {
-      if (!element || element.nodeType !== 1) return;
-      
-      // Remove gradient classes that cause oklch issues
-      const classList = element.classList;
-      const problematicClasses = [
-        'bg-gradient-to-r',
-        'bg-gradient-to-br',
-        'bg-gradient-to-l',
-        'bg-gradient-to-tr',
-        'bg-gradient-to-tl',
-        'bg-gradient-to-b',
-        'bg-gradient-to-t'
-      ];
-      
-      problematicClasses.forEach(cls => {
-        if (classList.contains(cls)) {
-          classList.remove(cls);
-          // Replace with solid safe color
-          element.style.background = '#ffffff';
-        }
-      });
-      
-      // Force safe colors on all elements
-      const computedStyle = window.getComputedStyle(element);
-      
-      // Fix background colors
-      if (computedStyle.backgroundColor && computedStyle.backgroundColor !== 'rgba(0, 0, 0, 0)') {
-        const bgColor = computedStyle.backgroundColor;
-        if (bgColor.includes('oklch') || bgColor.includes('gradient')) {
-          element.style.backgroundColor = '#ffffff';
-          element.style.backgroundImage = 'none';
-        }
+    try {
+      const doc = await generatePDF(displayTitle, groupedBlocks, fontSize, lineHeight);
+      doc.save(`${filename}.pdf`);
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Failed to generate PDF: ' + error.message);
+      throw error;
+    } finally {
+      if (document.body.contains(loadingDiv)) {
+        document.body.removeChild(loadingDiv);
       }
-      
-      // Fix text colors
-      if (computedStyle.color) {
-        const color = computedStyle.color;
-        if (color.includes('oklch')) {
-          element.style.color = '#1e293b';
-        }
-      }
-      
-      // Fix border colors
-      if (computedStyle.borderColor && computedStyle.borderColor.includes('oklch')) {
-        element.style.borderColor = '#e2e8f0';
-      }
-      
-      // Remove any background-image with gradients
-      if (element.style.backgroundImage && element.style.backgroundImage.includes('gradient')) {
-        element.style.backgroundImage = 'none';
-        element.style.backgroundColor = '#ffffff';
-      }
-      
-      // Recursively sanitize children
-      Array.from(element.children).forEach(sanitizeElement);
-    };
-    
-    // Sanitize the entire cloned tree
-    sanitizeElement(clonedElement);
-    
-    tempContainer.appendChild(clonedElement);
-    document.body.appendChild(tempContainer);
-
-    // Wait for any async operations
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Generate canvas with maximum compatibility settings
-    const canvas = await window.html2canvas(tempContainer, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      imageTimeout: 0,
-      removeContainer: true,
-      foreignObjectRendering: false, // Disable foreign object rendering
-      onclone: (clonedDoc) => {
-        // Extra sanitization pass in the cloned document
-        const allElements = clonedDoc.querySelectorAll('*');
-        allElements.forEach(el => {
-          // Remove all class attributes to prevent Tailwind from applying styles
-          const problematicPrefixes = ['bg-', 'text-', 'border-', 'from-', 'to-', 'via-'];
-          const classes = Array.from(el.classList || []);
-          
-          classes.forEach(className => {
-            if (problematicPrefixes.some(prefix => className.startsWith(prefix))) {
-              el.classList.remove(className);
-            }
-          });
-          
-          // Force inline safe styles
-          if (el.style) {
-            // Clear any gradient backgrounds
-            if (el.style.backgroundImage) {
-              el.style.backgroundImage = 'none';
-            }
-            
-            // Ensure safe colors
-            if (!el.style.color || el.style.color === '') {
-              el.style.color = '#1e293b';
-            }
-            
-            if (!el.style.backgroundColor || el.style.backgroundColor === 'transparent') {
-              el.style.backgroundColor = '#ffffff';
-            }
-          }
-        });
-      }
-    });
-
-    // Remove temporary container
-    document.body.removeChild(tempContainer);
-
-    // Create PDF
-    const imgWidth = 210; // A4 width in mm
-    const pageHeight = 297; // A4 height in mm
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    // Add first page
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-
-    // Add additional pages if content is longer
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
     }
+  };
 
-    // Save the PDF
-    pdf.save(`${filename}.pdf`);
-    
-  } catch (error) {
-    console.error('PDF generation error:', error);
-    alert('Failed to generate PDF: ' + error.message + '\n\nTry using the HTML or Markdown download options instead.');
-    throw error;
-  } finally {
-    // Always remove loading indicator
-    if (document.body.contains(loadingDiv)) {
-      document.body.removeChild(loadingDiv);
-    }
-  }
-};
   return (
     <>
       {fullScreenImages && (
@@ -1513,22 +1513,12 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
         onClick={onClose}
       >
         <div
-          className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden ${
-            sepiaMode 
-              ? "bg-[#f4e8d4]"
-              : darkMode 
-              ? "bg-slate-900" 
-              : "bg-white"
-          }`}
+          className="rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden bg-white"
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
         >
-          <div className={`flex-shrink-0 ${
-            sepiaMode
-              ? "bg-gradient-to-r from-amber-700 to-amber-800"
-              : "bg-gradient-to-r from-blue-600 to-cyan-600"
-          } text-white px-6 py-4 flex items-center justify-between z-10`}>
+          <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-4 flex items-center justify-between z-10">
             <div className="flex items-center gap-3 flex-1 min-w-0">
               {item.locked && (
                 <div className="flex-shrink-0 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5">
@@ -1539,11 +1529,18 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
               <h1 className="text-3xl font-bold truncate">{displayTitle}</h1>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <DownloadDropdown 
-                onDownload={handleDownload} 
-                darkMode={darkMode}
-                sepiaMode={sepiaMode}
-              />
+              {owner && (
+                <button
+                  type="button"
+                  onClick={handleEdit}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1.5"
+                  title="Edit entry"
+                >
+                  <Edit3 size={20} />
+                  <span className="text-sm font-semibold">Edit</span>
+                </button>
+              )}
+              <DownloadDropdown onDownload={handleDownload} />
               <button
                 type="button"
                 onClick={(e) => {
@@ -1569,31 +1566,13 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
 
           {/* Reading Settings Panel */}
           {showReadingPanel && (
-            <div className={`flex-shrink-0 px-6 py-4 border-b ${
-              sepiaMode
-                ? "bg-[#e8dcc8] border-amber-700"
-                : darkMode 
-                ? "bg-slate-800 border-slate-700" 
-                : "bg-slate-50 border-slate-200"
-            }`}>
-              <h3 className={`text-sm font-bold mb-3 ${
-                sepiaMode
-                  ? "text-[#3d2817]"
-                  : darkMode 
-                  ? "text-slate-200" 
-                  : "text-slate-700"
-              }`}>
+            <div className="flex-shrink-0 px-6 py-4 border-b bg-slate-50 border-slate-200">
+              <h3 className="text-sm font-bold mb-3 text-slate-700">
                 📖 Reading Settings
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={`text-xs font-semibold block mb-1 ${
-                    sepiaMode
-                      ? "text-[#5c4033]"
-                      : darkMode 
-                      ? "text-slate-300" 
-                      : "text-slate-600"
-                  }`}>
+                  <label className="text-xs font-semibold block mb-1 text-slate-600">
                     Font Size: {fontSize}px
                   </label>
                   <input
@@ -1606,13 +1585,7 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
                   />
                 </div>
                 <div>
-                  <label className={`text-xs font-semibold block mb-1 ${
-                    sepiaMode
-                      ? "text-[#5c4033]"
-                      : darkMode 
-                      ? "text-slate-300" 
-                      : "text-slate-600"
-                  }`}>
+                  <label className="text-xs font-semibold block mb-1 text-slate-600">
                     Line Height: {lineHeight.toFixed(1)}
                   </label>
                   <input
@@ -1626,25 +1599,13 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
                   />
                 </div>
                 <div>
-                  <label className={`text-xs font-semibold block mb-1 ${
-                    sepiaMode
-                      ? "text-[#5c4033]"
-                      : darkMode 
-                      ? "text-slate-300" 
-                      : "text-slate-600"
-                  }`}>
+                  <label className="text-xs font-semibold block mb-1 text-slate-600">
                     Font Family
                   </label>
                   <select
                     value={fontFamily}
                     onChange={(e) => setFontFamily(e.target.value)}
-                    className={`w-full px-2 py-1 rounded text-sm ${
-                      sepiaMode
-                        ? "bg-[#f4e8d4] text-[#5c4033] border border-amber-700"
-                        : darkMode 
-                        ? "bg-slate-700 text-slate-200" 
-                        : "bg-white text-slate-800"
-                    }`}
+                    className="w-full px-2 py-1 rounded text-sm bg-white text-slate-800 border border-slate-200"
                   >
                     <option value="default">Default</option>
                     <option value="serif">Serif</option>
@@ -1659,75 +1620,36 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
                   onClick={() => setReadingMode(!readingMode)}
                   className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
                     readingMode 
-                      ? sepiaMode
-                        ? "bg-amber-700 text-white"
-                        : "bg-blue-600 text-white"
-                      : sepiaMode
-                      ? "bg-amber-200 text-amber-900"
-                      : darkMode 
-                      ? "bg-slate-700 text-slate-200" 
+                      ? "bg-blue-600 text-white"
                       : "bg-slate-200 text-slate-700"
                   }`}
                 >
                   {readingMode ? "Exit" : "Enable"} Focus Mode
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSepiaMode(!sepiaMode);
-                    if (!sepiaMode && darkMode) {
-                      setDarkMode(false);
-                    }
-                  }}
-                  className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors flex items-center gap-1 ${
-                    sepiaMode 
-                      ? "bg-amber-700 text-white" 
-                      : darkMode 
-                      ? "bg-slate-700 text-slate-200" 
-                      : "bg-slate-200 text-slate-700"
-                  }`}
-                >
-                  <span className={sepiaMode ? "text-lg" : ""}>☀️</span>
-                  {sepiaMode ? "Exit" : "Enable"} Sepia Mode
-                </button>
               </div>
             </div>
           )}
 
-          {/* Enhanced CSS for Complete Style Preservation - INCLUDING NESTED LISTS */}
+          {/* ✅ SIMPLE LIGHT MODE CSS - All colors preserved perfectly */}
           <style>{`
-            /* Base text colors for modes */
-            .sepia-mode-content {
-              color: #5c4033 !important;
-            }
-            .sepia-mode-content h1,
-            .sepia-mode-content h2 {
-              color: #3d2817 !important;
+            /* Remove backgrounds */
+            .rich-text-content *,
+            .reading-content-container * {
+              background-color: transparent !important;
+              background-image: none !important;
             }
             
-            .dark-mode-content {
-              color: #f1f5f9 !important;
-            }
-            .dark-mode-content h1,
-            .dark-mode-content h2 {
-              color: #f1f5f9 !important;
-            }
-            
+            /* Light mode - preserve ALL colors as entered */
             .light-mode-content {
-              color: #1e293b !important;
+              color: #1e293b;
             }
+            
             .light-mode-content h1,
             .light-mode-content h2 {
-              color: #0f172a !important;
+              color: #0f172a;
             }
 
-            /* Rich text content - preserve ALL inline styles */
-            .rich-text-content {
-              word-wrap: break-word;
-              overflow-wrap: break-word;
-            }
-
-            /* Text formatting */
+            /* Preserve text formatting */
             .rich-text-content strong,
             .rich-text-content b {
               font-weight: 700;
@@ -1742,111 +1664,25 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
               text-decoration: underline;
             }
 
-            .rich-text-content s,
-            .rich-text-content strike {
-              text-decoration: line-through;
-            }
-
-            /* Lists - CRITICAL: Preserve nested list styles */
+            /* Lists */
             .rich-text-content ul,
             .rich-text-content ol {
               margin: 1rem 0;
               padding-left: 2.5rem;
-              list-style-position: outside;
             }
 
-            /* First level bullet lists */
             .rich-text-content ul {
               list-style-type: disc;
             }
 
-            /* Preserve inline list-style-type for bullets */
-            .rich-text-content ul[style*="list-style-type: disc"],
-            .rich-text-content ul[style*="list-style-type:disc"] {
-              list-style-type: disc !important;
-            }
-
-            .rich-text-content ul[style*="list-style-type: circle"],
-            .rich-text-content ul[style*="list-style-type:circle"] {
-              list-style-type: circle !important;
-            }
-
-            .rich-text-content ul[style*="list-style-type: square"],
-            .rich-text-content ul[style*="list-style-type:square"] {
-              list-style-type: square !important;
-            }
-
-            .rich-text-content ul[style*="list-style-type: none"],
-            .rich-text-content ul[style*="list-style-type:none"] {
-              list-style-type: none !important;
-            }
-
-            /* Second level nested bullets - DIFFERENT STYLE */
-            .rich-text-content ul ul {
-              margin: 0.5rem 0;
-              list-style-type: circle;
-            }
-
-            /* Third level nested bullets - DIFFERENT STYLE */
-            .rich-text-content ul ul ul {
-              list-style-type: square;
-            }
-
-            /* BUT: If nested list has explicit style attribute, respect it */
-            .rich-text-content ul ul[style*="list-style-type"],
-            .rich-text-content ul ul ul[style*="list-style-type"] {
-              /* Inline styles will override */
-            }
-
-            /* Numbered lists */
             .rich-text-content ol {
               list-style-type: decimal;
             }
 
-            .rich-text-content ol[style*="list-style-type: decimal"],
-            .rich-text-content ol[style*="list-style-type:decimal"] {
-              list-style-type: decimal !important;
-            }
-
-            .rich-text-content ol[style*="list-style-type: lower-alpha"],
-            .rich-text-content ol[style*="list-style-type:lower-alpha"] {
-              list-style-type: lower-alpha !important;
-            }
-
-            .rich-text-content ol[style*="list-style-type: upper-alpha"],
-            .rich-text-content ol[style*="list-style-type:upper-alpha"] {
-              list-style-type: upper-alpha !important;
-            }
-
-            .rich-text-content ol[style*="list-style-type: lower-roman"],
-            .rich-text-content ol[style*="list-style-type:lower-roman"] {
-              list-style-type: lower-roman !important;
-            }
-
-            .rich-text-content ol[style*="list-style-type: upper-roman"],
-            .rich-text-content ol[style*="list-style-type:upper-roman"] {
-              list-style-type: upper-roman !important;
-            }
-
-            /* Nested numbered lists */
-            .rich-text-content ol ol {
-              margin: 0.5rem 0;
-              list-style-type: lower-alpha;
-            }
-
-            .rich-text-content ol ol ol {
-              list-style-type: lower-roman;
-            }
-
-            /* List items */
             .rich-text-content li {
               margin: 0.5rem 0;
               padding-left: 0.5rem;
               line-height: 1.6;
-            }
-
-            .rich-text-content li::marker {
-              font-weight: 600;
             }
 
             /* Paragraphs */
@@ -1855,65 +1691,28 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
               line-height: inherit;
             }
 
-            .rich-text-content p:first-child {
-              margin-top: 0;
-            }
-
-            .rich-text-content p:last-child {
-              margin-bottom: 0;
-            }
-
             /* Code inline */
             .rich-text-content code {
-              background-color: rgba(135,131,120,.15);
-              color: #eb5757;
+              background-color: rgba(135,131,120,.15) !important;
+              color: #eb5757 !important;
               border-radius: 4px;
               font-size: 90%;
               padding: 0.2em 0.4em;
-              font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
             }
 
             /* Links */
             .rich-text-content a {
-              color: #2563eb;
               text-decoration: underline;
-              text-underline-offset: 2px;
-              transition: color 0.2s;
             }
 
-            .rich-text-content a:hover {
-              color: #1d4ed8;
-            }
-
-            /* Dark mode link adjustments */
             .dark-mode-text .rich-text-content a {
-              color: #60a5fa;
+              color: #60a5fa !important;
             }
 
-            .dark-mode-text .rich-text-content a:hover {
-              color: #93c5fd;
+            .light-mode-text .rich-text-content a {
+              color: #2563eb !important;
             }
 
-            /* Preserve blockquotes */
-            .rich-text-content blockquote {
-              border-left: 4px solid #e2e8f0;
-              padding-left: 1rem;
-              margin: 1rem 0;
-              font-style: italic;
-            }
-
-            /* Reading content container */
-            .reading-content-container * {
-              line-height: inherit !important;
-            }
-
-            .reading-content-container p,
-            .reading-content-container div,
-            .reading-content-container span,
-            .reading-content-container li {
-              line-height: inherit !important;
-            }
-            
             .reading-content-container {
               scroll-behavior: smooth;
             }
@@ -1938,18 +1737,10 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
 
           <div
             ref={contentRef}
-            className={`flex-1 overflow-y-auto overflow-x-hidden p-8 pb-24 reading-content-container ${
-              sepiaMode 
-                ? "bg-[#f4e8d4] sepia-mode-content" 
-                : darkMode 
-                ? "bg-slate-900 dark-mode-content" 
-                : "bg-white light-mode-content"
-            } ${readingMode ? "max-w-3xl mx-auto" : ""} ${getFontFamilyClass()}`}
+            className={`flex-1 overflow-y-auto overflow-x-hidden p-8 pb-24 reading-content-container bg-white light-mode-content ${readingMode ? "max-w-3xl mx-auto" : ""} ${getFontFamilyClass()}`}
             style={{
               fontSize: `${fontSize}px`,
               lineHeight: lineHeight,
-              overflowY: 'auto',
-              WebkitOverflowScrolling: 'touch'
             }}
           >
             <div className="max-w-none space-y-6">
@@ -1963,14 +1754,8 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
                         {bookmarkedSections.has(idx) && (
                           <Bookmark size={20} className="absolute -left-8 top-1 text-amber-500 fill-amber-500" />
                         )}
-                        <h2
-                          className={`text-3xl font-extrabold mb-3 mt-4 pb-2 border-b-2 ${
-                            sepiaMode 
-                              ? "border-amber-700" 
-                              : "border-blue-400"
-                          }`}
-                        >
-                          {renderHTMLContent(block.value, "", darkMode)}
+                        <h2 className="text-3xl font-extrabold mb-3 mt-4 pb-2 border-b-2 border-blue-400">
+                          {renderHTMLContent(block.value, "", false)}
                         </h2>
                         <button
                           type="button"
@@ -1986,11 +1771,8 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
 
                   if (block?.type === "text") {
                     return (
-                      <div
-                        key={`p-${idx}`}
-                        className="leading-relaxed"
-                      >
-                        {renderHTMLContent(block.value, "", darkMode)}
+                      <div key={`p-${idx}`} className="leading-relaxed">
+                        {renderHTMLContent(block.value, "", false)}
                       </div>
                     );
                   }
@@ -2014,7 +1796,7 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
                         className="my-6 relative group cursor-pointer"
                         onDoubleClick={() => openFullScreen([block], 0)}
                       >
-                        <div className={`rounded-lg border overflow-hidden ${darkMode ? "border-slate-700 bg-slate-800" : "border-slate-200 bg-slate-50"}`}>
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden">
                           <img
                             src={block.value}
                             alt=""
@@ -2106,68 +1888,28 @@ function FullViewModal({ item, onClose, darkMode: initialDarkMode }) {
                   return null;
                 })
               ) : (
-                <p className={`text-center py-8 ${
-                  sepiaMode
-                    ? "text-[#8b7355]"
-                    : darkMode 
-                    ? "text-slate-400" 
-                    : "text-slate-500"
-                }`}>No content available</p>
+                <p className="text-center py-8 text-slate-500">No content available</p>
               )}
             </div>
           </div>
 
-          <div
-            className={`flex-shrink-0 px-6 py-4 border-t flex items-center justify-between ${
-              sepiaMode
-                ? "bg-[#e8dcc8] border-amber-700"
-                : darkMode 
-                ? "bg-slate-800 border-slate-700" 
-                : "bg-slate-50 border-slate-200"
-            }`}
-          >
+          <div className="flex-shrink-0 px-6 py-4 border-t bg-slate-50 border-slate-200 flex items-center justify-between">
             <span className="text-sm">
               {downloading && (
-                <span className={`flex items-center gap-2 ${
-                  sepiaMode ? "text-[#5c4033]" : darkMode ? "text-slate-300" : "text-slate-600"
-                }`}>
+                <span className="flex items-center gap-2 text-slate-600">
                   <RefreshCcw size={16} className="animate-spin" />
                   Downloading...
                 </span>
               )}
             </span>
 
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setDarkMode(!darkMode);
-                  if (!darkMode) setSepiaMode(false);
-                }}
-                className={`p-2 rounded-lg transition-colors ${
-                  sepiaMode
-                    ? "bg-amber-200 text-amber-900 hover:bg-amber-300"
-                    : darkMode 
-                    ? "bg-slate-700 text-yellow-400 hover:bg-slate-600" 
-                    : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                }`}
-                title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              >
-                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-                  sepiaMode
-                    ? "bg-amber-700 text-white hover:bg-amber-800"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                }`}
-              >
-                Close
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 rounded-lg font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Close
+            </button>
           </div>
         </div>
       </div>
@@ -2412,7 +2154,7 @@ export default function BIMDisplay() {
         <FullViewModal
           item={viewingItem}
           onClose={() => setViewingItem(null)}
-          darkMode={darkMode}
+          owner={owner}
         />
       )}
 
