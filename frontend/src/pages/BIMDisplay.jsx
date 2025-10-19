@@ -2064,6 +2064,8 @@ export default function BIMDisplay() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFavorites, setFilterFavorites] = useState(false);
   const [sortBy, setSortBy] = useState("recent");
+  const navigate = useNavigate();
+
   
   const owner = true; // Mock owner mode
 
@@ -2127,12 +2129,25 @@ export default function BIMDisplay() {
     }
   };
 
-  const handleDuplicate = async (id) => {
-    if (!owner) return;
-    const item = items.find((i) => i.id === id);
-    if (!item) return;
-    alert("Duplicate feature - navigate to /bim/new with state");
-  };
+  const handleDuplicate = (id) => {
+  if (!owner) return;
+  const item = items.find((i) => i.id === id);
+  if (!item) return;
+
+  const displayTitle =
+    (extractMainTitle(item.blocks || [])?.title || item.title || "Untitled") + " (copy)";
+
+  navigate("/bim/new", {
+    state: {
+      duplicateOf: String(id),
+      preset: {
+        title: displayTitle,
+        blocks: item.blocks || [],
+        locked: false,
+      },
+    },
+  });
+};
 
   const toggleFavorite = (id) => {
     setFavorites((prev) => {
@@ -2480,7 +2495,7 @@ export default function BIMDisplay() {
                             type="button"
                             onClick={(evt) => {
                               evt.stopPropagation();
-                              alert("Edit feature");
+                              navigate(`/bim/edit/${encodeURIComponent(e.id)}`);
                             }}
                             disabled={e.locked}
                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
