@@ -220,6 +220,24 @@ const saveDarkMode = (value) => {
   } catch {}
 };
 
+/* ---------- Study Mode Persistence ---------- */
+const STUDY_MODE_KEY = "bim:studyMode";
+
+const loadStudyMode = () => {
+  try {
+    const saved = localStorage.getItem(STUDY_MODE_KEY);
+    return saved || "light";
+  } catch {
+    return "light";
+  }
+};
+
+const saveStudyMode = (value) => {
+  try {
+    localStorage.setItem(STUDY_MODE_KEY, value);
+  } catch {}
+};
+
 /* ---------- Favorites Persistence ---------- */
 const FAVORITES_KEY = "bim:favorites";
 
@@ -364,7 +382,7 @@ function renderHTMLContent(htmlContent, className = "", darkMode = false) {
   
   return (
     <div
-      className={`rich-text-content ${className} light-mode-text`}
+      className={`rich-text-content ${className}`}
       dangerouslySetInnerHTML={{ __html: htmlContent }}
     />
   );
@@ -612,7 +630,7 @@ function FullScreenImageViewer({ images = [], initialIndex = 0, onClose }) {
 }
 
 /* ---------- Image Carousel ---------- */
-function ImageCarousel({ images = [], isPreview = false, onFullScreen }) {
+function ImageCarousel({ images = [], isPreview = false, onFullScreen, studyMode = 'light' }) {
   const safeImages = Array.isArray(images) ? images.filter((im) => im && im.value) : [];
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -647,23 +665,36 @@ function ImageCarousel({ images = [], isPreview = false, onFullScreen }) {
     if (onFullScreen) onFullScreen(currentIndex);
   };
 
+  const getArrowStyle = () => {
+    if (studyMode === 'light' || studyMode === 'sepia') {
+      return "bg-black/70 hover:bg-black/90 text-white border-2 border-white/20";
+    } else {
+      return "bg-white/90 hover:bg-white text-slate-900 border-2 border-slate-700 shadow-xl";
+    }
+  };
+
   return (
     <div className="relative group">
       <div
-        className={`relative ${isPreview ? "h-48" : "h-96"} rounded-lg overflow-hidden border-2 border-slate-200 cursor-pointer`}
+        className={`relative ${isPreview ? "h-48" : "h-96"} rounded-lg overflow-hidden border-2 ${
+          studyMode === 'light' ? 'border-slate-200 bg-slate-50' :
+          studyMode === 'sepia' ? 'border-amber-200 bg-amber-50' :
+          studyMode === 'dark' ? 'border-slate-600 bg-slate-700' :
+          'border-slate-700 bg-slate-800'
+        } cursor-pointer`}
         onDoubleClick={handleDoubleClick}
       >
         <img
           src={safeImages[currentIndex].value}
           alt=""
-          className="w-full h-full object-contain bg-slate-50"
+          className="w-full h-full object-contain"
           loading="lazy"
         />
 
         <button
           type="button"
           onClick={handleFullScreenClick}
-          className="absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+          className={`absolute top-3 right-3 ${getArrowStyle()} p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100`}
           title="View full screen (or double-click)"
         >
           <Maximize2 size={20} />
@@ -674,14 +705,14 @@ function ImageCarousel({ images = [], isPreview = false, onFullScreen }) {
             <button
               type="button"
               onClick={goToPrevious}
-              className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-0 group-hover:opacity-100"
+              className={`absolute left-3 top-1/2 -translate-y-1/2 ${getArrowStyle()} p-2 rounded-full transition-all opacity-0 group-hover:opacity-100 shadow-lg`}
             >
               <ChevronLeft size={24} />
             </button>
             <button
               type="button"
               onClick={goToNext}
-              className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full transition-all opacity-0 group-hover:opacity-100"
+              className={`absolute right-3 top-1/2 -translate-y-1/2 ${getArrowStyle()} p-2 rounded-full transition-all opacity-0 group-hover:opacity-100 shadow-lg`}
             >
               <ChevronRight size={24} />
             </button>
@@ -892,7 +923,7 @@ function UnlockedPreviewOverlay({ darkMode = false }) {
             Preview available
           </p>
           <p className={`${darkMode ? "text-slate-200" : "text-slate-700"} text-sm`}>
-            Click <span className={darkMode ? "text-blue-300" : "text-blue-700"}>View More</span> to see details
+            Click <span className={`font-bold ${darkMode ? "text-blue-300" : "text-blue-700"}`}>View More</span> to see details
           </p>
         </div>
       </div>
@@ -989,6 +1020,71 @@ function DownloadDropdown({ onDownload }) {
             >
               <format.icon size={18} className={format.color} />
               <span className="text-sm font-medium">{format.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Study Mode Dropdown ---------- */
+function StudyModeDropdown({ studyMode, onStudyModeChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const modes = [
+    { value: 'light', label: 'Light Mode' },
+    { value: 'sepia', label: 'Sepia Mode' },
+    { value: 'dark', label: 'Dark Mode' },
+    { value: 'night', label: 'Night Mode' },
+  ];
+
+  const currentModeLabel = modes.find(m => m.value === studyMode)?.label || 'Light Mode';
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-2"
+        title="Study Mode"
+      >
+        <span className="text-sm font-medium">{currentModeLabel}</span>
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full right-0 mt-2 w-48 rounded-xl shadow-2xl border overflow-hidden z-[110] bg-white border-slate-200">
+          <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide bg-slate-50 text-slate-600">
+            Study Mode
+          </div>
+          {modes.map((mode) => (
+            <button
+              key={mode.value}
+              onClick={(e) => {
+                e.stopPropagation();
+                onStudyModeChange(mode.value);
+                setIsOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-4 py-3 transition text-left hover:bg-slate-50 text-slate-700 ${
+                studyMode === mode.value ? 'bg-blue-50 font-semibold' : ''
+              }`}
+            >
+              <span className="text-sm">{mode.label}</span>
+              {studyMode === mode.value && <Check size={16} className="text-blue-600" />}
             </button>
           ))}
         </div>
@@ -1193,24 +1289,25 @@ function FullViewModal({ item, onClose, owner }) {
   const [readingMode, setReadingMode] = useState(false);
   const [showReadingPanel, setShowReadingPanel] = useState(false);
   const [bookmarkedSections, setBookmarkedSections] = useState(new Set());
-  const [studyMode, setStudyMode] = useState('light'); // 'light', 'sepia', 'dark', 'night'
+  const [studyMode, setStudyMode] = useState(loadStudyMode());
 
   const contentRef = useRef(null);
 
+  // Save study mode whenever it changes
+  useEffect(() => {
+    saveStudyMode(studyMode);
+  }, [studyMode]);
+
   // Block body scroll when modal is open
   useEffect(() => {
-    // Save original body overflow
     const originalOverflow = document.body.style.overflow;
     const originalPaddingRight = document.body.style.paddingRight;
     
-    // Calculate scrollbar width
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
     
-    // Block scroll and prevent layout shift
     document.body.style.overflow = 'hidden';
     document.body.style.paddingRight = `${scrollbarWidth}px`;
     
-    // Cleanup on unmount
     return () => {
       document.body.style.overflow = originalOverflow;
       document.body.style.paddingRight = originalPaddingRight;
@@ -1479,6 +1576,41 @@ function FullViewModal({ item, onClose, owner }) {
     }
   };
 
+  const getCodeTheme = () => {
+    switch(studyMode) {
+      case 'light':
+        return {
+          bg: '#f8f9fa',
+          border: '#e9ecef',
+          text: '#212529'
+        };
+      case 'sepia':
+        return {
+          bg: '#f5f1e8',
+          border: '#d4c5a9',
+          text: '#5c4a3a'
+        };
+      case 'dark':
+        return {
+          bg: '#1e293b',
+          border: '#334155',
+          text: '#10b981'
+        };
+      case 'night':
+        return {
+          bg: '#0f172a',
+          border: '#1e293b',
+          text: '#10b981'
+        };
+      default:
+        return {
+          bg: '#1e293b',
+          border: '#334155',
+          text: '#10b981'
+        };
+    }
+  };
+
   return (
     <>
       {fullScreenImages && (
@@ -1518,6 +1650,7 @@ function FullViewModal({ item, onClose, owner }) {
                 </button>
               )}
               <DownloadDropdown onDownload={handleDownload} />
+              <StudyModeDropdown studyMode={studyMode} onStudyModeChange={setStudyMode} />
               <button
                 type="button"
                 onClick={(e) => {
@@ -1589,32 +1722,6 @@ function FullViewModal({ item, onClose, owner }) {
                     <option value="mono">Monospace</option>
                   </select>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold block mb-1 text-slate-600">
-                    Study Mode Theme
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { value: 'light', label: '☀️', color: 'bg-white border border-slate-300' },
-                      { value: 'sepia', label: '📖', color: 'bg-amber-50 border border-amber-200' },
-                      { value: 'dark', label: '🌙', color: 'bg-slate-700 border border-slate-600' },
-                      { value: 'night', label: '🌃', color: 'bg-slate-900 border border-slate-800' }
-                    ].map(mode => (
-                      <button
-                        key={mode.value}
-                        type="button"
-                        onClick={() => setStudyMode(mode.value)}
-                        className={`px-2 py-1.5 rounded text-xs font-semibold transition-all ${
-                          studyMode === mode.value 
-                            ? 'ring-2 ring-blue-500 scale-105' 
-                            : 'hover:scale-105'
-                        } ${mode.color} ${mode.value === 'dark' || mode.value === 'night' ? 'text-white' : 'text-slate-800'}`}
-                      >
-                        {mode.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
               <div className="mt-3 flex gap-2">
                 <button
@@ -1633,8 +1740,11 @@ function FullViewModal({ item, onClose, owner }) {
           )}
 
           <style>{`
-            .rich-text-content *,
-            .reading-content-container * {
+            .rich-text-content {
+              color: inherit;
+            }
+            
+            .rich-text-content * {
               background-color: transparent !important;
               background-image: none !important;
             }
@@ -1690,68 +1800,40 @@ function FullViewModal({ item, onClose, owner }) {
               text-decoration: underline;
             }
 
-            /* VS Code Dark+ Theme for Code Blocks */
-            .code-block-syntax {
-              background-color: #1e1e1e !important;
-              border-color: #333333 !important;
-            }
-
-            .code-block-syntax code {
-              color: #d4d4d4 !important;
-              text-shadow: none !important;
-            }
-
-            /* Syntax highlighting patterns */
-            .code-block-syntax code {
-              background: transparent !important;
-            }
-
-            /* Keywords - purple/pink */
-            .code-block-syntax code::before {
-              background: linear-gradient(transparent, transparent);
-            }
-
-            /* Study Mode Themes */
+            /* Study Mode Themes - Base Colors for Uncolored Text */
             .study-mode-light {
               background-color: #ffffff !important;
-              color: #1e293b !important;
             }
-
-            .study-mode-light .rich-text-content,
-            .study-mode-light .rich-text-content *:not(code) {
+            
+            .study-mode-light .rich-text-content > *:not([style*="color"]) {
               color: #1e293b !important;
             }
 
             .study-mode-sepia {
               background-color: #f5f1e8 !important;
-              color: #5c4a3a !important;
             }
-
-            .study-mode-sepia .rich-text-content,
-            .study-mode-sepia .rich-text-content *:not(code) {
+            
+            .study-mode-sepia .rich-text-content > *:not([style*="color"]) {
               color: #5c4a3a !important;
             }
 
             .study-mode-dark {
               background-color: #1e293b !important;
-              color: #e2e8f0 !important;
             }
-
-            .study-mode-dark .rich-text-content,
-            .study-mode-dark .rich-text-content *:not(code) {
+            
+            .study-mode-dark .rich-text-content > *:not([style*="color"]) {
               color: #e2e8f0 !important;
             }
 
             .study-mode-night {
               background-color: #0f172a !important;
+            }
+            
+            .study-mode-night .rich-text-content > *:not([style*="color"]) {
               color: #cbd5e1 !important;
             }
 
-            .study-mode-night .rich-text-content,
-            .study-mode-night .rich-text-content *:not(code) {
-              color: #cbd5e1 !important;
-            }
-
+            /* Headings */
             .study-mode-sepia h1,
             .study-mode-sepia h2 {
               color: #3c2f23 !important;
@@ -1769,36 +1851,33 @@ function FullViewModal({ item, onClose, owner }) {
               color: #f1f5f9 !important;
             }
 
-            .study-mode-light .rich-text-content a {
+            /* Links */
+            .study-mode-light .rich-text-content a:not([style*="color"]) {
               color: #2563eb !important;
             }
 
-            .study-mode-sepia .rich-text-content a {
+            .study-mode-sepia .rich-text-content a:not([style*="color"]) {
               color: #b45309 !important;
             }
 
-            .study-mode-dark .rich-text-content a,
-            .study-mode-night .rich-text-content a {
+            .study-mode-dark .rich-text-content a:not([style*="color"]),
+            .study-mode-night .rich-text-content a:not([style*="color"]) {
               color: #60a5fa !important;
             }
 
-            /* Force visible text in dark modes */
-            .study-mode-dark p,
-            .study-mode-dark div,
-            .study-mode-dark span,
-            .study-mode-dark li,
-            .study-mode-night p,
-            .study-mode-night div,
-            .study-mode-night span,
-            .study-mode-night li {
-              color: inherit !important;
+            /* Enhance colored text visibility in dark modes */
+            .study-mode-dark .rich-text-content [style*="color: rgb(0, 0, 0)"],
+            .study-mode-dark .rich-text-content [style*="color: black"],
+            .study-mode-dark .rich-text-content [style*="color:#000"],
+            .study-mode-night .rich-text-content [style*="color: rgb(0, 0, 0)"],
+            .study-mode-night .rich-text-content [style*="color: black"],
+            .study-mode-night .rich-text-content [style*="color:#000"] {
+              color: #ffffff !important;
             }
-
-            .study-mode-dark strong,
-            .study-mode-dark b,
-            .study-mode-night strong,
-            .study-mode-night b {
-              color: #f8fafc !important;
+            
+            .study-mode-dark .rich-text-content [style*="color: rgb(33, 37, 41)"],
+            .study-mode-night .rich-text-content [style*="color: rgb(33, 37, 41)"] {
+              color: #e2e8f0 !important;
             }
 
             .reading-content-container {
@@ -1820,38 +1899,6 @@ function FullViewModal({ item, onClose, owner }) {
             
             .reading-content-container::-webkit-scrollbar-thumb:hover {
               background: rgba(100, 116, 139, 0.5);
-            }
-
-            /* Better code block scrollbar */
-            .code-block-syntax::-webkit-scrollbar {
-              width: 10px;
-              height: 10px;
-            }
-            
-            .code-block-syntax::-webkit-scrollbar-track {
-              background: #2d2d2d;
-              border-radius: 4px;
-            }
-            
-            .code-block-syntax::-webkit-scrollbar-thumb {
-              background: #555555;
-              border-radius: 4px;
-            }
-            
-            .code-block-syntax::-webkit-scrollbar-thumb:hover {
-              background: #666666;
-            }
-
-            /* Code block line numbers effect */
-            .code-block-syntax {
-              counter-reset: line;
-              position: relative;
-            }
-
-            .code-block-syntax code {
-              display: block;
-              white-space: pre;
-              word-wrap: normal;
             }
           `}</style>
 
@@ -1904,6 +1951,7 @@ function FullViewModal({ item, onClose, owner }) {
                           images={block.images}
                           isPreview={false}
                           onFullScreen={(index) => openFullScreen(block.images, index)}
+                          studyMode={studyMode}
                         />
                       </div>
                     );
@@ -1916,7 +1964,12 @@ function FullViewModal({ item, onClose, owner }) {
                         className="my-6 relative group cursor-pointer"
                         onDoubleClick={() => openFullScreen([block], 0)}
                       >
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden">
+                        <div className={`rounded-lg border overflow-hidden ${
+                          studyMode === 'light' ? 'border-slate-200 bg-slate-50' :
+                          studyMode === 'sepia' ? 'border-amber-200 bg-amber-50' :
+                          studyMode === 'dark' ? 'border-slate-600 bg-slate-700' :
+                          'border-slate-700 bg-slate-800'
+                        }`}>
                           <img
                             src={block.value}
                             alt=""
@@ -1940,6 +1993,7 @@ function FullViewModal({ item, onClose, owner }) {
                     const isExpanded = expandedCodeBlocks.has(idx);
                     const lines = String(block.value || "").split("\n");
                     const hasMore = lines.length > 10;
+                    const codeTheme = getCodeTheme();
 
                     return (
                       <div key={`cd-${idx}`} className="my-6">
@@ -1972,16 +2026,19 @@ function FullViewModal({ item, onClose, owner }) {
                           </button>
 
                           <pre 
-                            className="code-block-syntax rounded-lg p-6 overflow-x-auto overflow-y-auto border-2"
+                            className="rounded-lg p-6 overflow-x-auto overflow-y-auto border-2"
                             style={{ 
                               maxHeight: isExpanded ? 'none' : '400px',
                               fontFamily: '"Fira Code", "Cascadia Code", "JetBrains Mono", Consolas, Monaco, "Courier New", monospace',
                               fontSize: '14px',
                               lineHeight: '1.6',
-                              tabSize: 4
+                              tabSize: 4,
+                              backgroundColor: codeTheme.bg,
+                              borderColor: codeTheme.border,
+                              color: codeTheme.text
                             }}
                           >
-                            <code>{block.value || ""}</code>
+                            <code style={{ color: codeTheme.text }}>{block.value || ""}</code>
                           </pre>
 
                           {hasMore && (
@@ -2065,6 +2122,7 @@ export default function BIMDisplay() {
   const [filterFavorites, setFilterFavorites] = useState(false);
   const [sortBy, setSortBy] = useState("recent");
   const navigate = useNavigate();
+  const location = useLocation();
 
   
   const owner = true; // Mock owner mode
@@ -2130,24 +2188,29 @@ export default function BIMDisplay() {
   };
 
   const handleDuplicate = (id) => {
-  if (!owner) return;
-  const item = items.find((i) => i.id === id);
-  if (!item) return;
+    if (!owner) return;
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
 
-  const displayTitle =
-    (extractMainTitle(item.blocks || [])?.title || item.title || "Untitled") + " (copy)";
+    const displayTitle =
+      (extractMainTitle(item.blocks || [])?.title || item.title || "Untitled") + " (copy)";
 
-  navigate("/bim/new", {
-    state: {
-      duplicateOf: String(id),
-      preset: {
-        title: displayTitle,
-        blocks: item.blocks || [],
-        locked: false,
+    navigate("/bim/new", {
+      state: {
+        duplicateOf: String(id),
+        preset: {
+          title: displayTitle,
+          blocks: item.blocks || [],
+          locked: false,
+        },
       },
-    },
-  });
-};
+    });
+  };
+
+  const handleEdit = (id) => {
+    if (!owner) return;
+    navigate(`/bim/edit/${encodeURIComponent(id)}`);
+  };
 
   const toggleFavorite = (id) => {
     setFavorites((prev) => {
@@ -2440,9 +2503,11 @@ export default function BIMDisplay() {
                             lockingIds.has(e.id)
                               ? "bg-slate-300 text-slate-500 cursor-wait opacity-60"
                               : e.locked
-                              ? "bg-amber-100 text-amber-600 hover:bg-amber-200"
+                              ? darkMode
+                                ? "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/50"
+                                : "bg-amber-100 text-amber-600 hover:bg-amber-200"
                               : darkMode
-                              ? "bg-slate-700 text-slate-400 hover:text-amber-500 hover:bg-slate-600"
+                              ? "bg-slate-700 text-slate-300 hover:text-amber-400 hover:bg-slate-600 border border-slate-600"
                               : "bg-slate-100 text-slate-400 hover:text-amber-500 hover:bg-slate-200"
                           }`}
                           title={
@@ -2495,7 +2560,7 @@ export default function BIMDisplay() {
                             type="button"
                             onClick={(evt) => {
                               evt.stopPropagation();
-                              navigate(`/bim/edit/${encodeURIComponent(e.id)}`);
+                              handleEdit(e.id);
                             }}
                             disabled={e.locked}
                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
@@ -2516,9 +2581,7 @@ export default function BIMDisplay() {
                             type="button"
                             onClick={(evt) => {
                               evt.stopPropagation();
-                              if (!e.locked) {
-                                handleDuplicate(e.id);
-                              }
+                              handleDuplicate(e.id);
                             }}
                             disabled={e.locked}
                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
@@ -2539,9 +2602,7 @@ export default function BIMDisplay() {
                             type="button"
                             onClick={(evt) => {
                               evt.stopPropagation();
-                              if (!e.locked) {
-                                onDelete(e.id);
-                              }
+                              onDelete(e.id);
                             }}
                             disabled={busyId === String(e.id) || e.locked}
                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
@@ -2584,7 +2645,7 @@ export default function BIMDisplay() {
           <div className="flex justify-center">
             <button
               type="button"
-              onClick={() => alert("Create new entry")}
+              onClick={() => navigate("/bim/new")}
               className="px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all"
             >
               <span className="inline-flex items-center gap-2">
@@ -2635,7 +2696,7 @@ export default function BIMDisplay() {
             {owner && (
               <button
                 type="button"
-                onClick={() => alert("Create first entry")}
+                onClick={() => navigate("/bim/new")}
                 className="mt-6 px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all"
               >
                 <span className="inline-flex items-center gap-2">
