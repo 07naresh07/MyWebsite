@@ -6,6 +6,18 @@ import {
   Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, FileText, FileDown, File
 } from "lucide-react";
 
+/* ---------- HELPER: Check if running on local server ---------- */
+const isLocalServer = () => {
+  const hostname = window.location.hostname;
+  return hostname === 'localhost' || 
+         hostname === '127.0.0.1' || 
+         hostname.startsWith('192.168.') ||
+         hostname.startsWith('10.') ||
+         hostname === '0.0.0.0' ||
+         hostname === '' ||
+         hostname === '::1';
+};
+
 /* ---------- API base ---------- */
 const RAW_API = (import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || "").trim();
 const API_BASE = RAW_API.replace(/\/+$/, "");
@@ -1638,7 +1650,7 @@ function FullViewModal({ item, onClose, owner }) {
               <h1 className="text-3xl font-bold truncate">{displayTitle}</h1>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {owner && (
+              {isLocalServer() && owner && (
                 <button
                   type="button"
                   onClick={handleEdit}
@@ -2124,8 +2136,9 @@ export default function BIMDisplay() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  
-  const owner = true; // Mock owner mode
+  // Check if running on local server
+  const isLocal = isLocalServer();
+  const owner = isLocal; // Only enable owner mode on local server
 
   useEffect(() => {
     saveDarkMode(darkMode);
@@ -2221,6 +2234,7 @@ export default function BIMDisplay() {
   };
 
   const handleLockUnlock = (entryId, currentLockState) => {
+    if (!owner) return;
     const action = currentLockState ? 'unlock this entry' : 'lock this entry';
     setPasswordPrompt({ 
       entryId, 
@@ -2495,33 +2509,35 @@ export default function BIMDisplay() {
                           <Star size={16} fill={favorites.has(e.id) ? "currentColor" : "none"} />
                         </button>
                         
-                        <button
-                          type="button"
-                          onClick={() => handleLockUnlock(e.id, e.locked)}
-                          disabled={lockingIds.has(e.id)}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            lockingIds.has(e.id)
-                              ? "bg-slate-300 text-slate-500 cursor-wait opacity-60"
-                              : e.locked
-                              ? darkMode
-                                ? "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/50"
-                                : "bg-amber-100 text-amber-600 hover:bg-amber-200"
-                              : darkMode
-                              ? "bg-slate-700 text-slate-300 hover:text-amber-400 hover:bg-slate-600 border border-slate-600"
-                              : "bg-slate-100 text-slate-400 hover:text-amber-500 hover:bg-slate-200"
-                          }`}
-                          title={
-                            lockingIds.has(e.id) 
-                              ? "Updating..." 
-                              : e.locked 
-                              ? "🔒 Click to unlock" 
-                              : "🔓 Click to lock"
-                          }
-                        >
-                          {e.locked ? <Lock size={16} /> : <Unlock size={16} />}
-                        </button>
+                        {isLocal && (
+                          <button
+                            type="button"
+                            onClick={() => handleLockUnlock(e.id, e.locked)}
+                            disabled={lockingIds.has(e.id)}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              lockingIds.has(e.id)
+                                ? "bg-slate-300 text-slate-500 cursor-wait opacity-60"
+                                : e.locked
+                                ? darkMode
+                                  ? "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/50"
+                                  : "bg-amber-100 text-amber-600 hover:bg-amber-200"
+                                : darkMode
+                                ? "bg-slate-700 text-slate-300 hover:text-amber-400 hover:bg-slate-600 border border-slate-600"
+                                : "bg-slate-100 text-slate-400 hover:text-amber-500 hover:bg-slate-200"
+                            }`}
+                            title={
+                              lockingIds.has(e.id) 
+                                ? "Updating..." 
+                                : e.locked 
+                                ? "🔒 Click to unlock" 
+                                : "🔓 Click to lock"
+                            }
+                          >
+                            {e.locked ? <Lock size={16} /> : <Unlock size={16} />}
+                          </button>
+                        )}
                         
-                        {owner && (
+                        {isLocal && (
                           <span className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-bold shadow-sm">
                             {e.blocks?.length ?? 0} {e.blocks?.length === 1 ? "block" : "blocks"}
                           </span>
@@ -2554,7 +2570,7 @@ export default function BIMDisplay() {
                         </span>
                       </button>
 
-                      {owner && (
+                      {isLocal && (
                         <>
                           <button
                             type="button"
@@ -2623,7 +2639,7 @@ export default function BIMDisplay() {
                       )}
                     </div>
 
-                    {owner && (
+                    {isLocal && (
                       <div className={`pt-3 border-t flex items-center justify-between ${darkMode ? "border-slate-700" : "border-slate-100"}`}>
                         <span
                           className={`text-xs font-mono px-3 py-1.5 rounded ${
@@ -2641,7 +2657,7 @@ export default function BIMDisplay() {
           </div>
         )}
 
-        {!loading && !err && filteredAndSortedItems.length > 0 && owner && (
+        {!loading && !err && filteredAndSortedItems.length > 0 && isLocal && (
           <div className="flex justify-center">
             <button
               type="button"
@@ -2691,9 +2707,9 @@ export default function BIMDisplay() {
             </div>
             <p className={`font-bold text-2xl mb-2 ${darkMode ? "text-slate-200" : "text-slate-700"}`}>No BIM data available</p>
             <p className={`mb-6 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
-              {owner ? "Start building your knowledge base today!" : "The owner hasn't added any public entries yet."}
+              {isLocal ? "Start building your knowledge base today!" : "The owner hasn't added any public entries yet."}
             </p>
-            {owner && (
+            {isLocal && (
               <button
                 type="button"
                 onClick={() => navigate("/bim/new")}
