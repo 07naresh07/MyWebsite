@@ -2234,16 +2234,37 @@ export default function BIMDisplay() {
   };
 
   const handleLockUnlock = (entryId, currentLockState) => {
-    if (!owner) return;
-    const action = currentLockState ? 'unlock this entry' : 'lock this entry';
-    setPasswordPrompt({ 
-      entryId, 
-      currentLockState,
-      action,
-      callback: async (token) => {
-        await toggleLockWithToken(entryId, !currentLockState, token);
+    // In web mode (not local), users can only unlock, not lock
+    if (!isLocal && !currentLockState) {
+      // Trying to lock in web mode - not allowed
+      return;
+    }
+    
+    // In local mode, require password for both lock and unlock
+    if (isLocal) {
+      const action = currentLockState ? 'unlock this entry' : 'lock this entry';
+      setPasswordPrompt({ 
+        entryId, 
+        currentLockState,
+        action,
+        callback: async (token) => {
+          await toggleLockWithToken(entryId, !currentLockState, token);
+        }
+      });
+    } else {
+      // In web mode, only allow unlocking with password
+      if (currentLockState) {
+        const action = 'unlock this entry to view content';
+        setPasswordPrompt({ 
+          entryId, 
+          currentLockState,
+          action,
+          callback: async (token) => {
+            await toggleLockWithToken(entryId, false, token);
+          }
+        });
       }
-    });
+    }
   };
 
   const toggleLockWithToken = async (id, newLockedState, token) => {
@@ -2509,33 +2530,34 @@ export default function BIMDisplay() {
                           <Star size={16} fill={favorites.has(e.id) ? "currentColor" : "none"} />
                         </button>
                         
-                        {isLocal && (
-                          <button
-                            type="button"
-                            onClick={() => handleLockUnlock(e.id, e.locked)}
-                            disabled={lockingIds.has(e.id)}
-                            className={`p-1.5 rounded-lg transition-colors ${
-                              lockingIds.has(e.id)
-                                ? "bg-slate-300 text-slate-500 cursor-wait opacity-60"
-                                : e.locked
-                                ? darkMode
-                                  ? "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/50"
-                                  : "bg-amber-100 text-amber-600 hover:bg-amber-200"
-                                : darkMode
+                        <button
+                          type="button"
+                          onClick={() => handleLockUnlock(e.id, e.locked)}
+                          disabled={lockingIds.has(e.id)}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            lockingIds.has(e.id)
+                              ? "bg-slate-300 text-slate-500 cursor-wait opacity-60"
+                              : e.locked
+                              ? darkMode
+                                ? "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/50"
+                                : "bg-amber-100 text-amber-600 hover:bg-amber-200"
+                              : isLocal
+                              ? darkMode
                                 ? "bg-slate-700 text-slate-300 hover:text-amber-400 hover:bg-slate-600 border border-slate-600"
                                 : "bg-slate-100 text-slate-400 hover:text-amber-500 hover:bg-slate-200"
-                            }`}
-                            title={
-                              lockingIds.has(e.id) 
-                                ? "Updating..." 
-                                : e.locked 
-                                ? "🔒 Click to unlock" 
-                                : "🔓 Click to lock"
-                            }
-                          >
-                            {e.locked ? <Lock size={16} /> : <Unlock size={16} />}
-                          </button>
-                        )}
+                              : "bg-slate-300 dark:bg-slate-700 text-slate-400 cursor-not-allowed opacity-50"
+                          }`}
+                          title={
+                            lockingIds.has(e.id) 
+                              ? "Updating..." 
+                              : e.locked 
+                              ? isLocal ? "🔒 Click to unlock" : "🔒 Click to unlock and view content"
+                              : isLocal ? "🔓 Click to lock" : "Already unlocked"
+                          }
+                          style={!isLocal && !e.locked ? { pointerEvents: 'none' } : {}}
+                        >
+                          {e.locked ? <Lock size={16} /> : <Unlock size={16} />}
+                        </button>
                         
                         {isLocal && (
                           <span className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-bold shadow-sm">
