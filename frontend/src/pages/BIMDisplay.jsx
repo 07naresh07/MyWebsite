@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   BookOpen, Trash2, Edit3, Plus, Eye, Star,
   ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw,
-  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, FileText, FileDown, File
+  Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, FileText, FileDown, File,
+  ChevronUp, Minus
 } from "lucide-react";
 
 /* ---------- HELPER: Check if running on local server ---------- */
@@ -1294,7 +1295,8 @@ function FullViewModal({ item, onClose, owner }) {
   const [fullScreenIndex, setFullScreenIndex] = useState(0);
   const [downloading, setDownloading] = useState(false);
   
-  // Reading Features
+  const [windowMode, setWindowMode] = useState('normal');
+  
   const [fontSize, setFontSize] = useState(18);
   const [lineHeight, setLineHeight] = useState(1.7);
   const [fontFamily, setFontFamily] = useState("default");
@@ -1305,12 +1307,10 @@ function FullViewModal({ item, onClose, owner }) {
 
   const contentRef = useRef(null);
 
-  // Save study mode whenever it changes
   useEffect(() => {
     saveStudyMode(studyMode);
   }, [studyMode]);
 
-  // Block body scroll when modal is open
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
     const originalPaddingRight = document.body.style.paddingRight;
@@ -1389,7 +1389,7 @@ function FullViewModal({ item, onClose, owner }) {
   const handleDownload = async (format) => {
     setDownloading(true);
     try {
-      const filename = `${displayTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`;
+      const filename = displayTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
       
       if (format === 'txt') {
         downloadAsText(filename);
@@ -1630,11 +1630,19 @@ function FullViewModal({ item, onClose, owner }) {
       )}
 
       <div
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-hidden`}
-        onClick={onClose}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-hidden transition-all duration-300 ${
+          windowMode === 'minimized' ? 'items-end justify-end p-0' : ''
+        }`}
+        onClick={windowMode === 'minimized' ? undefined : onClose}
       >
         <div
-          className="rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden bg-white"
+          className={`rounded-2xl shadow-2xl flex flex-col overflow-hidden bg-white transition-all duration-300 ${
+            windowMode === 'maximized' 
+              ? 'w-full h-full max-w-none max-h-none rounded-none' 
+              : windowMode === 'minimized'
+              ? 'w-96 h-16 rounded-t-2xl rounded-b-none'
+              : 'max-w-4xl w-full max-h-[90vh]'
+          }`}
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
@@ -1650,30 +1658,72 @@ function FullViewModal({ item, onClose, owner }) {
               <h1 className="text-3xl font-bold truncate">{displayTitle}</h1>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {isLocalServer() && owner && (
+              {windowMode === 'minimized' ? (
                 <button
                   type="button"
-                  onClick={handleEdit}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1.5"
-                  title="Edit entry"
+                  onClick={() => setWindowMode('normal')}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                  title="Restore"
                 >
-                  <Edit3 size={20} />
-                  <span className="text-sm font-semibold">Edit</span>
+                  <ChevronUp size={20} />
                 </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setWindowMode('minimized')}
+                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                    title="Minimize"
+                  >
+                    <Minus size={20} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWindowMode(windowMode === 'maximized' ? 'normal' : 'maximized')}
+                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                    title={windowMode === 'maximized' ? 'Restore' : 'Maximize'}
+                  >
+                    {windowMode === 'maximized' ? (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="14" height="14" rx="2" />
+                        <path d="M7 21h10a2 2 0 0 0 2-2V9" />
+                      </svg>
+                    ) : (
+                      <Maximize2 size={20} />
+                    )}
+                  </button>
+                </>
               )}
-              <DownloadDropdown onDownload={handleDownload} />
-              <StudyModeDropdown studyMode={studyMode} onStudyModeChange={setStudyMode} />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowReadingPanel(!showReadingPanel);
-                }}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                title="Reading Settings"
-              >
-                <Type size={20} />
-              </button>
+              
+              {windowMode !== 'minimized' && (
+                <>
+                  {isLocalServer() && owner && (
+                    <button
+                      type="button"
+                      onClick={handleEdit}
+                      className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1.5"
+                      title="Edit entry"
+                    >
+                      <Edit3 size={20} />
+                      <span className="text-sm font-semibold">Edit</span>
+                    </button>
+                  )}
+                  <DownloadDropdown onDownload={handleDownload} />
+                  <StudyModeDropdown studyMode={studyMode} onStudyModeChange={setStudyMode} />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowReadingPanel(!showReadingPanel);
+                    }}
+                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                    title="Reading Settings"
+                  >
+                    <Type size={20} />
+                  </button>
+                </>
+              )}
+              
               <button
                 type="button"
                 onClick={onClose}
@@ -1686,72 +1736,74 @@ function FullViewModal({ item, onClose, owner }) {
             </div>
           </div>
 
-          {showReadingPanel && (
-            <div className="flex-shrink-0 px-6 py-4 border-b bg-slate-50 border-slate-200">
-              <h3 className="text-sm font-bold mb-3 text-slate-700">
-                📖 Reading Settings
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold block mb-1 text-slate-600">
-                    Font Size: {fontSize}px
-                  </label>
-                  <input
-                    type="range"
-                    min="14"
-                    max="28"
-                    value={fontSize}
-                    onChange={(e) => setFontSize(Number(e.target.value))}
-                    className="w-full"
-                  />
+          {windowMode !== 'minimized' && (
+            <>
+              {showReadingPanel && (
+                <div className="flex-shrink-0 px-6 py-4 border-b bg-slate-50 border-slate-200">
+                  <h3 className="text-sm font-bold mb-3 text-slate-700">
+                    📖 Reading Settings
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold block mb-1 text-slate-600">
+                        Font Size: {fontSize}px
+                      </label>
+                      <input
+                        type="range"
+                        min="14"
+                        max="28"
+                        value={fontSize}
+                        onChange={(e) => setFontSize(Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold block mb-1 text-slate-600">
+                        Line Height: {lineHeight.toFixed(1)}
+                      </label>
+                      <input
+                        type="range"
+                        min="1.3"
+                        max="2.5"
+                        step="0.1"
+                        value={lineHeight}
+                        onChange={(e) => setLineHeight(parseFloat(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold block mb-1 text-slate-600">
+                        Font Family
+                      </label>
+                      <select
+                        value={fontFamily}
+                        onChange={(e) => setFontFamily(e.target.value)}
+                        className="w-full px-2 py-1 rounded text-sm bg-white text-slate-800 border border-slate-200"
+                      >
+                        <option value="default">Default</option>
+                        <option value="serif">Serif</option>
+                        <option value="sans">Sans-serif</option>
+                        <option value="mono">Monospace</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setReadingMode(!readingMode)}
+                      className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
+                        readingMode 
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {readingMode ? "Exit" : "Enable"} Focus Mode
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold block mb-1 text-slate-600">
-                    Line Height: {lineHeight.toFixed(1)}
-                  </label>
-                  <input
-                    type="range"
-                    min="1.3"
-                    max="2.5"
-                    step="0.1"
-                    value={lineHeight}
-                    onChange={(e) => setLineHeight(parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold block mb-1 text-slate-600">
-                    Font Family
-                  </label>
-                  <select
-                    value={fontFamily}
-                    onChange={(e) => setFontFamily(e.target.value)}
-                    className="w-full px-2 py-1 rounded text-sm bg-white text-slate-800 border border-slate-200"
-                  >
-                    <option value="default">Default</option>
-                    <option value="serif">Serif</option>
-                    <option value="sans">Sans-serif</option>
-                    <option value="mono">Monospace</option>
-                  </select>
-                </div>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setReadingMode(!readingMode)}
-                  className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
-                    readingMode 
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-200 text-slate-700"
-                  }`}
-                >
-                  {readingMode ? "Exit" : "Enable"} Focus Mode
-                </button>
-              </div>
-            </div>
-          )}
+              )}
 
-          <style>{`
+              <style>{`
             .rich-text-content {
               color: inherit;
             }
@@ -1812,7 +1864,6 @@ function FullViewModal({ item, onClose, owner }) {
               text-decoration: underline;
             }
 
-            /* Study Mode Themes - Base Colors for Uncolored Text */
             .study-mode-light {
               background-color: #ffffff !important;
             }
@@ -1845,7 +1896,6 @@ function FullViewModal({ item, onClose, owner }) {
               color: #cbd5e1 !important;
             }
 
-            /* Headings */
             .study-mode-sepia h1,
             .study-mode-sepia h2 {
               color: #3c2f23 !important;
@@ -1863,7 +1913,6 @@ function FullViewModal({ item, onClose, owner }) {
               color: #f1f5f9 !important;
             }
 
-            /* Links */
             .study-mode-light .rich-text-content a:not([style*="color"]) {
               color: #2563eb !important;
             }
@@ -1877,7 +1926,6 @@ function FullViewModal({ item, onClose, owner }) {
               color: #60a5fa !important;
             }
 
-            /* Enhance colored text visibility in dark modes */
             .study-mode-dark .rich-text-content [style*="color: rgb(0, 0, 0)"],
             .study-mode-dark .rich-text-content [style*="color: black"],
             .study-mode-dark .rich-text-content [style*="color:#000"],
@@ -2112,6 +2160,8 @@ function FullViewModal({ item, onClose, owner }) {
               Close
             </button>
           </div>
+            </>
+          )}
         </div>
       </div>
     </>
@@ -2136,9 +2186,8 @@ export default function BIMDisplay() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Check if running on local server
   const isLocal = isLocalServer();
-  const owner = isLocal; // Only enable owner mode on local server
+  const owner = isLocal;
 
   useEffect(() => {
     saveDarkMode(darkMode);
@@ -2234,7 +2283,6 @@ export default function BIMDisplay() {
   };
 
   const handleLockUnlock = (entryId, currentLockState) => {
-    // In local mode, require password for both lock and unlock
     if (isLocal) {
       const action = currentLockState ? 'unlock this entry' : 'lock this entry';
       setPasswordPrompt({ 
@@ -2246,7 +2294,6 @@ export default function BIMDisplay() {
         }
       });
     } else {
-      // In web mode, allow both locking and unlocking with password
       const action = currentLockState ? 'unlock this entry to view content' : 'lock this entry';
       setPasswordPrompt({ 
         entryId, 
