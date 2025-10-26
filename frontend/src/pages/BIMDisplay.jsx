@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
-  BookOpen, Trash2, Edit3, Plus, Eye, Star,
+  BookOpen, Trash2, Plus, Eye, Star,
   ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw,
   Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, FileText, FileDown, File,
-  ChevronUp, Minus
+  ChevronUp, Minus, Edit, Minimize
 } from "lucide-react";
 
 /* ---------- HELPER: Check if running on local server ---------- */
@@ -505,14 +505,31 @@ function FullScreenImageViewer({ images = [], initialIndex = 0, onClose }) {
     setOffset({ x: 0, y: 0 });
   };
 
-  const downloadCurrent = () => {
-    const src = safeImages[currentIndex].value;
-    const a = document.createElement("a");
-    a.href = src;
-    a.download = src.split("/").pop() || "image";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  const downloadCurrent = async () => {
+    try {
+      const src = safeImages[currentIndex].value;
+      const response = await fetch(src);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = src.split("/").pop() || `image-${Date.now()}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback method
+      const src = safeImages[currentIndex].value;
+      const a = document.createElement("a");
+      a.href = src;
+      a.download = src.split("/").pop() || `image-${Date.now()}.jpg`;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
   };
 
   return (
@@ -692,8 +709,10 @@ function ImageCarousel({ images = [], isPreview = false, onFullScreen, studyMode
         className={`relative ${isPreview ? "h-48" : "h-96"} rounded-lg overflow-hidden border-2 ${
           studyMode === 'light' ? 'border-slate-200 bg-slate-50' :
           studyMode === 'sepia' ? 'border-amber-200 bg-amber-50' :
-          studyMode === 'dark' ? 'border-slate-600 bg-slate-700' :
-          'border-slate-700 bg-slate-800'
+          studyMode === 'blue' ? 'border-blue-300 bg-blue-50' :
+          studyMode === 'green' ? 'border-green-300 bg-green-50' :
+          studyMode === 'amber' ? 'border-amber-300 bg-amber-100' :
+          'border-purple-300 bg-purple-50'
         } cursor-pointer`}
         onDoubleClick={handleDoubleClick}
       >
@@ -1057,13 +1076,15 @@ function StudyModeDropdown({ studyMode, onStudyModeChange }) {
   }, []);
 
   const modes = [
-    { value: 'light', label: 'Light Mode' },
-    { value: 'sepia', label: 'Sepia Mode' },
-    { value: 'dark', label: 'Dark Mode' },
-    { value: 'night', label: 'Night Mode' },
+    { value: 'light', label: 'Light Mode', icon: '☀️' },
+    { value: 'sepia', label: 'Sepia Mode', icon: '📜' },
+    { value: 'blue', label: 'Blue Mode', icon: '💙' },
+    { value: 'green', label: 'Green Mode', icon: '💚' },
+    { value: 'amber', label: 'Amber Mode', icon: '🟡' },
+    { value: 'purple', label: 'Purple Mode', icon: '💜' },
   ];
 
-  const currentModeLabel = modes.find(m => m.value === studyMode)?.label || 'Light Mode';
+  const currentMode = modes.find(m => m.value === studyMode) || modes[0];
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -1076,11 +1097,11 @@ function StudyModeDropdown({ studyMode, onStudyModeChange }) {
         className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-2"
         title="Study Mode"
       >
-        <span className="text-sm font-medium">{currentModeLabel}</span>
+        <span className="text-sm font-medium">{currentMode.icon} {currentMode.label}</span>
       </button>
 
       {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-48 rounded-xl shadow-2xl border overflow-hidden z-[110] bg-white border-slate-200">
+        <div className="absolute top-full right-0 mt-2 w-52 rounded-xl shadow-2xl border overflow-hidden z-[110] bg-white border-slate-200">
           <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide bg-slate-50 text-slate-600">
             Study Mode
           </div>
@@ -1096,7 +1117,10 @@ function StudyModeDropdown({ studyMode, onStudyModeChange }) {
                 studyMode === mode.value ? 'bg-blue-50 font-semibold' : ''
               }`}
             >
-              <span className="text-sm">{mode.label}</span>
+              <span className="text-sm flex items-center gap-2">
+                <span>{mode.icon}</span>
+                <span>{mode.label}</span>
+              </span>
               {studyMode === mode.value && <Check size={16} className="text-blue-600" />}
             </button>
           ))}
@@ -1107,7 +1131,7 @@ function StudyModeDropdown({ studyMode, onStudyModeChange }) {
 }
 
 /* ---------- PDF Export ---------- */
-async function generatePDF(displayTitle, groupedBlocks, fontSize, lineHeight) {
+async function generatePDF(displayTitle, groupedBlocks, fontSize) {
   if (!window.jspdf) {
     const script = document.createElement('script');
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
@@ -1193,7 +1217,7 @@ async function generatePDF(displayTitle, groupedBlocks, fontSize, lineHeight) {
       for (const line of lines) {
         checkPageBreak(7);
         doc.text(line, margin, yPosition);
-        yPosition += 7 * (lineHeight || 1.5);
+        yPosition += 7 * 1.5;
       }
       yPosition += 3;
     }
@@ -1286,8 +1310,51 @@ async function generatePDF(displayTitle, groupedBlocks, fontSize, lineHeight) {
   return doc;
 }
 
+/* ---------- Minimized Window Bar ---------- */
+function MinimizedWindowBar({ windows, onRestore, onClose }) {
+  if (windows.length === 0) return null;
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-[60] bg-slate-800/95 backdrop-blur-md border-t border-slate-700 p-2">
+      <div className="max-w-7xl mx-auto flex gap-2 overflow-x-auto">
+        {windows.map((window) => (
+          <div
+            key={window.id}
+            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 min-w-[200px] max-w-[300px] transition-colors group"
+          >
+            <BookOpen size={16} className="text-blue-400 flex-shrink-0" />
+            <span className="text-white text-sm truncate flex-1">{window.title}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRestore(window.id);
+              }}
+              className="p-1 hover:bg-slate-500 rounded transition-colors"
+              title="Restore"
+            >
+              <ChevronUp size={16} className="text-white" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose(window.id);
+              }}
+              className="p-1 hover:bg-red-500 rounded transition-colors"
+              title="Close"
+            >
+              <X size={16} className="text-white" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Full View Modal ---------- */
-function FullViewModal({ item, onClose, owner }) {
+function FullViewModal({ item, onClose, owner, windowId, onMinimize }) {
   const navigate = useNavigate();
   const [expandedCodeBlocks, setExpandedCodeBlocks] = useState(new Set());
   const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
@@ -1296,9 +1363,9 @@ function FullViewModal({ item, onClose, owner }) {
   const [downloading, setDownloading] = useState(false);
   
   const [windowMode, setWindowMode] = useState('normal');
+  const [isMinimized, setIsMinimized] = useState(false);
   
   const [fontSize, setFontSize] = useState(18);
-  const [lineHeight, setLineHeight] = useState(1.7);
   const [fontFamily, setFontFamily] = useState("default");
   const [readingMode, setReadingMode] = useState(false);
   const [showReadingPanel, setShowReadingPanel] = useState(false);
@@ -1312,19 +1379,21 @@ function FullViewModal({ item, onClose, owner }) {
   }, [studyMode]);
 
   useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    const originalPaddingRight = document.body.style.paddingRight;
-    
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    
-    document.body.style.overflow = 'hidden';
-    document.body.style.paddingRight = `${scrollbarWidth}px`;
-    
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.paddingRight = originalPaddingRight;
-    };
-  }, []);
+    if (!isMinimized) {
+      const originalOverflow = document.body.style.overflow;
+      const originalPaddingRight = document.body.style.paddingRight;
+      
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.paddingRight = originalPaddingRight;
+      };
+    }
+  }, [isMinimized]);
 
   if (!item) return null;
 
@@ -1385,6 +1454,27 @@ function FullViewModal({ item, onClose, owner }) {
     onClose();
     navigate(`/bim/edit/${encodeURIComponent(item.id)}`);
   };
+
+  const handleMinimize = () => {
+    setIsMinimized(true);
+    onMinimize(windowId, displayTitle);
+  };
+
+  const handleRestore = () => {
+    setIsMinimized(false);
+  };
+
+  // Listen for restore events
+  useEffect(() => {
+    const handleRestoreEvent = (event) => {
+      if (event.detail && event.detail.windowId === windowId) {
+        handleRestore();
+      }
+    };
+    
+    window.addEventListener('restoreWindow', handleRestoreEvent);
+    return () => window.removeEventListener('restoreWindow', handleRestoreEvent);
+  }, [windowId]);
 
   const handleDownload = async (format) => {
     setDownloading(true);
@@ -1575,7 +1665,7 @@ function FullViewModal({ item, onClose, owner }) {
     document.body.appendChild(loadingDiv);
 
     try {
-      const doc = await generatePDF(displayTitle, groupedBlocks, fontSize, lineHeight);
+      const doc = await generatePDF(displayTitle, groupedBlocks, fontSize);
       doc.save(`${filename}.pdf`);
     } catch (error) {
       console.error('PDF generation error:', error);
@@ -1602,17 +1692,29 @@ function FullViewModal({ item, onClose, owner }) {
           border: '#d4c5a9',
           text: '#5c4a3a'
         };
-      case 'dark':
+      case 'blue':
         return {
-          bg: '#1e293b',
-          border: '#334155',
-          text: '#10b981'
+          bg: '#eff6ff',
+          border: '#dbeafe',
+          text: '#1e40af'
         };
-      case 'night':
+      case 'green':
         return {
-          bg: '#0f172a',
-          border: '#1e293b',
-          text: '#10b981'
+          bg: '#f0fdf4',
+          border: '#dcfce7',
+          text: '#166534'
+        };
+      case 'amber':
+        return {
+          bg: '#fffbeb',
+          border: '#fef3c7',
+          text: '#92400e'
+        };
+      case 'purple':
+        return {
+          bg: '#faf5ff',
+          border: '#f3e8ff',
+          text: '#6b21a8'
         };
       default:
         return {
@@ -1623,6 +1725,10 @@ function FullViewModal({ item, onClose, owner }) {
     }
   };
 
+  if (isMinimized) {
+    return null;
+  }
+
   return (
     <>
       {fullScreenImages && (
@@ -1630,17 +1736,13 @@ function FullViewModal({ item, onClose, owner }) {
       )}
 
       <div
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-hidden transition-all duration-300 ${
-          windowMode === 'minimized' ? 'items-end justify-end p-0' : ''
-        }`}
-        onClick={windowMode === 'minimized' ? undefined : onClose}
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-hidden transition-all duration-300`}
+        onClick={onClose}
       >
         <div
           className={`rounded-2xl shadow-2xl flex flex-col overflow-hidden bg-white transition-all duration-300 ${
             windowMode === 'maximized' 
               ? 'w-full h-full max-w-none max-h-none rounded-none' 
-              : windowMode === 'minimized'
-              ? 'w-96 h-16 rounded-t-2xl rounded-b-none'
               : 'max-w-4xl w-full max-h-[90vh]'
           }`}
           onClick={(e) => e.stopPropagation()}
@@ -1658,71 +1760,54 @@ function FullViewModal({ item, onClose, owner }) {
               <h1 className="text-3xl font-bold truncate">{displayTitle}</h1>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {windowMode === 'minimized' ? (
+              <button
+                type="button"
+                onClick={handleMinimize}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                title="Minimize"
+              >
+                <Minus size={20} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setWindowMode(windowMode === 'maximized' ? 'normal' : 'maximized')}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                title={windowMode === 'maximized' ? 'Restore' : 'Maximize'}
+              >
+                {windowMode === 'maximized' ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="14" height="14" rx="2" />
+                    <path d="M7 21h10a2 2 0 0 0 2-2V9" />
+                  </svg>
+                ) : (
+                  <Maximize2 size={20} />
+                )}
+              </button>
+              
+              {isLocalServer() && owner && (
                 <button
                   type="button"
-                  onClick={() => setWindowMode('normal')}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                  title="Restore"
+                  onClick={handleEdit}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1.5"
+                  title="Edit entry"
                 >
-                  <ChevronUp size={20} />
+                  <Edit size={20} />
+                  <span className="text-sm font-semibold">Edit</span>
                 </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setWindowMode('minimized')}
-                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                    title="Minimize"
-                  >
-                    <Minus size={20} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setWindowMode(windowMode === 'maximized' ? 'normal' : 'maximized')}
-                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                    title={windowMode === 'maximized' ? 'Restore' : 'Maximize'}
-                  >
-                    {windowMode === 'maximized' ? (
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="3" width="14" height="14" rx="2" />
-                        <path d="M7 21h10a2 2 0 0 0 2-2V9" />
-                      </svg>
-                    ) : (
-                      <Maximize2 size={20} />
-                    )}
-                  </button>
-                </>
               )}
-              
-              {windowMode !== 'minimized' && (
-                <>
-                  {isLocalServer() && owner && (
-                    <button
-                      type="button"
-                      onClick={handleEdit}
-                      className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1.5"
-                      title="Edit entry"
-                    >
-                      <Edit3 size={20} />
-                      <span className="text-sm font-semibold">Edit</span>
-                    </button>
-                  )}
-                  <DownloadDropdown onDownload={handleDownload} />
-                  <StudyModeDropdown studyMode={studyMode} onStudyModeChange={setStudyMode} />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowReadingPanel(!showReadingPanel);
-                    }}
-                    className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                    title="Reading Settings"
-                  >
-                    <Type size={20} />
-                  </button>
-                </>
-              )}
+              <DownloadDropdown onDownload={handleDownload} />
+              <StudyModeDropdown studyMode={studyMode} onStudyModeChange={setStudyMode} />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReadingPanel(!showReadingPanel);
+                }}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                title="Reading Settings"
+              >
+                <Type size={20} />
+              </button>
               
               <button
                 type="button"
@@ -1736,74 +1821,58 @@ function FullViewModal({ item, onClose, owner }) {
             </div>
           </div>
 
-          {windowMode !== 'minimized' && (
-            <>
-              {showReadingPanel && (
-                <div className="flex-shrink-0 px-6 py-4 border-b bg-slate-50 border-slate-200">
-                  <h3 className="text-sm font-bold mb-3 text-slate-700">
-                    📖 Reading Settings
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold block mb-1 text-slate-600">
-                        Font Size: {fontSize}px
-                      </label>
-                      <input
-                        type="range"
-                        min="14"
-                        max="28"
-                        value={fontSize}
-                        onChange={(e) => setFontSize(Number(e.target.value))}
-                        className="w-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold block mb-1 text-slate-600">
-                        Line Height: {lineHeight.toFixed(1)}
-                      </label>
-                      <input
-                        type="range"
-                        min="1.3"
-                        max="2.5"
-                        step="0.1"
-                        value={lineHeight}
-                        onChange={(e) => setLineHeight(parseFloat(e.target.value))}
-                        className="w-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold block mb-1 text-slate-600">
-                        Font Family
-                      </label>
-                      <select
-                        value={fontFamily}
-                        onChange={(e) => setFontFamily(e.target.value)}
-                        className="w-full px-2 py-1 rounded text-sm bg-white text-slate-800 border border-slate-200"
-                      >
-                        <option value="default">Default</option>
-                        <option value="serif">Serif</option>
-                        <option value="sans">Sans-serif</option>
-                        <option value="mono">Monospace</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setReadingMode(!readingMode)}
-                      className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
-                        readingMode 
-                          ? "bg-blue-600 text-white"
-                          : "bg-slate-200 text-slate-700"
-                      }`}
-                    >
-                      {readingMode ? "Exit" : "Enable"} Focus Mode
-                    </button>
-                  </div>
+          {showReadingPanel && (
+            <div className="flex-shrink-0 px-6 py-4 border-b bg-slate-50 border-slate-200">
+              <h3 className="text-sm font-bold mb-3 text-slate-700">
+                📖 Reading Settings
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold block mb-1 text-slate-600">
+                    Font Size: {fontSize}px
+                  </label>
+                  <input
+                    type="range"
+                    min="14"
+                    max="28"
+                    value={fontSize}
+                    onChange={(e) => setFontSize(Number(e.target.value))}
+                    className="w-full"
+                  />
                 </div>
-              )}
+                <div>
+                  <label className="text-xs font-semibold block mb-1 text-slate-600">
+                    Font Family
+                  </label>
+                  <select
+                    value={fontFamily}
+                    onChange={(e) => setFontFamily(e.target.value)}
+                    className="w-full px-2 py-1 rounded text-sm bg-white text-slate-800 border border-slate-200"
+                  >
+                    <option value="default">Default</option>
+                    <option value="serif">Serif</option>
+                    <option value="sans">Sans-serif</option>
+                    <option value="mono">Monospace</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReadingMode(!readingMode)}
+                  className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
+                    readingMode 
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  {readingMode ? "Exit" : "Enable"} Focus Mode
+                </button>
+              </div>
+            </div>
+          )}
 
-              <style>{`
+          <style>{`
             .rich-text-content {
               color: inherit;
             }
@@ -1880,20 +1949,36 @@ function FullViewModal({ item, onClose, owner }) {
               color: #5c4a3a !important;
             }
 
-            .study-mode-dark {
-              background-color: #1e293b !important;
+            .study-mode-blue {
+              background-color: #eff6ff !important;
             }
             
-            .study-mode-dark .rich-text-content > *:not([style*="color"]) {
-              color: #e2e8f0 !important;
+            .study-mode-blue .rich-text-content > *:not([style*="color"]) {
+              color: #1e3a8a !important;
             }
 
-            .study-mode-night {
-              background-color: #0f172a !important;
+            .study-mode-green {
+              background-color: #f0fdf4 !important;
             }
             
-            .study-mode-night .rich-text-content > *:not([style*="color"]) {
-              color: #cbd5e1 !important;
+            .study-mode-green .rich-text-content > *:not([style*="color"]) {
+              color: #14532d !important;
+            }
+
+            .study-mode-amber {
+              background-color: #fffbeb !important;
+            }
+            
+            .study-mode-amber .rich-text-content > *:not([style*="color"]) {
+              color: #78350f !important;
+            }
+
+            .study-mode-purple {
+              background-color: #faf5ff !important;
+            }
+            
+            .study-mode-purple .rich-text-content > *:not([style*="color"]) {
+              color: #581c87 !important;
             }
 
             .study-mode-sepia h1,
@@ -1906,11 +1991,24 @@ function FullViewModal({ item, onClose, owner }) {
               color: #0f172a !important;
             }
 
-            .study-mode-dark h1,
-            .study-mode-dark h2,
-            .study-mode-night h1,
-            .study-mode-night h2 {
-              color: #f1f5f9 !important;
+            .study-mode-blue h1,
+            .study-mode-blue h2 {
+              color: #1e3a8a !important;
+            }
+
+            .study-mode-green h1,
+            .study-mode-green h2 {
+              color: #14532d !important;
+            }
+
+            .study-mode-amber h1,
+            .study-mode-amber h2 {
+              color: #78350f !important;
+            }
+
+            .study-mode-purple h1,
+            .study-mode-purple h2 {
+              color: #581c87 !important;
             }
 
             .study-mode-light .rich-text-content a:not([style*="color"]) {
@@ -1921,23 +2019,20 @@ function FullViewModal({ item, onClose, owner }) {
               color: #b45309 !important;
             }
 
-            .study-mode-dark .rich-text-content a:not([style*="color"]),
-            .study-mode-night .rich-text-content a:not([style*="color"]) {
-              color: #60a5fa !important;
+            .study-mode-blue .rich-text-content a:not([style*="color"]) {
+              color: #1d4ed8 !important;
             }
 
-            .study-mode-dark .rich-text-content [style*="color: rgb(0, 0, 0)"],
-            .study-mode-dark .rich-text-content [style*="color: black"],
-            .study-mode-dark .rich-text-content [style*="color:#000"],
-            .study-mode-night .rich-text-content [style*="color: rgb(0, 0, 0)"],
-            .study-mode-night .rich-text-content [style*="color: black"],
-            .study-mode-night .rich-text-content [style*="color:#000"] {
-              color: #ffffff !important;
+            .study-mode-green .rich-text-content a:not([style*="color"]) {
+              color: #15803d !important;
             }
-            
-            .study-mode-dark .rich-text-content [style*="color: rgb(33, 37, 41)"],
-            .study-mode-night .rich-text-content [style*="color: rgb(33, 37, 41)"] {
-              color: #e2e8f0 !important;
+
+            .study-mode-amber .rich-text-content a:not([style*="color"]) {
+              color: #b45309 !important;
+            }
+
+            .study-mode-purple .rich-text-content a:not([style*="color"]) {
+              color: #7c3aed !important;
             }
 
             .reading-content-container {
@@ -1967,7 +2062,7 @@ function FullViewModal({ item, onClose, owner }) {
             className={`flex-1 overflow-y-auto overflow-x-hidden p-8 pb-24 reading-content-container study-mode-${studyMode} ${readingMode ? "max-w-3xl mx-auto" : ""} ${getFontFamilyClass()}`}
             style={{
               fontSize: `${fontSize}px`,
-              lineHeight: lineHeight,
+              lineHeight: 1.7,
             }}
           >
             <div className="max-w-none space-y-6">
@@ -2027,8 +2122,10 @@ function FullViewModal({ item, onClose, owner }) {
                         <div className={`rounded-lg border overflow-hidden ${
                           studyMode === 'light' ? 'border-slate-200 bg-slate-50' :
                           studyMode === 'sepia' ? 'border-amber-200 bg-amber-50' :
-                          studyMode === 'dark' ? 'border-slate-600 bg-slate-700' :
-                          'border-slate-700 bg-slate-800'
+                          studyMode === 'blue' ? 'border-blue-300 bg-blue-50' :
+                          studyMode === 'green' ? 'border-green-300 bg-green-50' :
+                          studyMode === 'amber' ? 'border-amber-300 bg-amber-100' :
+                          'border-purple-300 bg-purple-50'
                         }`}>
                           <img
                             src={block.value}
@@ -2160,8 +2257,6 @@ function FullViewModal({ item, onClose, owner }) {
               Close
             </button>
           </div>
-            </>
-          )}
         </div>
       </div>
     </>
@@ -2175,7 +2270,8 @@ export default function BIMDisplay() {
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState("");
   const [favorites, setFavorites] = useState(loadFavorites());
-  const [viewingItem, setViewingItem] = useState(null);
+  const [viewingItems, setViewingItems] = useState([]);
+  const [minimizedWindows, setMinimizedWindows] = useState([]);
   const [darkMode, setDarkMode] = useState(loadDarkMode());
   const [deleteConfirmItem, setDeleteConfirmItem] = useState(null);
   const [lockingIds, setLockingIds] = useState(new Set());
@@ -2342,8 +2438,29 @@ export default function BIMDisplay() {
         alert("🔒 This entry is locked");
         return;
       }
-      setViewingItem(item);
+      const windowId = `window-${Date.now()}-${Math.random()}`;
+      setViewingItems(prev => [...prev, { ...item, windowId }]);
     }
+  };
+
+  const closeViewingItem = (windowId) => {
+    setViewingItems(prev => prev.filter(item => item.windowId !== windowId));
+    setMinimizedWindows(prev => prev.filter(w => w.id !== windowId));
+  };
+
+  const handleMinimize = (windowId, title) => {
+    setMinimizedWindows(prev => {
+      const exists = prev.find(w => w.id === windowId);
+      if (exists) return prev;
+      return [...prev, { id: windowId, title }];
+    });
+  };
+
+  const handleRestore = (windowId) => {
+    setMinimizedWindows(prev => prev.filter(w => w.id !== windowId));
+    // Dispatch custom event to notify the modal to restore
+    const event = new CustomEvent('restoreWindow', { detail: { windowId } });
+    window.dispatchEvent(event);
   };
 
   const filteredAndSortedItems = useMemo(() => {
@@ -2377,13 +2494,22 @@ export default function BIMDisplay() {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${darkMode ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50"}`}>
-      {viewingItem && (
+      {viewingItems.map((item) => (
         <FullViewModal
-          item={viewingItem}
-          onClose={() => setViewingItem(null)}
+          key={item.windowId}
+          item={item}
+          windowId={item.windowId}
+          onClose={() => closeViewingItem(item.windowId)}
+          onMinimize={handleMinimize}
           owner={owner}
         />
-      )}
+      ))}
+
+      <MinimizedWindowBar
+        windows={minimizedWindows}
+        onRestore={handleRestore}
+        onClose={closeViewingItem}
+      />
 
       {deleteConfirmItem && (
         <DeleteConfirmationModal
@@ -2647,7 +2773,7 @@ export default function BIMDisplay() {
                             title={e.locked ? "Unlock to edit" : "Edit entry"}
                           >
                             <span className="inline-flex items-center gap-1.5">
-                              <Edit3 size={16} /> Edit
+                              <Edit size={16} /> Edit
                             </span>
                           </button>
 
