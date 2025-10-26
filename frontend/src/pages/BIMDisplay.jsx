@@ -4,7 +4,7 @@ import {
   BookOpen, Trash2, Plus, Eye, Star,
   ChevronLeft, ChevronRight, Maximize2, Check, Moon, Sun, Download, ZoomIn, ZoomOut, RefreshCcw,
   Search, SortAsc, X, AlertTriangle, Type, Bookmark, Lock, Unlock, FileText, FileDown, File,
-  ChevronUp, Minus, Edit, Minimize
+  ChevronUp, Minus, Edit
 } from "lucide-react";
 
 /* ---------- HELPER: Check if running on local server ---------- */
@@ -387,7 +387,7 @@ function DeleteConfirmationModal({ item, onConfirm, onCancel, darkMode }) {
 }
 
 /* ---------- Render HTML Content ---------- */
-function renderHTMLContent(htmlContent, className = "", darkMode = false) {
+function renderHTMLContent(htmlContent, className = "") {
   if (!htmlContent) return null;
   if (!htmlContent.includes("<")) {
     return <div className={className}>{htmlContent}</div>;
@@ -520,7 +520,6 @@ function FullScreenImageViewer({ images = [], initialIndex = 0, onClose }) {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Download failed:', error);
-      // Fallback method
       const src = safeImages[currentIndex].value;
       const a = document.createElement("a");
       a.href = src;
@@ -844,1425 +843,6 @@ function LockedContentOverlay({ darkMode = false }) {
   );
 }
 
-/* ---------- Shared preview body ---------- */
-function PreviewContent({ blocks = [], darkMode = false }) {
-  const groupedBlocks = groupConsecutiveImages(blocks);
-  return (
-    <div
-      className={`p-4 rounded-lg border space-y-4 max-h-48 overflow-hidden relative ${
-        darkMode
-          ? "bg-gradient-to-br from-slate-800 to-white/0 border-slate-600"
-          : "bg-gradient-to-br from-slate-50 to-white border-slate-200"
-      }`}
-    >
-      {groupedBlocks.slice(0, 5).map((block, idx) => {
-        if (block?.type === "h1") return null;
-
-        if (block?.type === "h2") {
-          const textContent = String(block.value || "")
-            .replace(/<[^>]*>/g, "")
-            .slice(0, 100);
-          return (
-            <h2
-              key={`pv-h2-${idx}`}
-              className={`text-lg font-extrabold mb-2 mt-3 pb-1 border-b border-blue-400 ${
-                darkMode ? "text-slate-100" : "text-slate-900"
-              }`}
-            >
-              {textContent}
-            </h2>
-          );
-        }
-
-        if (block?.type === "text") {
-          const textContent = String(block.value || "")
-            .replace(/<[^>]*>/g, "")
-            .slice(0, 180);
-          return (
-            <div
-              key={`pv-text-${idx}`}
-              className={`leading-relaxed text-sm ${
-                darkMode ? "text-slate-300" : "text-slate-700"
-              }`}
-            >
-              {textContent}
-              {textContent.length >= 180 ? "…" : ""}
-            </div>
-          );
-        }
-
-        if (block?.type === "image-group" || block?.type === "image") {
-          return (
-            <div
-              key={`pv-img-${idx}`}
-              className={`relative w-full h-20 rounded-lg overflow-hidden border ${
-                darkMode ? "border-slate-600 bg-slate-700" : "border-slate-200 bg-slate-50"
-              }`}
-            >
-              <div className="w-full h-full flex items-center justify-center">
-                <Eye size={32} className={`${darkMode ? "text-slate-500" : "text-slate-300"}`} />
-                <span
-                  className={`ml-2 text-sm font-semibold ${
-                    darkMode ? "text-slate-400" : "text-slate-500"
-                  }`}
-                >
-                  {block?.type === "image-group" ? `${block.images.length} Images` : "Image"}
-                </span>
-              </div>
-            </div>
-          );
-        }
-
-        return null;
-      })}
-      {groupedBlocks.length > 5 && (
-        <div className="text-xs italic text-slate-400">+ more content…</div>
-      )}
-      <div
-        className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t pointer-events-none ${
-          darkMode ? "from-slate-700" : "from-white"
-        }`}
-      />
-    </div>
-  );
-}
-
-/* ---------- Unlocked overlay ---------- */
-function UnlockedPreviewOverlay({ darkMode = false }) {
-  return (
-    <>
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
-        }
-      `}</style>
-      <div className={`absolute inset-0 flex items-center justify-center z-10 backdrop-blur-sm ${
-        darkMode ? "bg-gradient-to-br from-blue-900/20 via-slate-800/30 to-slate-900/20"
-                 : "bg-gradient-to-br from-blue-50/90 via-cyan-50/90 to-white/90"
-      }`}>
-        <div className="text-center px-6 py-6">
-          <div className="mb-3">
-            <div className={`p-3 rounded-full shadow-2xl inline-block animate-[float_3s_ease-in-out_infinite] ${
-              darkMode ? "bg-blue-700" : "bg-blue-600"
-            }`}>
-              <Eye size={32} className="text-white" />
-            </div>
-          </div>
-          <p className={`text-base font-bold mb-1 ${
-            darkMode ? "text-blue-200" : "text-blue-900"
-          }`}>
-            Preview available
-          </p>
-          <p className={`${darkMode ? "text-slate-200" : "text-slate-700"} text-sm`}>
-            Click <span className={`font-bold ${darkMode ? "text-blue-300" : "text-blue-700"}`}>View More</span> to see details
-          </p>
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ---------- Preview wrapper ---------- */
-function BlockPreview({ blocks = [], darkMode = false, locked = false }) {
-  if (!blocks.length) {
-    return (
-      <div
-        className={`flex items-center justify-center h-24 rounded-lg border ${
-          darkMode
-            ? "bg-gradient-to-br from-slate-800 to-slate-700 border-slate-600"
-            : "bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200"
-        }`}
-      >
-        <p className="text-sm text-slate-400">No content</p>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`relative rounded-lg border overflow-hidden ${
-        darkMode ? "border-slate-600" : "border-slate-200"
-      }`}
-      style={{ minHeight: "12rem" }}
-    >
-      <div className="locked-content-blur">
-        <PreviewContent blocks={blocks} darkMode={darkMode} />
-      </div>
-
-      {locked ? (
-        <LockedContentOverlay darkMode={darkMode} />
-      ) : (
-        <UnlockedPreviewOverlay darkMode={darkMode} />
-      )}
-    </div>
-  );
-}
-
-/* ---------- Download Format Dropdown ---------- */
-function DownloadDropdown({ onDownload }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const formats = [
-    { value: 'pdf', label: 'PDF Document', icon: File, color: 'text-red-500' },
-    { value: 'txt', label: 'Plain Text', icon: FileText, color: 'text-blue-500' },
-    { value: 'html', label: 'HTML File', icon: FileDown, color: 'text-orange-500' },
-    { value: 'md', label: 'Markdown', icon: FileText, color: 'text-purple-500' },
-  ];
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
-        className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1"
-        title="Download"
-      >
-        <Download size={20} />
-      </button>
-
-      {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-56 rounded-xl shadow-2xl border overflow-hidden z-[110] bg-white border-slate-200">
-          <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide bg-slate-50 text-slate-600">
-            Download As
-          </div>
-          {formats.map((format) => (
-            <button
-              key={format.value}
-              onClick={(e) => {
-                e.stopPropagation();
-                onDownload(format.value);
-                setIsOpen(false);
-              }}
-              className="w-full flex items-center gap-3 px-4 py-3 transition text-left hover:bg-slate-50 text-slate-700"
-            >
-              <format.icon size={18} className={format.color} />
-              <span className="text-sm font-medium">{format.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ---------- Study Mode Dropdown ---------- */
-function StudyModeDropdown({ studyMode, onStudyModeChange }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const modes = [
-    { value: 'light', label: 'Light Mode', icon: '☀️' },
-    { value: 'sepia', label: 'Sepia Mode', icon: '📜' },
-    { value: 'blue', label: 'Blue Mode', icon: '💙' },
-    { value: 'green', label: 'Green Mode', icon: '💚' },
-    { value: 'amber', label: 'Amber Mode', icon: '🟡' },
-    { value: 'purple', label: 'Purple Mode', icon: '💜' },
-  ];
-
-  const currentMode = modes.find(m => m.value === studyMode) || modes[0];
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
-        className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-2"
-        title="Study Mode"
-      >
-        <span className="text-sm font-medium">{currentMode.icon} {currentMode.label}</span>
-      </button>
-
-      {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-52 rounded-xl shadow-2xl border overflow-hidden z-[110] bg-white border-slate-200">
-          <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide bg-slate-50 text-slate-600">
-            Study Mode
-          </div>
-          {modes.map((mode) => (
-            <button
-              key={mode.value}
-              onClick={(e) => {
-                e.stopPropagation();
-                onStudyModeChange(mode.value);
-                setIsOpen(false);
-              }}
-              className={`w-full flex items-center justify-between px-4 py-3 transition text-left hover:bg-slate-50 text-slate-700 ${
-                studyMode === mode.value ? 'bg-blue-50 font-semibold' : ''
-              }`}
-            >
-              <span className="text-sm flex items-center gap-2">
-                <span>{mode.icon}</span>
-                <span>{mode.label}</span>
-              </span>
-              {studyMode === mode.value && <Check size={16} className="text-blue-600" />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ---------- PDF Export ---------- */
-async function generatePDF(displayTitle, groupedBlocks, fontSize) {
-  if (!window.jspdf) {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    document.head.appendChild(script);
-    await new Promise((resolve) => { script.onload = resolve; });
-  }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF('p', 'mm', 'a4');
-  
-  const pageWidth = 210;
-  const pageHeight = 297;
-  const margin = 20;
-  const contentWidth = pageWidth - 2 * margin;
-  let yPosition = margin;
-  
-  const checkPageBreak = (requiredHeight) => {
-    if (yPosition + requiredHeight > pageHeight - margin) {
-      doc.addPage();
-      yPosition = margin;
-      return true;
-    }
-    return false;
-  };
-  
-  const extractText = (html) => {
-    if (!html) return '';
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-    return temp.textContent || temp.innerText || '';
-  };
-  
-  const wrapText = (text, maxWidth, fontSize) => {
-    doc.setFontSize(fontSize);
-    const lines = doc.splitTextToSize(text, maxWidth);
-    return lines;
-  };
-  
-  doc.setFontSize(24);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(15, 23, 42);
-  const titleLines = wrapText(displayTitle, contentWidth, 24);
-  titleLines.forEach((line, i) => {
-    doc.text(line, margin, yPosition);
-    yPosition += 10;
-  });
-  
-  doc.setDrawColor(59, 130, 246);
-  doc.setLineWidth(1);
-  doc.line(margin, yPosition, pageWidth - margin, yPosition);
-  yPosition += 15;
-  
-  for (const block of groupedBlocks) {
-    if (block?.type === "h1") {
-      continue;
-    }
-    
-    if (block?.type === "h2") {
-      checkPageBreak(15);
-      doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(30, 41, 59);
-      const text = extractText(block.value);
-      const lines = wrapText(text, contentWidth, 18);
-      lines.forEach((line) => {
-        doc.text(line, margin, yPosition);
-        yPosition += 8;
-      });
-      doc.setDrawColor(59, 130, 246);
-      doc.setLineWidth(0.5);
-      doc.line(margin, yPosition, pageWidth - margin, yPosition);
-      yPosition += 10;
-    }
-    
-    else if (block?.type === "text") {
-      checkPageBreak(10);
-      doc.setFontSize(fontSize || 11);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(51, 65, 85);
-      const text = extractText(block.value);
-      const lines = wrapText(text, contentWidth, fontSize || 11);
-      
-      for (const line of lines) {
-        checkPageBreak(7);
-        doc.text(line, margin, yPosition);
-        yPosition += 7 * 1.5;
-      }
-      yPosition += 3;
-    }
-    
-    else if (block?.type === "code") {
-      checkPageBreak(20);
-      doc.setFillColor(30, 41, 59);
-      doc.rect(margin, yPosition - 3, contentWidth, 10, 'F');
-      
-      doc.setFontSize(9);
-      doc.setFont('courier', 'normal');
-      doc.setTextColor(16, 185, 129);
-      
-      yPosition += 5;
-      const codeLines = String(block.value || '').split('\n');
-      
-      for (const line of codeLines) {
-        if (checkPageBreak(5)) {
-          doc.setFillColor(30, 41, 59);
-          doc.rect(margin, yPosition - 3, contentWidth, 10, 'F');
-        }
-        doc.text(line || ' ', margin + 2, yPosition);
-        yPosition += 5;
-      }
-      yPosition += 8;
-    }
-    
-    else if (block?.type === "image") {
-      try {
-        checkPageBreak(60);
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = () => {
-            console.warn('Image load failed:', block.value);
-            resolve();
-          };
-          img.src = block.value;
-        });
-        
-        if (img.complete && img.naturalWidth > 0) {
-          const imgWidth = contentWidth;
-          const imgHeight = (img.height / img.width) * imgWidth;
-          const maxHeight = 100;
-          const finalHeight = Math.min(imgHeight, maxHeight);
-          
-          checkPageBreak(finalHeight + 10);
-          doc.addImage(img, 'JPEG', margin, yPosition, imgWidth, finalHeight);
-          yPosition += finalHeight + 10;
-        }
-      } catch (e) {
-        console.warn('Failed to add image to PDF:', e);
-        doc.setFontSize(10);
-        doc.setTextColor(100, 116, 139);
-        doc.text('[Image]', margin, yPosition);
-        yPosition += 10;
-      }
-    }
-    
-    else if (block?.type === "image-group") {
-      for (const img of block.images) {
-        try {
-          checkPageBreak(60);
-          const image = new Image();
-          image.crossOrigin = "anonymous";
-          await new Promise((resolve) => {
-            image.onload = resolve;
-            image.onerror = resolve;
-            image.src = img.value;
-          });
-          
-          if (image.complete && image.naturalWidth > 0) {
-            const imgWidth = contentWidth;
-            const imgHeight = (image.height / image.width) * imgWidth;
-            const maxHeight = 80;
-            const finalHeight = Math.min(imgHeight, maxHeight);
-            
-            checkPageBreak(finalHeight + 10);
-            doc.addImage(image, 'JPEG', margin, yPosition, imgWidth, finalHeight);
-            yPosition += finalHeight + 10;
-          }
-        } catch (e) {
-          console.warn('Failed to add image to PDF:', e);
-        }
-      }
-    }
-  }
-  
-  return doc;
-}
-
-/* ---------- Minimized Window Bar ---------- */
-function MinimizedWindowBar({ windows, onRestore, onClose }) {
-  if (windows.length === 0) return null;
-
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-[60] bg-slate-800/95 backdrop-blur-md border-t border-slate-700 p-2">
-      <div className="max-w-7xl mx-auto flex gap-2 overflow-x-auto">
-        {windows.map((window) => (
-          <div
-            key={window.id}
-            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 min-w-[200px] max-w-[300px] transition-colors group"
-          >
-            <BookOpen size={16} className="text-blue-400 flex-shrink-0" />
-            <span className="text-white text-sm truncate flex-1">{window.title}</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRestore(window.id);
-              }}
-              className="p-1 hover:bg-slate-500 rounded transition-colors"
-              title="Restore"
-            >
-              <ChevronUp size={16} className="text-white" />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose(window.id);
-              }}
-              className="p-1 hover:bg-red-500 rounded transition-colors"
-              title="Close"
-            >
-              <X size={16} className="text-white" />
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Full View Modal ---------- */
-function FullViewModal({ item, onClose, owner, windowId, onMinimize }) {
-  const navigate = useNavigate();
-  const [expandedCodeBlocks, setExpandedCodeBlocks] = useState(new Set());
-  const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
-  const [fullScreenImages, setFullScreenImages] = useState(null);
-  const [fullScreenIndex, setFullScreenIndex] = useState(0);
-  const [downloading, setDownloading] = useState(false);
-  
-  const [windowMode, setWindowMode] = useState('normal');
-  const [isMinimized, setIsMinimized] = useState(false);
-  
-  const [fontSize, setFontSize] = useState(18);
-  const [fontFamily, setFontFamily] = useState("default");
-  const [readingMode, setReadingMode] = useState(false);
-  const [showReadingPanel, setShowReadingPanel] = useState(false);
-  const [bookmarkedSections, setBookmarkedSections] = useState(new Set());
-  const [studyMode, setStudyMode] = useState(loadStudyMode());
-
-  const contentRef = useRef(null);
-
-  useEffect(() => {
-    saveStudyMode(studyMode);
-  }, [studyMode]);
-
-  useEffect(() => {
-    if (!isMinimized) {
-      const originalOverflow = document.body.style.overflow;
-      const originalPaddingRight = document.body.style.paddingRight;
-      
-      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-      
-      document.body.style.overflow = 'hidden';
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-      
-      return () => {
-        document.body.style.overflow = originalOverflow;
-        document.body.style.paddingRight = originalPaddingRight;
-      };
-    }
-  }, [isMinimized]);
-
-  if (!item) return null;
-
-  const groupedBlocks = useMemo(() => groupConsecutiveImages(item.blocks || []), [item]);
-  const mainTitleInfo = extractMainTitle(item.blocks || []);
-  const displayTitle = mainTitleInfo ? mainTitleInfo.title : item.title;
-
-  const toggleCodeExpansion = (index) =>
-    setExpandedCodeBlocks((prev) => {
-      const next = new Set(prev);
-      next.has(index) ? next.delete(index) : next.add(index);
-      return next;
-    });
-
-  const handleCopyCode = (code, index) => {
-    navigator.clipboard.writeText(code || "").then(() => {
-      setCopiedCodeIndex(index);
-      setTimeout(() => setCopiedCodeIndex(null), 2000);
-    });
-  };
-
-  const openFullScreen = (images, index) => {
-    setFullScreenImages(images);
-    setFullScreenIndex(index);
-  };
-
-  const closeFullScreen = () => {
-    setFullScreenImages(null);
-    setFullScreenIndex(0);
-  };
-
-  const toggleBookmark = (index) => {
-    setBookmarkedSections(prev => {
-      const next = new Set(prev);
-      next.has(index) ? next.delete(index) : next.add(index);
-      return next;
-    });
-  };
-
-  const getFontFamilyClass = () => {
-    switch(fontFamily) {
-      case 'serif': return 'font-serif';
-      case 'mono': return 'font-mono';
-      case 'sans': return 'font-sans';
-      default: return '';
-    }
-  };
-
-  const extractTextContent = (html) => {
-    if (!html) return '';
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-    return temp.textContent || temp.innerText || '';
-  };
-
-  const handleEdit = () => {
-    if (!owner) return;
-    onClose();
-    navigate(`/bim/edit/${encodeURIComponent(item.id)}`);
-  };
-
-  const handleMinimize = () => {
-    setIsMinimized(true);
-    onMinimize(windowId, displayTitle);
-  };
-
-  const handleRestore = () => {
-    setIsMinimized(false);
-  };
-
-  // Listen for restore events
-  useEffect(() => {
-    const handleRestoreEvent = (event) => {
-      if (event.detail && event.detail.windowId === windowId) {
-        handleRestore();
-      }
-    };
-    
-    window.addEventListener('restoreWindow', handleRestoreEvent);
-    return () => window.removeEventListener('restoreWindow', handleRestoreEvent);
-  }, [windowId]);
-
-  const handleDownload = async (format) => {
-    setDownloading(true);
-    try {
-      const filename = displayTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-      
-      if (format === 'txt') {
-        downloadAsText(filename);
-      } else if (format === 'html') {
-        downloadAsHTML(filename);
-      } else if (format === 'md') {
-        downloadAsMarkdown(filename);
-      } else if (format === 'pdf') {
-        await downloadAsPDF(filename);
-      }
-    } catch (error) {
-      console.error('Download failed:', error);
-      alert('Download failed: ' + error.message);
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const downloadAsText = (filename) => {
-    let content = `${displayTitle}\n${'='.repeat(displayTitle.length)}\n\n`;
-    
-    groupedBlocks.forEach((block) => {
-      if (block?.type === "h1" || block?.type === "h2") {
-        const text = extractTextContent(block.value);
-        content += `\n${text}\n${'-'.repeat(text.length)}\n\n`;
-      } else if (block?.type === "text") {
-        const text = extractTextContent(block.value);
-        content += text + '\n\n';
-      } else if (block?.type === "code") {
-        content += '```\n' + (block.value || '') + '\n```\n\n';
-      } else if (block?.type === "image") {
-        content += `[Image: ${block.value}]\n\n`;
-      } else if (block?.type === "image-group") {
-        content += `[Image Gallery: ${block.images.length} images]\n\n`;
-      }
-    });
-
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadAsHTML = (filename) => {
-    let htmlContent = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${displayTitle}</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      line-height: 1.7;
-      max-width: 800px;
-      margin: 40px auto;
-      padding: 20px;
-      color: #1e293b;
-      background: white;
-    }
-    h1 {
-      font-size: 2.5rem;
-      font-weight: 800;
-      margin-bottom: 1.5rem;
-      color: #0f172a;
-      border-bottom: 3px solid #3b82f6;
-      padding-bottom: 15px;
-    }
-    h2 {
-      font-size: 2rem;
-      font-weight: 700;
-      margin-top: 2.5rem;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 2px solid #3b82f6;
-      color: #1e293b;
-    }
-    p { margin: 1rem 0; line-height: 1.7; }
-    ul, ol { margin: 1rem 0; padding-left: 2.5rem; }
-    code {
-      background-color: rgba(135,131,120,.15);
-      color: #eb5757;
-      border-radius: 4px;
-      font-size: 90%;
-      padding: 0.2em 0.4em;
-    }
-    pre {
-      background-color: #1e293b;
-      color: #10b981;
-      padding: 1.5rem;
-      border-radius: 0.5rem;
-      overflow-x: auto;
-      margin: 1.5rem 0;
-    }
-    img {
-      max-width: 100%;
-      height: auto;
-      border-radius: 0.5rem;
-      margin: 1.5rem 0;
-    }
-  </style>
-</head>
-<body>
-  <h1>${displayTitle}</h1>
-`;
-
-    groupedBlocks.forEach((block) => {
-      if (block?.type === "h1") {
-      } else if (block?.type === "h2") {
-        htmlContent += `  <h2>${block.value}</h2>\n`;
-      } else if (block?.type === "text") {
-        htmlContent += `  <div>${block.value}</div>\n`;
-      } else if (block?.type === "code") {
-        const escaped = (block.value || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        htmlContent += `  <pre><code>${escaped}</code></pre>\n`;
-      } else if (block?.type === "image") {
-        htmlContent += `  <img src="${block.value}" alt="Content image" />\n`;
-      } else if (block?.type === "image-group") {
-        block.images.forEach(img => {
-          htmlContent += `  <img src="${img.value}" alt="Content image" />\n`;
-        });
-      }
-    });
-
-    htmlContent += `</body>\n</html>`;
-
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadAsMarkdown = (filename) => {
-    let content = `# ${displayTitle}\n\n`;
-    
-    groupedBlocks.forEach((block) => {
-      if (block?.type === "h1") {
-      } else if (block?.type === "h2") {
-        const text = extractTextContent(block.value);
-        content += `## ${text}\n\n`;
-      } else if (block?.type === "text") {
-        const text = extractTextContent(block.value);
-        content += text + '\n\n';
-      } else if (block?.type === "code") {
-        const lang = block.language || 'javascript';
-        content += `\`\`\`${lang}\n${block.value || ''}\n\`\`\`\n\n`;
-      } else if (block?.type === "image") {
-        content += `![Image](${block.value})\n\n`;
-      } else if (block?.type === "image-group") {
-        block.images.forEach(img => {
-          content += `![Image](${img.value})\n`;
-        });
-        content += '\n';
-      }
-    });
-
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadAsPDF = async (filename) => {
-    const loadingDiv = document.createElement('div');
-    loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); color: white; padding: 20px 40px; border-radius: 10px; z-index: 10000; font-size: 16px; font-weight: bold;';
-    loadingDiv.textContent = '📄 Generating PDF... Please wait';
-    document.body.appendChild(loadingDiv);
-
-    try {
-      const doc = await generatePDF(displayTitle, groupedBlocks, fontSize);
-      doc.save(`${filename}.pdf`);
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      alert('Failed to generate PDF: ' + error.message);
-      throw error;
-    } finally {
-      if (document.body.contains(loadingDiv)) {
-        document.body.removeChild(loadingDiv);
-      }
-    }
-  };
-
-  const getCodeTheme = () => {
-    switch(studyMode) {
-      case 'light':
-        return {
-          bg: '#f8f9fa',
-          border: '#e9ecef',
-          text: '#212529'
-        };
-      case 'sepia':
-        return {
-          bg: '#f5f1e8',
-          border: '#d4c5a9',
-          text: '#5c4a3a'
-        };
-      case 'blue':
-        return {
-          bg: '#eff6ff',
-          border: '#dbeafe',
-          text: '#1e40af'
-        };
-      case 'green':
-        return {
-          bg: '#f0fdf4',
-          border: '#dcfce7',
-          text: '#166534'
-        };
-      case 'amber':
-        return {
-          bg: '#fffbeb',
-          border: '#fef3c7',
-          text: '#92400e'
-        };
-      case 'purple':
-        return {
-          bg: '#faf5ff',
-          border: '#f3e8ff',
-          text: '#6b21a8'
-        };
-      default:
-        return {
-          bg: '#1e293b',
-          border: '#334155',
-          text: '#10b981'
-        };
-    }
-  };
-
-  if (isMinimized) {
-    return null;
-  }
-
-  return (
-    <>
-      {fullScreenImages && (
-        <FullScreenImageViewer images={fullScreenImages} initialIndex={fullScreenIndex} onClose={closeFullScreen} />
-      )}
-
-      <div
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-hidden transition-all duration-300`}
-        onClick={onClose}
-      >
-        <div
-          className={`rounded-2xl shadow-2xl flex flex-col overflow-hidden bg-white transition-all duration-300 ${
-            windowMode === 'maximized' 
-              ? 'w-full h-full max-w-none max-h-none rounded-none' 
-              : 'max-w-4xl w-full max-h-[90vh]'
-          }`}
-          onClick={(e) => e.stopPropagation()}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-4 flex items-center justify-between z-10">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              {item.locked && (
-                <div className="flex-shrink-0 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                  <Lock size={16} />
-                  <span className="text-xs font-bold">LOCKED</span>
-                </div>
-              )}
-              <h1 className="text-3xl font-bold truncate">{displayTitle}</h1>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                type="button"
-                onClick={handleMinimize}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                title="Minimize"
-              >
-                <Minus size={20} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setWindowMode(windowMode === 'maximized' ? 'normal' : 'maximized')}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                title={windowMode === 'maximized' ? 'Restore' : 'Maximize'}
-              >
-                {windowMode === 'maximized' ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="14" height="14" rx="2" />
-                    <path d="M7 21h10a2 2 0 0 0 2-2V9" />
-                  </svg>
-                ) : (
-                  <Maximize2 size={20} />
-                )}
-              </button>
-              
-              {isLocalServer() && owner && (
-                <button
-                  type="button"
-                  onClick={handleEdit}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1.5"
-                  title="Edit entry"
-                >
-                  <Edit size={20} />
-                  <span className="text-sm font-semibold">Edit</span>
-                </button>
-              )}
-              <DownloadDropdown onDownload={handleDownload} />
-              <StudyModeDropdown studyMode={studyMode} onStudyModeChange={setStudyMode} />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowReadingPanel(!showReadingPanel);
-                }}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                title="Reading Settings"
-              >
-                <Type size={20} />
-              </button>
-              
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                title="Close"
-                aria-label="Close"
-              >
-                <X size={24} />
-              </button>
-            </div>
-          </div>
-
-          {showReadingPanel && (
-            <div className="flex-shrink-0 px-6 py-4 border-b bg-slate-50 border-slate-200">
-              <h3 className="text-sm font-bold mb-3 text-slate-700">
-                📖 Reading Settings
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold block mb-1 text-slate-600">
-                    Font Size: {fontSize}px
-                  </label>
-                  <input
-                    type="range"
-                    min="14"
-                    max="28"
-                    value={fontSize}
-                    onChange={(e) => setFontSize(Number(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold block mb-1 text-slate-600">
-                    Font Family
-                  </label>
-                  <select
-                    value={fontFamily}
-                    onChange={(e) => setFontFamily(e.target.value)}
-                    className="w-full px-2 py-1 rounded text-sm bg-white text-slate-800 border border-slate-200"
-                  >
-                    <option value="default">Default</option>
-                    <option value="serif">Serif</option>
-                    <option value="sans">Sans-serif</option>
-                    <option value="mono">Monospace</option>
-                  </select>
-                </div>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setReadingMode(!readingMode)}
-                  className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
-                    readingMode 
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-200 text-slate-700"
-                  }`}
-                >
-                  {readingMode ? "Exit" : "Enable"} Focus Mode
-                </button>
-              </div>
-            </div>
-          )}
-
-          <style>{`
-            .rich-text-content {
-              color: inherit;
-            }
-            
-            .rich-text-content * {
-              background-color: transparent !important;
-              background-image: none !important;
-            }
-            
-            .rich-text-content strong,
-            .rich-text-content b {
-              font-weight: 700;
-            }
-
-            .rich-text-content em,
-            .rich-text-content i {
-              font-style: italic;
-            }
-
-            .rich-text-content u {
-              text-decoration: underline;
-            }
-
-            .rich-text-content ul,
-            .rich-text-content ol {
-              margin: 1rem 0;
-              padding-left: 2.5rem;
-            }
-
-            .rich-text-content ul {
-              list-style-type: disc;
-            }
-
-            .rich-text-content ol {
-              list-style-type: decimal;
-            }
-
-            .rich-text-content li {
-              margin: 0.5rem 0;
-              padding-left: 0.5rem;
-              line-height: 1.6;
-            }
-
-            .rich-text-content p {
-              margin: 0.75rem 0;
-              line-height: inherit;
-            }
-
-            .rich-text-content code {
-              background-color: rgba(135,131,120,.15) !important;
-              color: #eb5757 !important;
-              border-radius: 4px;
-              font-size: 90%;
-              padding: 0.2em 0.4em;
-            }
-
-            .rich-text-content a {
-              text-decoration: underline;
-            }
-
-            .study-mode-light {
-              background-color: #ffffff !important;
-            }
-            
-            .study-mode-light .rich-text-content > *:not([style*="color"]) {
-              color: #1e293b !important;
-            }
-
-            .study-mode-sepia {
-              background-color: #f5f1e8 !important;
-            }
-            
-            .study-mode-sepia .rich-text-content > *:not([style*="color"]) {
-              color: #5c4a3a !important;
-            }
-
-            .study-mode-blue {
-              background-color: #eff6ff !important;
-            }
-            
-            .study-mode-blue .rich-text-content > *:not([style*="color"]) {
-              color: #1e3a8a !important;
-            }
-
-            .study-mode-green {
-              background-color: #f0fdf4 !important;
-            }
-            
-            .study-mode-green .rich-text-content > *:not([style*="color"]) {
-              color: #14532d !important;
-            }
-
-            .study-mode-amber {
-              background-color: #fffbeb !important;
-            }
-            
-            .study-mode-amber .rich-text-content > *:not([style*="color"]) {
-              color: #78350f !important;
-            }
-
-            .study-mode-purple {
-              background-color: #faf5ff !important;
-            }
-            
-            .study-mode-purple .rich-text-content > *:not([style*="color"]) {
-              color: #581c87 !important;
-            }
-
-            .study-mode-sepia h1,
-            .study-mode-sepia h2 {
-              color: #3c2f23 !important;
-            }
-
-            .study-mode-light h1,
-            .study-mode-light h2 {
-              color: #0f172a !important;
-            }
-
-            .study-mode-blue h1,
-            .study-mode-blue h2 {
-              color: #1e3a8a !important;
-            }
-
-            .study-mode-green h1,
-            .study-mode-green h2 {
-              color: #14532d !important;
-            }
-
-            .study-mode-amber h1,
-            .study-mode-amber h2 {
-              color: #78350f !important;
-            }
-
-            .study-mode-purple h1,
-            .study-mode-purple h2 {
-              color: #581c87 !important;
-            }
-
-            .study-mode-light .rich-text-content a:not([style*="color"]) {
-              color: #2563eb !important;
-            }
-
-            .study-mode-sepia .rich-text-content a:not([style*="color"]) {
-              color: #b45309 !important;
-            }
-
-            .study-mode-blue .rich-text-content a:not([style*="color"]) {
-              color: #1d4ed8 !important;
-            }
-
-            .study-mode-green .rich-text-content a:not([style*="color"]) {
-              color: #15803d !important;
-            }
-
-            .study-mode-amber .rich-text-content a:not([style*="color"]) {
-              color: #b45309 !important;
-            }
-
-            .study-mode-purple .rich-text-content a:not([style*="color"]) {
-              color: #7c3aed !important;
-            }
-
-            .reading-content-container {
-              scroll-behavior: smooth;
-            }
-            
-            .reading-content-container::-webkit-scrollbar {
-              width: 12px;
-            }
-            
-            .reading-content-container::-webkit-scrollbar-track {
-              background: transparent;
-            }
-            
-            .reading-content-container::-webkit-scrollbar-thumb {
-              background: rgba(100, 116, 139, 0.3);
-              border-radius: 6px;
-            }
-            
-            .reading-content-container::-webkit-scrollbar-thumb:hover {
-              background: rgba(100, 116, 139, 0.5);
-            }
-          `}</style>
-
-          <div
-            ref={contentRef}
-            className={`flex-1 overflow-y-auto overflow-x-hidden p-8 pb-24 reading-content-container study-mode-${studyMode} ${readingMode ? "max-w-3xl mx-auto" : ""} ${getFontFamilyClass()}`}
-            style={{
-              fontSize: `${fontSize}px`,
-              lineHeight: 1.7,
-            }}
-          >
-            <div className="max-w-none space-y-6">
-              {groupedBlocks.length ? (
-                groupedBlocks.map((block, idx) => {
-                  if (block?.type === "h1") return null;
-
-                  if (block?.type === "h2") {
-                    return (
-                      <div key={`h2-${idx}`} className="relative group">
-                        {bookmarkedSections.has(idx) && (
-                          <Bookmark size={20} className="absolute -left-8 top-1 text-amber-500 fill-amber-500" />
-                        )}
-                        <h2 className="text-3xl font-extrabold mb-3 mt-4 pb-2 border-b-2 border-blue-400">
-                          {renderHTMLContent(block.value, "", false)}
-                        </h2>
-                        <button
-                          type="button"
-                          onClick={() => toggleBookmark(idx)}
-                          className="absolute -right-8 top-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Bookmark section"
-                        >
-                          <Bookmark size={18} className={bookmarkedSections.has(idx) ? "fill-amber-500 text-amber-500" : "text-slate-400"} />
-                        </button>
-                      </div>
-                    );
-                  }
-
-                  if (block?.type === "text") {
-                    return (
-                      <div key={`p-${idx}`} className="leading-relaxed">
-                        {renderHTMLContent(block.value, "", false)}
-                      </div>
-                    );
-                  }
-
-                  if (block?.type === "image-group") {
-                    return (
-                      <div key={`ig-${idx}`} className="my-6">
-                        <ImageCarousel
-                          images={block.images}
-                          isPreview={false}
-                          onFullScreen={(index) => openFullScreen(block.images, index)}
-                          studyMode={studyMode}
-                        />
-                      </div>
-                    );
-                  }
-
-                  if (block?.type === "image") {
-                    return (
-                      <div
-                        key={`im-${idx}`}
-                        className="my-6 relative group cursor-pointer"
-                        onDoubleClick={() => openFullScreen([block], 0)}
-                      >
-                        <div className={`rounded-lg border overflow-hidden ${
-                          studyMode === 'light' ? 'border-slate-200 bg-slate-50' :
-                          studyMode === 'sepia' ? 'border-amber-200 bg-amber-50' :
-                          studyMode === 'blue' ? 'border-blue-300 bg-blue-50' :
-                          studyMode === 'green' ? 'border-green-300 bg-green-50' :
-                          studyMode === 'amber' ? 'border-amber-300 bg-amber-100' :
-                          'border-purple-300 bg-purple-50'
-                        }`}>
-                          <img
-                            src={block.value}
-                            alt=""
-                            className="w-full h-auto max-h-[600px] object-contain mx-auto"
-                            loading="lazy"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => openFullScreen([block], 0)}
-                          className="absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                          title="View full screen"
-                        >
-                          <Maximize2 size={20} />
-                        </button>
-                      </div>
-                    );
-                  }
-
-                  if (block?.type === "code") {
-                    const isExpanded = expandedCodeBlocks.has(idx);
-                    const lines = String(block.value || "").split("\n");
-                    const hasMore = lines.length > 10;
-                    const codeTheme = getCodeTheme();
-
-                    return (
-                      <div key={`cd-${idx}`} className="my-6">
-                        <div className="relative group/code">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCopyCode(block.value, idx);
-                            }}
-                            className={`absolute top-3 right-3 z-10 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all opacity-0 group-hover/code:opacity-100 ${
-                              copiedCodeIndex === idx ? "bg-green-500 text-white" : "bg-slate-700 text-white hover:bg-slate-600"
-                            }`}
-                            title="Copy code"
-                          >
-                            <span className="inline-flex items-center gap-1.5">
-                              {copiedCodeIndex === idx ? (
-                                <>
-                                  <Check size={14} /> Copied!
-                                </>
-                              ) : (
-                                <>
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                  </svg>
-                                  Copy
-                                </>
-                              )}
-                            </span>
-                          </button>
-
-                          <pre 
-                            className="rounded-lg p-6 overflow-x-auto overflow-y-auto border-2"
-                            style={{ 
-                              maxHeight: isExpanded ? 'none' : '400px',
-                              fontFamily: '"Fira Code", "Cascadia Code", "JetBrains Mono", Consolas, Monaco, "Courier New", monospace',
-                              fontSize: '14px',
-                              lineHeight: '1.6',
-                              tabSize: 4,
-                              backgroundColor: codeTheme.bg,
-                              borderColor: codeTheme.border,
-                              color: codeTheme.text
-                            }}
-                          >
-                            <code style={{ color: codeTheme.text }}>{block.value || ""}</code>
-                          </pre>
-
-                          {hasMore && (
-                            <div className="mt-3 flex justify-center">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleCodeExpansion(idx);
-                                }}
-                                className={`px-5 py-2.5 rounded-lg transition-all text-sm font-bold flex items-center gap-2 shadow-lg ${
-                                  studyMode === 'light' || studyMode === 'sepia'
-                                    ? 'bg-white text-slate-900 hover:bg-slate-50 border-2 border-slate-300 hover:border-slate-400'
-                                    : 'bg-slate-800 text-slate-100 hover:bg-slate-700 border-2 border-slate-600'
-                                }`}
-                              >
-                                {isExpanded ? (
-                                  <>
-                                    <ChevronLeft size={18} />
-                                    <span>Show Less</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Maximize2 size={18} />
-                                    <span>View Full Code ({lines.length} lines)</span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return null;
-                })
-              ) : (
-                <p className="text-center py-8 text-slate-500">No content available</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex-shrink-0 px-6 py-4 border-t bg-slate-50 border-slate-200 flex items-center justify-between">
-            <span className="text-sm">
-              {downloading && (
-                <span className="flex items-center gap-2 text-slate-600">
-                  <RefreshCcw size={16} className="animate-spin" />
-                  Downloading...
-                </span>
-              )}
-            </span>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2 rounded-lg font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
 /* ---------- Main Component ---------- */
 export default function BIMDisplay() {
   const [items, setItems] = useState([]);
@@ -2280,7 +860,6 @@ export default function BIMDisplay() {
   const [filterFavorites, setFilterFavorites] = useState(false);
   const [sortBy, setSortBy] = useState("recent");
   const navigate = useNavigate();
-  const location = useLocation();
 
   const isLocal = isLocalServer();
   const owner = isLocal;
@@ -2292,6 +871,17 @@ export default function BIMDisplay() {
   useEffect(() => {
     saveFavorites(favorites);
   }, [favorites]);
+
+  useEffect(() => {
+    const handlePasswordPrompt = (event) => {
+      if (event.detail) {
+        setPasswordPrompt(event.detail);
+      }
+    };
+    
+    window.addEventListener('showPasswordPrompt', handlePasswordPrompt);
+    return () => window.removeEventListener('showPasswordPrompt', handlePasswordPrompt);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -2458,7 +1048,6 @@ export default function BIMDisplay() {
 
   const handleRestore = (windowId) => {
     setMinimizedWindows(prev => prev.filter(w => w.id !== windowId));
-    // Dispatch custom event to notify the modal to restore
     const event = new CustomEvent('restoreWindow', { detail: { windowId } });
     window.dispatchEvent(event);
   };
@@ -2908,5 +1497,1684 @@ export default function BIMDisplay() {
         )}
       </div>
     </div>
+  );
+}
+
+/* ---------- Shared preview body ---------- */
+function PreviewContent({ blocks = [], darkMode = false }) {
+  const groupedBlocks = groupConsecutiveImages(blocks);
+  return (
+    <div
+      className={`p-4 rounded-lg border space-y-4 max-h-48 overflow-hidden relative ${
+        darkMode
+          ? "bg-gradient-to-br from-slate-800 to-white/0 border-slate-600"
+          : "bg-gradient-to-br from-slate-50 to-white border-slate-200"
+      }`}
+    >
+      {groupedBlocks.slice(0, 5).map((block, idx) => {
+        if (block?.type === "h1") return null;
+
+        if (block?.type === "h2") {
+          const textContent = String(block.value || "")
+            .replace(/<[^>]*>/g, "")
+            .slice(0, 100);
+          return (
+            <h2
+              key={`pv-h2-${idx}`}
+              className={`text-lg font-extrabold mb-2 mt-3 pb-1 border-b border-blue-400 ${
+                darkMode ? "text-slate-100" : "text-slate-900"
+              }`}
+            >
+              {textContent}
+            </h2>
+          );
+        }
+
+        if (block?.type === "text") {
+          const textContent = String(block.value || "")
+            .replace(/<[^>]*>/g, "")
+            .slice(0, 180);
+          return (
+            <div
+              key={`pv-text-${idx}`}
+              className={`leading-relaxed text-sm ${
+                darkMode ? "text-slate-300" : "text-slate-700"
+              }`}
+            >
+              {textContent}
+              {textContent.length >= 180 ? "…" : ""}
+            </div>
+          );
+        }
+
+        if (block?.type === "image-group" || block?.type === "image") {
+          return (
+            <div
+              key={`pv-img-${idx}`}
+              className={`relative w-full h-20 rounded-lg overflow-hidden border ${
+                darkMode ? "border-slate-600 bg-slate-700" : "border-slate-200 bg-slate-50"
+              }`}
+            >
+              <div className="w-full h-full flex items-center justify-center">
+                <Eye size={32} className={`${darkMode ? "text-slate-500" : "text-slate-300"}`} />
+                <span
+                  className={`ml-2 text-sm font-semibold ${
+                    darkMode ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
+                  {block?.type === "image-group" ? `${block.images.length} Images` : "Image"}
+                </span>
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })}
+      {groupedBlocks.length > 5 && (
+        <div className="text-xs italic text-slate-400">+ more content…</div>
+      )}
+      <div
+        className={`absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t pointer-events-none ${
+          darkMode ? "from-slate-700" : "from-white"
+        }`}
+      />
+    </div>
+  );
+}
+
+/* ---------- Unlocked overlay ---------- */
+function UnlockedPreviewOverlay({ darkMode = false }) {
+  return (
+    <>
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+      `}</style>
+      <div className={`absolute inset-0 flex items-center justify-center z-10 backdrop-blur-sm ${
+        darkMode ? "bg-gradient-to-br from-blue-900/20 via-slate-800/30 to-slate-900/20"
+                 : "bg-gradient-to-br from-blue-50/90 via-cyan-50/90 to-white/90"
+      }`}>
+        <div className="text-center px-6 py-6">
+          <div className="mb-3">
+            <div className={`p-3 rounded-full shadow-2xl inline-block animate-[float_3s_ease-in-out_infinite] ${
+              darkMode ? "bg-blue-700" : "bg-blue-600"
+            }`}>
+              <Eye size={32} className="text-white" />
+            </div>
+          </div>
+          <p className={`text-base font-bold mb-1 ${
+            darkMode ? "text-blue-200" : "text-blue-900"
+          }`}>
+            Preview available
+          </p>
+          <p className={`${darkMode ? "text-slate-200" : "text-slate-700"} text-sm`}>
+            Click <span className={`font-bold ${darkMode ? "text-blue-300" : "text-blue-700"}`}>View More</span> to see details
+          </p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ---------- Preview wrapper ---------- */
+function BlockPreview({ blocks = [], darkMode = false, locked = false }) {
+  if (!blocks.length) {
+    return (
+      <div
+        className={`flex items-center justify-center h-24 rounded-lg border ${
+          darkMode
+            ? "bg-gradient-to-br from-slate-800 to-slate-700 border-slate-600"
+            : "bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200"
+        }`}
+      >
+        <p className="text-sm text-slate-400">No content</p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`relative rounded-lg border overflow-hidden ${
+        darkMode ? "border-slate-600" : "border-slate-200"
+      }`}
+      style={{ minHeight: "12rem" }}
+    >
+      <div className="locked-content-blur">
+        <PreviewContent blocks={blocks} darkMode={darkMode} />
+      </div>
+
+      {locked ? (
+        <LockedContentOverlay darkMode={darkMode} />
+      ) : (
+        <UnlockedPreviewOverlay darkMode={darkMode} />
+      )}
+    </div>
+  );
+}
+
+/* ---------- Download Format Dropdown ---------- */
+function DownloadDropdown({ onDownload }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const formats = [
+    { value: 'pdf', label: 'PDF Document', icon: File, color: 'text-red-500' },
+    { value: 'txt', label: 'Plain Text', icon: FileText, color: 'text-blue-500' },
+    { value: 'html', label: 'HTML File', icon: FileDown, color: 'text-orange-500' },
+    { value: 'md', label: 'Markdown', icon: FileText, color: 'text-purple-500' },
+  ];
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1"
+        title="Download"
+      >
+        <Download size={20} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full right-0 mt-2 w-56 rounded-xl shadow-2xl border overflow-hidden z-[110] bg-white border-slate-200">
+          <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide bg-slate-50 text-slate-600">
+            Download As
+          </div>
+          {formats.map((format) => (
+            <button
+              key={format.value}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDownload(format.value);
+                setIsOpen(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 transition text-left hover:bg-slate-50 text-slate-700"
+            >
+              <format.icon size={18} className={format.color} />
+              <span className="text-sm font-medium">{format.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Study Mode Dropdown ---------- */
+function StudyModeDropdown({ studyMode, onStudyModeChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const modes = [
+    { value: 'light', label: 'Light Mode', icon: '☀️' },
+    { value: 'sepia', label: 'Sepia Mode', icon: '📜' },
+    { value: 'blue', label: 'Blue Mode', icon: '💙' },
+    { value: 'green', label: 'Green Mode', icon: '💚' },
+    { value: 'amber', label: 'Amber Mode', icon: '🟡' },
+    { value: 'purple', label: 'Purple Mode', icon: '💜' },
+  ];
+
+  const currentMode = modes.find(m => m.value === studyMode) || modes[0];
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-2"
+        title="Study Mode"
+      >
+        <span className="text-sm font-medium">{currentMode.icon} {currentMode.label}</span>
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full right-0 mt-2 w-52 rounded-xl shadow-2xl border overflow-hidden z-[110] bg-white border-slate-200">
+          <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide bg-slate-50 text-slate-600">
+            Study Mode
+          </div>
+          {modes.map((mode) => (
+            <button
+              key={mode.value}
+              onClick={(e) => {
+                e.stopPropagation();
+                onStudyModeChange(mode.value);
+                setIsOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-4 py-3 transition text-left hover:bg-slate-50 text-slate-700 ${
+                studyMode === mode.value ? 'bg-blue-50 font-semibold' : ''
+              }`}
+            >
+              <span className="text-sm flex items-center gap-2">
+                <span>{mode.icon}</span>
+                <span>{mode.label}</span>
+              </span>
+              {studyMode === mode.value && <Check size={16} className="text-blue-600" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- PDF Export ---------- */
+async function generatePDF(displayTitle, groupedBlocks, fontSize) {
+  if (!window.jspdf) {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    document.head.appendChild(script);
+    await new Promise((resolve) => { script.onload = resolve; });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p', 'mm', 'a4');
+  
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const margin = 20;
+  const contentWidth = pageWidth - 2 * margin;
+  let yPosition = margin;
+  
+  const checkPageBreak = (requiredHeight) => {
+    if (yPosition + requiredHeight > pageHeight - margin) {
+      doc.addPage();
+      yPosition = margin;
+      return true;
+    }
+    return false;
+  };
+  
+  const extractText = (html) => {
+    if (!html) return '';
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    return temp.textContent || temp.innerText || '';
+  };
+  
+  const wrapText = (text, maxWidth, fontSz) => {
+    doc.setFontSize(fontSz);
+    const lines = doc.splitTextToSize(text, maxWidth);
+    return lines;
+  };
+  
+  doc.setFontSize(24);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  const titleLines = wrapText(displayTitle, contentWidth, 24);
+  titleLines.forEach((line) => {
+    doc.text(line, margin, yPosition);
+    yPosition += 10;
+  });
+  
+  doc.setDrawColor(59, 130, 246);
+  doc.setLineWidth(1);
+  doc.line(margin, yPosition, pageWidth - margin, yPosition);
+  yPosition += 15;
+  
+  for (const block of groupedBlocks) {
+    if (block?.type === "h1") {
+      continue;
+    }
+    
+    if (block?.type === "h2") {
+      checkPageBreak(15);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 41, 59);
+      const text = extractText(block.value);
+      const lines = wrapText(text, contentWidth, 18);
+      lines.forEach((line) => {
+        doc.text(line, margin, yPosition);
+        yPosition += 8;
+      });
+      doc.setDrawColor(59, 130, 246);
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPosition, pageWidth - margin, yPosition);
+      yPosition += 10;
+    }
+    
+    else if (block?.type === "text") {
+      checkPageBreak(10);
+      doc.setFontSize(fontSize || 11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85);
+      const text = extractText(block.value);
+      const lines = wrapText(text, contentWidth, fontSize || 11);
+      
+      for (const line of lines) {
+        checkPageBreak(7);
+        doc.text(line, margin, yPosition);
+        yPosition += 7 * 1.5;
+      }
+      yPosition += 3;
+    }
+    
+    else if (block?.type === "code") {
+      checkPageBreak(20);
+      doc.setFillColor(30, 41, 59);
+      doc.rect(margin, yPosition - 3, contentWidth, 10, 'F');
+      
+      doc.setFontSize(9);
+      doc.setFont('courier', 'normal');
+      doc.setTextColor(16, 185, 129);
+      
+      yPosition += 5;
+      const codeLines = String(block.value || '').split('\n');
+      
+      for (const line of codeLines) {
+        if (checkPageBreak(5)) {
+          doc.setFillColor(30, 41, 59);
+          doc.rect(margin, yPosition - 3, contentWidth, 10, 'F');
+        }
+        doc.text(line || ' ', margin + 2, yPosition);
+        yPosition += 5;
+      }
+      yPosition += 8;
+    }
+    
+    else if (block?.type === "image") {
+      try {
+        checkPageBreak(60);
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = () => {
+            console.warn('Image load failed:', block.value);
+            resolve();
+          };
+          img.src = block.value;
+        });
+        
+        if (img.complete && img.naturalWidth > 0) {
+          const imgWidth = contentWidth;
+          const imgHeight = (img.height / img.width) * imgWidth;
+          const maxHeight = 100;
+          const finalHeight = Math.min(imgHeight, maxHeight);
+          
+          checkPageBreak(finalHeight + 10);
+          doc.addImage(img, 'JPEG', margin, yPosition, imgWidth, finalHeight);
+          yPosition += finalHeight + 10;
+        }
+      } catch (e) {
+        console.warn('Failed to add image to PDF:', e);
+        doc.setFontSize(10);
+        doc.setTextColor(100, 116, 139);
+        doc.text('[Image]', margin, yPosition);
+        yPosition += 10;
+      }
+    }
+    
+    else if (block?.type === "image-group") {
+      for (const img of block.images) {
+        try {
+          checkPageBreak(60);
+          const image = new Image();
+          image.crossOrigin = "anonymous";
+          await new Promise((resolve) => {
+            image.onload = resolve;
+            image.onerror = resolve;
+            image.src = img.value;
+          });
+          
+          if (image.complete && image.naturalWidth > 0) {
+            const imgWidth = contentWidth;
+            const imgHeight = (image.height / image.width) * imgWidth;
+            const maxHeight = 80;
+            const finalHeight = Math.min(imgHeight, maxHeight);
+            
+            checkPageBreak(finalHeight + 10);
+            doc.addImage(image, 'JPEG', margin, yPosition, imgWidth, finalHeight);
+            yPosition += finalHeight + 10;
+          }
+        } catch (e) {
+          console.warn('Failed to add image to PDF:', e);
+        }
+      }
+    }
+  }
+  
+  return doc;
+}
+
+/* ---------- Minimized Window Bar ---------- */
+function MinimizedWindowBar({ windows, onRestore, onClose }) {
+  if (windows.length === 0) return null;
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-[60] bg-slate-800/95 backdrop-blur-md border-t border-slate-700 p-2">
+      <div className="max-w-7xl mx-auto flex gap-2 overflow-x-auto">
+        {windows.map((window) => (
+          <div
+            key={window.id}
+            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 rounded-lg px-4 py-2 min-w-[200px] max-w-[300px] transition-colors group"
+          >
+            <BookOpen size={16} className="text-blue-400 flex-shrink-0" />
+            <span className="text-white text-sm truncate flex-1">{window.title}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRestore(window.id);
+              }}
+              className="p-1 hover:bg-slate-500 rounded transition-colors"
+              title="Restore"
+            >
+              <ChevronUp size={16} className="text-white" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose(window.id);
+              }}
+              className="p-1 hover:bg-red-500 rounded transition-colors"
+              title="Close"
+            >
+              <X size={16} className="text-white" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Full View Modal ---------- */
+function FullViewModal({ item, onClose, owner, windowId, onMinimize }) {
+  const navigate = useNavigate();
+  const [expandedCodeBlocks, setExpandedCodeBlocks] = useState(new Set());
+  const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
+  const [fullScreenImages, setFullScreenImages] = useState(null);
+  const [fullScreenIndex, setFullScreenIndex] = useState(0);
+  const [downloading, setDownloading] = useState(false);
+  
+  const [windowMode, setWindowMode] = useState('normal');
+  const [isMinimized, setIsMinimized] = useState(false);
+  
+  const [fontSize, setFontSize] = useState(18);
+  const [fontFamily, setFontFamily] = useState("default");
+  const [readingMode, setReadingMode] = useState(false);
+  const [showReadingPanel, setShowReadingPanel] = useState(false);
+  const [bookmarkedSections, setBookmarkedSections] = useState(new Set());
+  const [studyMode, setStudyMode] = useState(loadStudyMode());
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const [showSearch, setShowSearch] = useState(false);
+
+  const contentRef = useRef(null);
+
+  useEffect(() => {
+    saveStudyMode(studyMode);
+  }, [studyMode]);
+
+  useEffect(() => {
+    if (!isMinimized) {
+      const originalOverflow = document.body.style.overflow;
+      const originalPaddingRight = document.body.style.paddingRight;
+      
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.paddingRight = originalPaddingRight;
+      };
+    }
+  }, [isMinimized]);
+
+  if (!item) return null;
+
+  const groupedBlocks = useMemo(() => groupConsecutiveImages(item.blocks || []), [item]);
+  const mainTitleInfo = extractMainTitle(item.blocks || []);
+  const displayTitle = mainTitleInfo ? mainTitleInfo.title : item.title;
+
+  const toggleCodeExpansion = (index) =>
+    setExpandedCodeBlocks((prev) => {
+      const next = new Set(prev);
+      next.has(index) ? next.delete(index) : next.add(index);
+      return next;
+    });
+
+  const handleCopyCode = (code, index) => {
+    navigator.clipboard.writeText(code || "").then(() => {
+      setCopiedCodeIndex(index);
+      setTimeout(() => setCopiedCodeIndex(null), 2000);
+    });
+  };
+
+  const openFullScreen = (images, index) => {
+    setFullScreenImages(images);
+    setFullScreenIndex(index);
+  };
+
+  const closeFullScreen = () => {
+    setFullScreenImages(null);
+    setFullScreenIndex(0);
+  };
+
+  const toggleBookmark = (index) => {
+    setBookmarkedSections(prev => {
+      const next = new Set(prev);
+      next.has(index) ? next.delete(index) : next.add(index);
+      return next;
+    });
+  };
+
+  const getFontFamilyClass = () => {
+    switch(fontFamily) {
+      case 'serif': return 'font-serif';
+      case 'mono': return 'font-mono';
+      case 'sans': return 'font-sans';
+      default: return '';
+    }
+  };
+
+  const extractTextContent = (html) => {
+    if (!html) return '';
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    return temp.textContent || temp.innerText || '';
+  };
+
+  const handleEditClick = () => {
+    const handleAuth = (token) => {
+      onClose();
+      navigate(`/bim/edit/${encodeURIComponent(item.id)}`);
+    };
+    
+    const promptEvent = new CustomEvent('showPasswordPrompt', { 
+      detail: { 
+        action: 'edit this entry', 
+        callback: handleAuth 
+      } 
+    });
+    window.dispatchEvent(promptEvent);
+  };
+
+  const performSearch = (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setCurrentSearchIndex(0);
+      const content = contentRef.current;
+      if (content) {
+        const highlighted = content.querySelectorAll('.search-highlight');
+        highlighted.forEach(el => {
+          const parent = el.parentNode;
+          if (parent) {
+            parent.replaceChild(document.createTextNode(el.textContent), el);
+            parent.normalize();
+          }
+        });
+      }
+      return;
+    }
+
+    const content = contentRef.current;
+    if (!content) return;
+
+    // Remove old highlights
+    const oldHighlights = content.querySelectorAll('.search-highlight');
+    oldHighlights.forEach(el => {
+      const parent = el.parentNode;
+      if (parent) {
+        parent.replaceChild(document.createTextNode(el.textContent), el);
+        parent.normalize();
+      }
+    });
+
+    // Find all text nodes
+    const walker = document.createTreeWalker(
+      content,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: function(node) {
+          // Skip script and style elements
+          if (node.parentElement && 
+              (node.parentElement.tagName === 'SCRIPT' || 
+               node.parentElement.tagName === 'STYLE')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      },
+      false
+    );
+
+    const nodesToHighlight = [];
+    let node;
+    while (node = walker.nextNode()) {
+      const text = node.textContent;
+      if (!text || !text.trim()) continue;
+      
+      const lowerText = text.toLowerCase();
+      const lowerQuery = query.toLowerCase();
+      let index = lowerText.indexOf(lowerQuery);
+      
+      if (index !== -1) {
+        const indices = [];
+        while (index !== -1) {
+          indices.push(index);
+          index = lowerText.indexOf(lowerQuery, index + 1);
+        }
+        if (indices.length > 0) {
+          nodesToHighlight.push({ node, indices });
+        }
+      }
+    }
+
+    // Highlight matches
+    const allHighlights = [];
+    nodesToHighlight.forEach(({ node, indices }) => {
+      const text = node.textContent;
+      const parent = node.parentNode;
+      if (!parent) return;
+      
+      const fragment = document.createDocumentFragment();
+      let lastIndex = 0;
+
+      indices.forEach(index => {
+        // Add text before match
+        if (index > lastIndex) {
+          fragment.appendChild(document.createTextNode(text.substring(lastIndex, index)));
+        }
+        
+        // Add highlighted match
+        const mark = document.createElement('mark');
+        mark.className = 'search-highlight';
+        mark.setAttribute('data-search-index', String(allHighlights.length));
+        mark.textContent = text.substring(index, index + query.length);
+        fragment.appendChild(mark);
+        allHighlights.push(mark);
+        
+        lastIndex = index + query.length;
+      });
+
+      // Add remaining text
+      if (lastIndex < text.length) {
+        fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+      }
+
+      parent.replaceChild(fragment, node);
+    });
+
+    setSearchResults(allHighlights);
+    setCurrentSearchIndex(0);
+    
+    if (allHighlights.length > 0) {
+      // Wait for DOM to update
+      setTimeout(() => {
+        scrollToResult(0);
+      }, 100);
+    }
+  };
+
+  const scrollToResult = (index) => {
+    const highlights = contentRef.current?.querySelectorAll('.search-highlight');
+    if (!highlights || highlights.length === 0) return;
+    
+    if (index < 0 || index >= highlights.length) return;
+    
+    // Update all highlight styles
+    highlights.forEach((h, i) => {
+      if (i === index) {
+        h.style.backgroundColor = '#3b82f6';
+        h.style.color = 'white';
+        h.style.fontWeight = 'bold';
+        h.style.padding = '2px 4px';
+      } else {
+        h.style.backgroundColor = '#fbbf24';
+        h.style.color = 'black';
+        h.style.fontWeight = 'normal';
+        h.style.padding = '2px 0';
+      }
+    });
+    
+    // Scroll to current highlight
+    const currentHighlight = highlights[index];
+    if (currentHighlight) {
+      currentHighlight.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center',
+        inline: 'nearest'
+      });
+    }
+  };
+
+  const handleSearchNext = () => {
+    if (searchResults.length === 0) return;
+    const nextIndex = (currentSearchIndex + 1) % searchResults.length;
+    setCurrentSearchIndex(nextIndex);
+    scrollToResult(nextIndex);
+  };
+
+  const handleSearchPrev = () => {
+    if (searchResults.length === 0) return;
+    const prevIndex = currentSearchIndex === 0 ? searchResults.length - 1 : currentSearchIndex - 1;
+    setCurrentSearchIndex(prevIndex);
+    scrollToResult(prevIndex);
+  };
+
+  useEffect(() => {
+    if (searchQuery) {
+      const debounce = setTimeout(() => {
+        performSearch(searchQuery);
+      }, 300);
+      return () => clearTimeout(debounce);
+    } else {
+      performSearch("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
+  const handleMinimize = () => {
+    setIsMinimized(true);
+    onMinimize(windowId, displayTitle);
+  };
+
+  const handleRestore = () => {
+    setIsMinimized(false);
+  };
+
+  useEffect(() => {
+    const handleRestoreEvent = (event) => {
+      if (event.detail && event.detail.windowId === windowId) {
+        handleRestore();
+      }
+    };
+    
+    window.addEventListener('restoreWindow', handleRestoreEvent);
+    return () => window.removeEventListener('restoreWindow', handleRestoreEvent);
+  }, [windowId]);
+
+  const handleDownload = async (format) => {
+    setDownloading(true);
+    try {
+      const filename = displayTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      
+      if (format === 'txt') {
+        downloadAsText(filename);
+      } else if (format === 'html') {
+        downloadAsHTML(filename);
+      } else if (format === 'md') {
+        downloadAsMarkdown(filename);
+      } else if (format === 'pdf') {
+        await downloadAsPDF(filename);
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Download failed: ' + error.message);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const downloadAsText = (filename) => {
+    let content = `${displayTitle}\n${'='.repeat(displayTitle.length)}\n\n`;
+    
+    groupedBlocks.forEach((block) => {
+      if (block?.type === "h1" || block?.type === "h2") {
+        const text = extractTextContent(block.value);
+        content += `\n${text}\n${'-'.repeat(text.length)}\n\n`;
+      } else if (block?.type === "text") {
+        const text = extractTextContent(block.value);
+        content += text + '\n\n';
+      } else if (block?.type === "code") {
+        content += '```\n' + (block.value || '') + '\n```\n\n';
+      } else if (block?.type === "image") {
+        content += `[Image: ${block.value}]\n\n`;
+      } else if (block?.type === "image-group") {
+        content += `[Image Gallery: ${block.images.length} images]\n\n`;
+      }
+    });
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAsHTML = (filename) => {
+    let htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${displayTitle}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.7;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      color: #1e293b;
+      background: white;
+    }
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 1.5rem;
+      color: #0f172a;
+      border-bottom: 3px solid #3b82f6;
+      padding-bottom: 15px;
+    }
+    h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-top: 2.5rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #3b82f6;
+      color: #1e293b;
+    }
+    p { margin: 1rem 0; line-height: 1.7; }
+    ul, ol { margin: 1rem 0; padding-left: 2.5rem; }
+    code {
+      background-color: rgba(135,131,120,.15);
+      color: #eb5757;
+      border-radius: 4px;
+      font-size: 90%;
+      padding: 0.2em 0.4em;
+    }
+    pre {
+      background-color: #1e293b;
+      color: #10b981;
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 0.5rem;
+      margin: 1.5rem 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>${displayTitle}</h1>
+`;
+
+    groupedBlocks.forEach((block) => {
+      if (block?.type === "h1") {
+      } else if (block?.type === "h2") {
+        htmlContent += `  <h2>${block.value}</h2>\n`;
+      } else if (block?.type === "text") {
+        htmlContent += `  <div>${block.value}</div>\n`;
+      } else if (block?.type === "code") {
+        const escaped = (block.value || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        htmlContent += `  <pre><code>${escaped}</code></pre>\n`;
+      } else if (block?.type === "image") {
+        htmlContent += `  <img src="${block.value}" alt="Content image" />\n`;
+      } else if (block?.type === "image-group") {
+        block.images.forEach(img => {
+          htmlContent += `  <img src="${img.value}" alt="Content image" />\n`;
+        });
+      }
+    });
+
+    htmlContent += `</body>\n</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAsMarkdown = (filename) => {
+    let content = `# ${displayTitle}\n\n`;
+    
+    groupedBlocks.forEach((block) => {
+      if (block?.type === "h1") {
+      } else if (block?.type === "h2") {
+        const text = extractTextContent(block.value);
+        content += `## ${text}\n\n`;
+      } else if (block?.type === "text") {
+        const text = extractTextContent(block.value);
+        content += text + '\n\n';
+      } else if (block?.type === "code") {
+        const lang = block.language || 'javascript';
+        content += `\`\`\`${lang}\n${block.value || ''}\n\`\`\`\n\n`;
+      } else if (block?.type === "image") {
+        content += `![Image](${block.value})\n\n`;
+      } else if (block?.type === "image-group") {
+        block.images.forEach(img => {
+          content += `![Image](${img.value})\n`;
+        });
+        content += '\n';
+      }
+    });
+
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadAsPDF = async (filename) => {
+    const loadingDiv = document.createElement('div');
+    loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); color: white; padding: 20px 40px; border-radius: 10px; z-index: 10000; font-size: 16px; font-weight: bold;';
+    loadingDiv.textContent = '📄 Generating PDF... Please wait';
+    document.body.appendChild(loadingDiv);
+
+    try {
+      const doc = await generatePDF(displayTitle, groupedBlocks, fontSize);
+      doc.save(`${filename}.pdf`);
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Failed to generate PDF: ' + error.message);
+      throw error;
+    } finally {
+      if (document.body.contains(loadingDiv)) {
+        document.body.removeChild(loadingDiv);
+      }
+    }
+  };
+
+  const getCodeTheme = () => {
+    switch(studyMode) {
+      case 'light':
+        return {
+          bg: '#f8f9fa',
+          border: '#e9ecef',
+          text: '#212529'
+        };
+      case 'sepia':
+        return {
+          bg: '#f5f1e8',
+          border: '#d4c5a9',
+          text: '#5c4a3a'
+        };
+      case 'blue':
+        return {
+          bg: '#eff6ff',
+          border: '#dbeafe',
+          text: '#1e40af'
+        };
+      case 'green':
+        return {
+          bg: '#f0fdf4',
+          border: '#dcfce7',
+          text: '#166534'
+        };
+      case 'amber':
+        return {
+          bg: '#fffbeb',
+          border: '#fef3c7',
+          text: '#92400e'
+        };
+      case 'purple':
+        return {
+          bg: '#faf5ff',
+          border: '#f3e8ff',
+          text: '#6b21a8'
+        };
+      default:
+        return {
+          bg: '#1e293b',
+          border: '#334155',
+          text: '#10b981'
+        };
+    }
+  };
+
+  if (isMinimized) {
+    return null;
+  }
+
+  return (
+    <>
+      {fullScreenImages && (
+        <FullScreenImageViewer images={fullScreenImages} initialIndex={fullScreenIndex} onClose={closeFullScreen} />
+      )}
+
+      <div
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-hidden transition-all duration-300`}
+        onClick={onClose}
+      >
+        <div
+          className={`rounded-2xl shadow-2xl flex flex-col overflow-hidden bg-white transition-all duration-300 ${
+            windowMode === 'maximized' 
+              ? 'w-full h-full max-w-none max-h-none rounded-none' 
+              : 'max-w-4xl w-full max-h-[90vh]'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-4 flex items-center justify-between z-10">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              {item.locked && (
+                <div className="flex-shrink-0 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                  <Lock size={16} />
+                  <span className="text-xs font-bold">LOCKED</span>
+                </div>
+              )}
+              <h1 className="text-3xl font-bold truncate">{displayTitle}</h1>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {showSearch ? (
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">
+                  <Search size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search in content..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-transparent border-none outline-none text-white placeholder-white/60 w-48"
+                    autoFocus
+                  />
+                  {searchResults.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-white/80">
+                        {currentSearchIndex + 1}/{searchResults.length}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleSearchPrev}
+                        className="p-1 hover:bg-white/20 rounded"
+                        title="Previous"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSearchNext}
+                        className="p-1 hover:bg-white/20 rounded"
+                        title="Next"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSearch(false);
+                      setSearchQuery("");
+                    }}
+                    className="p-1 hover:bg-white/20 rounded"
+                    title="Close search"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowSearch(true)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                  title="Search in content"
+                >
+                  <Search size={20} />
+                </button>
+              )}
+              
+              <button
+                type="button"
+                onClick={handleMinimize}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                title="Minimize"
+              >
+                <Minus size={20} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setWindowMode(windowMode === 'maximized' ? 'normal' : 'maximized')}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                title={windowMode === 'maximized' ? 'Restore' : 'Maximize'}
+              >
+                {windowMode === 'maximized' ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="14" height="14" rx="2" />
+                    <path d="M7 21h10a2 2 0 0 0 2-2V9" />
+                  </svg>
+                ) : (
+                  <Maximize2 size={20} />
+                )}
+              </button>
+              
+              {!item.locked && (
+                <button
+                  type="button"
+                  onClick={handleEditClick}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-1.5"
+                  title="Edit entry"
+                >
+                  <Edit size={20} />
+                  <span className="text-sm font-semibold">Edit</span>
+                </button>
+              )}
+              <DownloadDropdown onDownload={handleDownload} />
+              <StudyModeDropdown studyMode={studyMode} onStudyModeChange={setStudyMode} />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReadingPanel(!showReadingPanel);
+                }}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                title="Reading Settings"
+              >
+                <Type size={20} />
+              </button>
+              
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                title="Close"
+                aria-label="Close"
+              >
+                <X size={24} />
+              </button>
+            </div>
+          </div>
+
+          {showReadingPanel && (
+            <div className="flex-shrink-0 px-6 py-4 border-b bg-slate-50 border-slate-200">
+              <h3 className="text-sm font-bold mb-3 text-slate-700">
+                📖 Reading Settings
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold block mb-1 text-slate-600">
+                    Font Size: {fontSize}px
+                  </label>
+                  <input
+                    type="range"
+                    min="14"
+                    max="28"
+                    value={fontSize}
+                    onChange={(e) => setFontSize(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold block mb-1 text-slate-600">
+                    Font Family
+                  </label>
+                  <select
+                    value={fontFamily}
+                    onChange={(e) => setFontFamily(e.target.value)}
+                    className="w-full px-2 py-1 rounded text-sm bg-white text-slate-800 border border-slate-200"
+                  >
+                    <option value="default">Default</option>
+                    <option value="serif">Serif</option>
+                    <option value="sans">Sans-serif</option>
+                    <option value="mono">Monospace</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReadingMode(!readingMode)}
+                  className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
+                    readingMode 
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  {readingMode ? "Exit" : "Enable"} Focus Mode
+                </button>
+              </div>
+            </div>
+          )}
+
+          <style>{`
+            .rich-text-content {
+              color: inherit;
+            }
+            
+            .rich-text-content * {
+              background-color: transparent !important;
+              background-image: none !important;
+            }
+            
+            .rich-text-content strong,
+            .rich-text-content b {
+              font-weight: 700;
+            }
+
+            .rich-text-content em,
+            .rich-text-content i {
+              font-style: italic;
+            }
+
+            .rich-text-content u {
+              text-decoration: underline;
+            }
+
+            .rich-text-content ul,
+            .rich-text-content ol {
+              margin: 1rem 0;
+              padding-left: 2.5rem;
+            }
+
+            .rich-text-content ul {
+              list-style-type: disc;
+            }
+
+            .rich-text-content ol {
+              list-style-type: decimal;
+            }
+
+            .rich-text-content li {
+              margin: 0.5rem 0;
+              padding-left: 0.5rem;
+              line-height: 1.6;
+            }
+
+            .rich-text-content p {
+              margin: 0.75rem 0;
+              line-height: inherit;
+            }
+
+            .rich-text-content code {
+              background-color: rgba(135,131,120,.15) !important;
+              color: #eb5757 !important;
+              border-radius: 4px;
+              font-size: 90%;
+              padding: 0.2em 0.4em;
+            }
+
+            .rich-text-content a {
+              text-decoration: underline;
+            }
+
+            .search-highlight {
+              background-color: #fbbf24 !important;
+              color: black !important;
+              padding: 2px 0;
+              border-radius: 3px;
+              transition: all 0.2s ease;
+              font-weight: normal;
+              display: inline;
+            }
+            
+            .search-highlight[style*="background-color: rgb(59, 130, 246)"] {
+              box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+              font-weight: bold !important;
+            }
+
+            .study-mode-light {
+              background-color: #ffffff !important;
+            }
+            
+            .study-mode-light .rich-text-content > *:not([style*="color"]) {
+              color: #1e293b !important;
+            }
+
+            .study-mode-sepia {
+              background-color: #f5f1e8 !important;
+            }
+            
+            .study-mode-sepia .rich-text-content > *:not([style*="color"]) {
+              color: #5c4a3a !important;
+            }
+
+            .study-mode-blue {
+              background-color: #eff6ff !important;
+            }
+            
+            .study-mode-blue .rich-text-content > *:not([style*="color"]) {
+              color: #1e3a8a !important;
+            }
+
+            .study-mode-green {
+              background-color: #f0fdf4 !important;
+            }
+            
+            .study-mode-green .rich-text-content > *:not([style*="color"]) {
+              color: #14532d !important;
+            }
+
+            .study-mode-amber {
+              background-color: #fffbeb !important;
+            }
+            
+            .study-mode-amber .rich-text-content > *:not([style*="color"]) {
+              color: #78350f !important;
+            }
+
+            .study-mode-purple {
+              background-color: #faf5ff !important;
+            }
+            
+            .study-mode-purple .rich-text-content > *:not([style*="color"]) {
+              color: #581c87 !important;
+            }
+
+            .study-mode-sepia h1,
+            .study-mode-sepia h2 {
+              color: #3c2f23 !important;
+            }
+
+            .study-mode-light h1,
+            .study-mode-light h2 {
+              color: #0f172a !important;
+            }
+
+            .study-mode-blue h1,
+            .study-mode-blue h2 {
+              color: #1e3a8a !important;
+            }
+
+            .study-mode-green h1,
+            .study-mode-green h2 {
+              color: #14532d !important;
+            }
+
+            .study-mode-amber h1,
+            .study-mode-amber h2 {
+              color: #78350f !important;
+            }
+
+            .study-mode-purple h1,
+            .study-mode-purple h2 {
+              color: #581c87 !important;
+            }
+
+            .study-mode-light .rich-text-content a:not([style*="color"]) {
+              color: #2563eb !important;
+            }
+
+            .study-mode-sepia .rich-text-content a:not([style*="color"]) {
+              color: #b45309 !important;
+            }
+
+            .study-mode-blue .rich-text-content a:not([style*="color"]) {
+              color: #1d4ed8 !important;
+            }
+
+            .study-mode-green .rich-text-content a:not([style*="color"]) {
+              color: #15803d !important;
+            }
+
+            .study-mode-amber .rich-text-content a:not([style*="color"]) {
+              color: #b45309 !important;
+            }
+
+            .study-mode-purple .rich-text-content a:not([style*="color"]) {
+              color: #7c3aed !important;
+            }
+
+            .reading-content-container {
+              scroll-behavior: smooth;
+            }
+            
+            .reading-content-container::-webkit-scrollbar {
+              width: 12px;
+            }
+            
+            .reading-content-container::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            
+            .reading-content-container::-webkit-scrollbar-thumb {
+              background: rgba(100, 116, 139, 0.3);
+              border-radius: 6px;
+            }
+            
+            .reading-content-container::-webkit-scrollbar-thumb:hover {
+              background: rgba(100, 116, 139, 0.5);
+            }
+          `}</style>
+
+          <div
+            ref={contentRef}
+            className={`flex-1 overflow-y-auto overflow-x-hidden p-8 pb-24 reading-content-container study-mode-${studyMode} ${readingMode ? "max-w-3xl mx-auto" : ""} ${getFontFamilyClass()}`}
+            style={{
+              fontSize: `${fontSize}px`,
+              lineHeight: 1.7,
+            }}
+          >
+            <div className="max-w-none space-y-6">
+              {groupedBlocks.length ? (
+                groupedBlocks.map((block, idx) => {
+                  if (block?.type === "h1") return null;
+
+                  if (block?.type === "h2") {
+                    return (
+                      <div key={`h2-${idx}`} className="relative group">
+                        {bookmarkedSections.has(idx) && (
+                          <Bookmark size={20} className="absolute -left-8 top-1 text-amber-500 fill-amber-500" />
+                        )}
+                        <h2 className="text-3xl font-extrabold mb-3 mt-4 pb-2 border-b-2 border-blue-400">
+                          {renderHTMLContent(block.value, "")}
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={() => toggleBookmark(idx)}
+                          className="absolute -right-8 top-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Bookmark section"
+                        >
+                          <Bookmark size={18} className={bookmarkedSections.has(idx) ? "fill-amber-500 text-amber-500" : "text-slate-400"} />
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (block?.type === "text") {
+                    return (
+                      <div key={`p-${idx}`} className="leading-relaxed">
+                        {renderHTMLContent(block.value, "")}
+                      </div>
+                    );
+                  }
+
+                  if (block?.type === "image-group") {
+                    return (
+                      <div key={`ig-${idx}`} className="my-6">
+                        <ImageCarousel
+                          images={block.images}
+                          isPreview={false}
+                          onFullScreen={(index) => openFullScreen(block.images, index)}
+                          studyMode={studyMode}
+                        />
+                      </div>
+                    );
+                  }
+
+                  if (block?.type === "image") {
+                    return (
+                      <div
+                        key={`im-${idx}`}
+                        className="my-6 relative group cursor-pointer"
+                        onDoubleClick={() => openFullScreen([block], 0)}
+                      >
+                        <div className={`rounded-lg border overflow-hidden ${
+                          studyMode === 'light' ? 'border-slate-200 bg-slate-50' :
+                          studyMode === 'sepia' ? 'border-amber-200 bg-amber-50' :
+                          studyMode === 'blue' ? 'border-blue-300 bg-blue-50' :
+                          studyMode === 'green' ? 'border-green-300 bg-green-50' :
+                          studyMode === 'amber' ? 'border-amber-300 bg-amber-100' :
+                          'border-purple-300 bg-purple-50'
+                        }`}>
+                          <img
+                            src={block.value}
+                            alt=""
+                            className="w-full h-auto max-h-[600px] object-contain mx-auto"
+                            loading="lazy"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openFullScreen([block], 0)}
+                          className="absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                          title="View full screen"
+                        >
+                          <Maximize2 size={20} />
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (block?.type === "code") {
+                    const isExpanded = expandedCodeBlocks.has(idx);
+                    const lines = String(block.value || "").split("\n");
+                    const hasMore = lines.length > 10;
+                    const codeTheme = getCodeTheme();
+
+                    return (
+                      <div key={`cd-${idx}`} className="my-6">
+                        <div className="relative group/code">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyCode(block.value, idx);
+                            }}
+                            className={`absolute top-3 right-3 z-10 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all opacity-0 group-hover/code:opacity-100 ${
+                              copiedCodeIndex === idx ? "bg-green-500 text-white" : "bg-slate-700 text-white hover:bg-slate-600"
+                            }`}
+                            title="Copy code"
+                          >
+                            <span className="inline-flex items-center gap-1.5">
+                              {copiedCodeIndex === idx ? (
+                                <>
+                                  <Check size={14} /> Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  Copy
+                                </>
+                              )}
+                            </span>
+                          </button>
+
+                          <pre 
+                            className="rounded-lg p-6 overflow-x-auto overflow-y-auto border-2"
+                            style={{ 
+                              maxHeight: isExpanded ? 'none' : '400px',
+                              fontFamily: '"Fira Code", "Cascadia Code", "JetBrains Mono", Consolas, Monaco, "Courier New", monospace',
+                              fontSize: '14px',
+                              lineHeight: '1.6',
+                              tabSize: 4,
+                              backgroundColor: codeTheme.bg,
+                              borderColor: codeTheme.border,
+                              color: codeTheme.text
+                            }}
+                          >
+                            <code style={{ color: codeTheme.text }}>{block.value || ""}</code>
+                          </pre>
+
+                          {hasMore && (
+                            <div className="mt-3 flex justify-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCodeExpansion(idx);
+                                }}
+                                className={`px-5 py-2.5 rounded-lg transition-all text-sm font-bold flex items-center gap-2 shadow-lg ${
+                                  studyMode === 'light' || studyMode === 'sepia'
+                                    ? 'bg-white text-slate-900 hover:bg-slate-50 border-2 border-slate-300 hover:border-slate-400'
+                                    : 'bg-slate-800 text-slate-100 hover:bg-slate-700 border-2 border-slate-600'
+                                }`}
+                              >
+                                {isExpanded ? (
+                                  <>
+                                    <ChevronLeft size={18} />
+                                    <span>Show Less</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Maximize2 size={18} />
+                                    <span>View Full Code ({lines.length} lines)</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })
+              ) : (
+                <p className="text-center py-8 text-slate-500">No content available</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex-shrink-0 px-6 py-4 border-t bg-slate-50 border-slate-200 flex items-center justify-between">
+            <span className="text-sm">
+              {downloading && (
+                <span className="flex items-center gap-2 text-slate-600">
+                  <RefreshCcw size={16} className="animate-spin" />
+                  Downloading...
+                </span>
+              )}
+            </span>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 rounded-lg font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
